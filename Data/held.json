@@ -1,6 +1,12 @@
 {
 	"lauftempo_m_pro_s": 5.5,
 	"sprunghoehe_m": 1.0,
+	"schwerkraft_faktor": 1.6,
 	"luftkontrolle_0_bis_1": 0.55,
-	"maus_faktor": 1.0
+	"maus_faktor": 1.0,
+	"dash_tempo_bonus_m_pro_s": 6.0,
+	"dash_hopser_m_pro_s": 3.0,
+	"dash_abklingzeit_s": 1.0,
+	"tempo_kette_fenster_s": 0.12,
+	"hoechsttempo_m_pro_s": 22.0
 }

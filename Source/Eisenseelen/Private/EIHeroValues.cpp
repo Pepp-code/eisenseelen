@@ -1,48 +1,30 @@
 #include "EIHeroValues.h"
 
 #include "Dom/JsonObject.h"
-#include "Misc/FileHelper.h"
-#include "Misc/Paths.h"
-#include "Serialization/JsonReader.h"
-#include "Serialization/JsonSerializer.h"
+#include "EIDataFile.h"
 
-FString FEIHeroValues::GetProjectFilePath()
+namespace
 {
-	return FPaths::Combine(FPaths::ProjectDir(), TEXT("Data/held.json"));
+	bool ReadValues(const FJsonObject& Root, FEIHeroValues& OutValues, FString& OutError)
+	{
+		return FEIDataFile::ReadNumber(Root, TEXT("lauftempo_m_pro_s"), 1.0, 30.0, OutValues.RunSpeedMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("sprunghoehe_m"), 0.2, 10.0, OutValues.JumpHeightMeters, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("schwerkraft_faktor"), 0.2, 5.0, OutValues.GravityFactor, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("luftkontrolle_0_bis_1"), 0.0, 1.0, OutValues.AirControl, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("maus_faktor"), 0.1, 5.0, OutValues.MouseFactor, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("dash_tempo_bonus_m_pro_s"), 0.0, 30.0, OutValues.DashSpeedBonusMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("dash_hopser_m_pro_s"), 0.0, 20.0, OutValues.DashHopMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("dash_abklingzeit_s"), 0.0, 30.0, OutValues.DashCooldownSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("tempo_kette_fenster_s"), 0.0, 1.0, OutValues.SpeedChainWindowSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("hoechsttempo_m_pro_s"), 1.0, 100.0, OutValues.MaxSpeedMetersPerSecond, OutError);
+	}
 }
 
 bool FEIHeroValues::LoadFromString(const FString& Json, FEIHeroValues& OutValues, FString& OutError)
 {
-	TSharedPtr<FJsonObject> Root;
-	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Json);
-	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
-	{
-		OutError = FString::Printf(TEXT("Die Datei ist kein gueltiges JSON (Zeile %d)."), Reader->GetLineNumber());
-		return false;
-	}
-
-	const auto ReadNumber = [&Root, &OutError](const TCHAR* Key, double Min, double Max, float& OutNumber)
-	{
-		double Number = 0.0;
-		if (!Root->TryGetNumberField(Key, Number))
-		{
-			OutError = FString::Printf(TEXT("Der Wert %s fehlt oder ist keine Zahl."), Key);
-			return false;
-		}
-		if (Number < Min || Number > Max)
-		{
-			OutError = FString::Printf(TEXT("Der Wert %s muss zwischen %g und %g liegen, ist aber %g."), Key, Min, Max, Number);
-			return false;
-		}
-		OutNumber = static_cast<float>(Number);
-		return true;
-	};
-
+	const TSharedPtr<FJsonObject> Root = FEIDataFile::Parse(Json, OutError);
 	FEIHeroValues Loaded;
-	if (!ReadNumber(TEXT("lauftempo_m_pro_s"), 1.0, 30.0, Loaded.RunSpeedMetersPerSecond)
-		|| !ReadNumber(TEXT("sprunghoehe_m"), 0.2, 10.0, Loaded.JumpHeightMeters)
-		|| !ReadNumber(TEXT("luftkontrolle_0_bis_1"), 0.0, 1.0, Loaded.AirControl)
-		|| !ReadNumber(TEXT("maus_faktor"), 0.1, 5.0, Loaded.MouseFactor))
+	if (!Root.IsValid() || !ReadValues(*Root, Loaded, OutError))
 	{
 		return false;
 	}
@@ -52,11 +34,12 @@ bool FEIHeroValues::LoadFromString(const FString& Json, FEIHeroValues& OutValues
 
 bool FEIHeroValues::LoadFromProjectFile(FEIHeroValues& OutValues, FString& OutError)
 {
-	FString Json;
-	if (!FFileHelper::LoadFileToString(Json, *GetProjectFilePath()))
+	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("held.json"), OutError);
+	FEIHeroValues Loaded;
+	if (!Root.IsValid() || !ReadValues(*Root, Loaded, OutError))
 	{
-		OutError = FString::Printf(TEXT("Die Datei %s fehlt."), *GetProjectFilePath());
 		return false;
 	}
-	return LoadFromString(Json, OutValues, OutError);
+	OutValues = Loaded;
+	return true;
 }

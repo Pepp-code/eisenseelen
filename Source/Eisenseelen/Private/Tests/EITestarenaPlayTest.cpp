@@ -93,6 +93,7 @@ public:
 
 		case EStep::Jump:
 			JumpPeakZ = FMath::Max(JumpPeakZ, Hero->GetActorLocation().Z);
+			AirSeconds = Now - StepAt;
 			if (Now - StepAt < HoldJumpSeconds)
 			{
 				return false;
@@ -127,6 +128,7 @@ private:
 		Test->TestTrue(TEXT("Data/held.json loads"), FEIHeroValues::LoadFromProjectFile(FromFile, Error));
 		Test->TestEqual(TEXT("The hero plays with the run speed from the file"), Hero->GetValues().RunSpeedMetersPerSecond, FromFile.RunSpeedMetersPerSecond);
 		Test->TestEqual(TEXT("The hero plays with the jump height from the file"), Hero->GetValues().JumpHeightMeters, FromFile.JumpHeightMeters);
+		Test->TestEqual(TEXT("The hero plays with the gravity from the file"), Hero->GetCharacterMovement()->GravityScale, FromFile.GravityFactor);
 
 		Player->RotationInput = FRotator::ZeroRotator;
 		Player->ApplyLookInput(FVector2D(1.0, 0.0));
@@ -152,6 +154,11 @@ private:
 		const float Expected = Hero->GetValues().JumpHeightMeters * CentimetersPerMeter;
 		Test->AddInfo(FString::Printf(TEXT("The space bar jumps %.0f cm, expected %.0f"), Height, Expected));
 		Test->TestNearlyEqual(TEXT("The space bar reaches the jump height"), Height, Expected, Expected * 0.1f);
+
+		const float Gravity = FMath::Abs(Hero->GetCharacterMovement()->GetGravityZ());
+		const float ExpectedAirSeconds = 2.0f * FMath::Sqrt(2.0f * Expected / Gravity);
+		Test->AddInfo(FString::Printf(TEXT("The jump stays in the air %.2f s, expected %.2f (%.0f cm)"), AirSeconds, ExpectedAirSeconds, Height));
+		Test->TestNearlyEqual(TEXT("Gravity sets the air time"), static_cast<float>(AirSeconds), ExpectedAirSeconds, ExpectedAirSeconds * 0.15f);
 	}
 
 	FAutomationTestBase* Test;
@@ -160,6 +167,7 @@ private:
 	double StepAt = 0.0;
 	double JumpStartZ = 0.0;
 	double JumpPeakZ = 0.0;
+	double AirSeconds = 0.0;
 	bool bJumpReleased = false;
 };
 

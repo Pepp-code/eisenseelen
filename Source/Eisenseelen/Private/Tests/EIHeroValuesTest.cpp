@@ -16,7 +16,8 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 	{
 		return FEIHeroValues::LoadFromString(Json, OutValues, OutError);
 	};
-	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprunghoehe_m\": 3, \"luftkontrolle_0_bis_1\": 0.25, \"maus_faktor\": 2}");
+	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprunghoehe_m\": 3, \"schwerkraft_faktor\": 2, \"luftkontrolle_0_bis_1\": 0.25, \"maus_faktor\": 2, ")
+		TEXT("\"dash_tempo_bonus_m_pro_s\": 5, \"dash_hopser_m_pro_s\": 2, \"dash_abklingzeit_s\": 1.5, \"tempo_kette_fenster_s\": 0.2, \"hoechsttempo_m_pro_s\": 20}");
 
 	FEIHeroValues Values;
 	FString Error;
@@ -25,6 +26,10 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Jump height"), Values.JumpHeightMeters, 3.0f);
 	TestEqual(TEXT("Air control"), Values.AirControl, 0.25f);
 	TestEqual(TEXT("Mouse factor"), Values.MouseFactor, 2.0f);
+	TestEqual(TEXT("Gravity"), Values.GravityFactor, 2.0f);
+	TestEqual(TEXT("Dash bonus"), Values.DashSpeedBonusMetersPerSecond, 5.0f);
+	TestEqual(TEXT("Dash cooldown"), Values.DashCooldownSeconds, 1.5f);
+	TestEqual(TEXT("Max speed"), Values.MaxSpeedMetersPerSecond, 20.0f);
 
 	FEIHeroValues Untouched;
 	TestFalse(TEXT("Broken JSON is refused"), Parse(TEXT("{ lauftempo"), Untouched, Error));

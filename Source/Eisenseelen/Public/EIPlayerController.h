@@ -26,6 +26,7 @@ private:
 	void HandleLook(const FInputActionValue& Value);
 	void HandleJumpStarted();
 	void HandleJumpEnded();
+	void HandleDash();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> Mapping;
@@ -38,4 +39,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> JumpAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> DashAction;
 };

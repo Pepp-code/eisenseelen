@@ -12,5 +12,8 @@
 		"breite_m": 4,
 		"tiefe_m": 4,
 		"hoehen_m": [0.5, 1.0, 1.5, 2.0]
-	}
+	},
+	"sprungfelder": [
+		{ "x_m": 10, "y_m": -12, "turm_hoehe_m": 5 }
+	]
 }

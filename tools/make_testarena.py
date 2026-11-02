@@ -11,17 +11,8 @@ import os
 import unreal
 
 MAP_PATH = "/Game/Maps/L_Testarena"
-MATERIAL_FOLDER = "/Game/Materials"
-MATERIAL_NAME = "M_Schachbrett"
-MATERIAL_PATH = f"{MATERIAL_FOLDER}/{MATERIAL_NAME}"
+MATERIAL_PATH = "/Game/Materials/M_Schachbrett"
 CUBE_MESH = "/Engine/BasicShapes/Cube.Cube"
-
-CHECKER_CELL_CM = 100
-# Surfaces lie on whole and half metres. This shift keeps them off the cell borders, where the pattern would flicker.
-CHECKER_SHIFT_CELLS = 0.13
-CHECKER_LIGHT = 0.42
-CHECKER_DARK = 0.30
-CHECKER_ROUGHNESS = 0.85
 
 CM_PER_M = 100
 PLANK_THICKNESS_M = 0.5
@@ -30,6 +21,8 @@ LABEL_HEIGHT_M = 3.8
 LABEL_SIZE_CM = 90
 # Just above the floor for a capsule with a half height of 88 cm.
 MARKER_HEIGHT_CM = 92
+TOWER_SIZE_M = 4
+TOWER_DISTANCE_M = 3.5
 
 
 def spawn(actors, actor_class, location=(0, 0, 0), rotation=(0, 0, 0), label=""):
@@ -38,58 +31,6 @@ def spawn(actors, actor_class, location=(0, 0, 0), rotation=(0, 0, 0), label="")
         raise RuntimeError(f"could not spawn {actor_class}")
     actor.set_actor_label(label or actor_class.__name__)
     return actor
-
-
-def make_checker_material():
-    """A checker fixed in the world: it does not stretch on scaled cubes, and its 1 m cells show size and speed."""
-    library = unreal.MaterialEditingLibrary
-    material_file = os.path.join(unreal.Paths.project_content_dir(), "Materials", f"{MATERIAL_NAME}.uasset")
-    if os.path.exists(material_file):
-        material = unreal.load_asset(MATERIAL_PATH)
-        library.delete_all_material_expressions(material)
-    else:
-        tools = unreal.AssetToolsHelpers.get_asset_tools()
-        material = tools.create_asset(MATERIAL_NAME, MATERIAL_FOLDER, unreal.Material, unreal.MaterialFactoryNew())
-    if material is None:
-        raise RuntimeError(f"could not create {MATERIAL_PATH}")
-
-    def node(expression_class, *inputs, **properties):
-        """Makes a material node. Inputs are (input name, source node) pairs."""
-        expression = library.create_material_expression(material, expression_class)
-        for key, value in properties.items():
-            expression.set_editor_property(key, value)
-        for input_name, source in inputs:
-            library.connect_material_expressions(source, "", expression, input_name)
-        return expression
-
-    def number(value):
-        return node(unreal.MaterialExpressionConstant, r=value)
-
-    def grey(value):
-        return node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(value, value, value, 1))
-
-    cells = node(
-        unreal.MaterialExpressionDivide,
-        ("A", node(unreal.MaterialExpressionWorldPosition)),
-        ("B", number(CHECKER_CELL_CM)),
-    )
-    shifted = node(unreal.MaterialExpressionAdd, ("A", cells), ("B", number(CHECKER_SHIFT_CELLS)))
-    whole_cells = node(unreal.MaterialExpressionFloor, ("", shifted))
-    # The sum of the cell numbers alternates between even and odd from one cell to the next, on every axis.
-    cell_sum = node(unreal.MaterialExpressionDotProduct, ("A", whole_cells), ("B", grey(1)))
-    positive_sum = node(unreal.MaterialExpressionAbs, ("", cell_sum))
-    is_odd = node(unreal.MaterialExpressionFmod, ("A", positive_sum), ("B", number(2)))
-    color = node(
-        unreal.MaterialExpressionLinearInterpolate,
-        ("A", grey(CHECKER_LIGHT)),
-        ("B", grey(CHECKER_DARK)),
-        ("Alpha", is_odd),
-    )
-    library.connect_material_property(color, "", unreal.MaterialProperty.MP_BASE_COLOR)
-    library.connect_material_property(number(CHECKER_ROUGHNESS), "", unreal.MaterialProperty.MP_ROUGHNESS)
-    library.recompile_material(material)
-    if not unreal.EditorAssetLibrary.save_asset(MATERIAL_PATH):
-        raise RuntimeError(f"could not save {MATERIAL_PATH}")
 
 
 def add_box(actors, label, center_m, size_m, rotation=(0, 0, 0)):
@@ -146,6 +87,17 @@ def add_jump_block(actors, blocks, height, front_x, y):
     add_course_marker(actors, "Klotz", front_x, y, height)
 
 
+def add_launch_pads(actors, pads):
+    """Launch pads, each with a tower that can be reached from it."""
+    pad_class = unreal.load_class(None, "/Script/Eisenseelen.EILaunchPad")
+    for pad in pads:
+        x, y, tower_height = pad["x_m"], pad["y_m"], pad["turm_hoehe_m"]
+        spawn(actors, pad_class, location=(x * CM_PER_M, y * CM_PER_M, 0), label="Sprungfeld")
+        tower_x = x + TOWER_DISTANCE_M
+        add_box(actors, "Turm", (tower_x, y, tower_height / 2), (TOWER_SIZE_M, TOWER_SIZE_M, tower_height))
+        add_label(actors, "Sprungfeld", x, y)
+
+
 def add_courses(actors, layout):
     """Lays all objects in one row in front of the start, ramps on the left and blocks on the right."""
     ramps = layout["rampen"]
@@ -166,7 +118,6 @@ def main():
     actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     with open(os.path.join(unreal.Paths.project_dir(), "Data", "testarena.json"), encoding="utf-8") as file:
         layout = json.load(file)
-    make_checker_material()
 
     # new_level refuses a map the editor already knows, so a rebuild empties the existing one instead.
     map_file = os.path.join(unreal.Paths.project_content_dir(), "Maps", "L_Testarena.umap")
@@ -182,6 +133,7 @@ def main():
     floor_size = layout["boden_m"]
     add_box(actors, "Boden", (0, 0, -0.5), (floor_size, floor_size, 1))
     add_courses(actors, layout)
+    add_launch_pads(actors, layout["sprungfelder"])
 
     sun = spawn(actors, unreal.DirectionalLight, location=(0, 0, 1000), rotation=(0, -50, 30), label="Sonne")
     sun.light_component.set_editor_property("atmosphere_sun_light", True)

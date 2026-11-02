@@ -1,6 +1,7 @@
 #include "EIPlayerController.h"
 
 #include "EIHeroCharacter.h"
+#include "EIHeroMovementComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -44,6 +45,7 @@ void AEIPlayerController::SetupInputComponent()
 	MoveAction = MakeAction(this, EInputActionValueType::Axis2D);
 	LookAction = MakeAction(this, EInputActionValueType::Axis2D);
 	JumpAction = MakeAction(this, EInputActionValueType::Boolean);
+	DashAction = MakeAction(this, EInputActionValueType::Boolean);
 
 	Mapping = NewObject<UInputMappingContext>(this);
 	MapMoveKey(Mapping, MoveAction, EKeys::W, true, false);
@@ -52,12 +54,14 @@ void AEIPlayerController::SetupInputComponent()
 	MapMoveKey(Mapping, MoveAction, EKeys::A, false, true);
 	Mapping->MapKey(LookAction, EKeys::Mouse2D);
 	Mapping->MapKey(JumpAction, EKeys::SpaceBar);
+	Mapping->MapKey(DashAction, EKeys::LeftShift);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AEIPlayerController::HandleMove);
 	Input->BindAction(LookAction, ETriggerEvent::Triggered, this, &AEIPlayerController::HandleLook);
 	Input->BindAction(JumpAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleJumpStarted);
 	Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandleJumpEnded);
+	Input->BindAction(DashAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleDash);
 
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 	Subsystem->AddMappingContext(Mapping, 0);
@@ -89,9 +93,9 @@ void AEIPlayerController::ApplyLookInput(const FVector2D& Input)
 
 void AEIPlayerController::HandleJumpStarted()
 {
-	if (ACharacter* Hero = GetCharacter())
+	if (AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
 	{
-		Hero->Jump();
+		Hero->PressJump();
 	}
 }
 
@@ -100,5 +104,13 @@ void AEIPlayerController::HandleJumpEnded()
 	if (ACharacter* Hero = GetCharacter())
 	{
 		Hero->StopJumping();
+	}
+}
+
+void AEIPlayerController::HandleDash()
+{
+	if (const AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
+	{
+		Hero->GetHeroMovement()->RequestDash();
 	}
 }

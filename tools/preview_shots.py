@@ -23,11 +23,14 @@ state = {"elapsed": 0.0, "next_view": 0, "shot_taken": False}
 def tick(delta_seconds):
     state["elapsed"] += delta_seconds
     index = state["next_view"]
-    if index >= len(VIEWS):
-        return
     due = SHADER_WAIT_SECONDS + index * SECONDS_BETWEEN_SHOTS
     world = unreal.find_object(None, WORLD_PATH)
     if world is None:
+        return
+    if index >= len(VIEWS):
+        # End the game from inside too, so it can never keep running when the starting script dies.
+        if state["elapsed"] >= due:
+            unreal.SystemLibrary.execute_console_command(world, "Quit")
         return
     if state["elapsed"] >= due - SECONDS_BETWEEN_SHOTS / 2 and not state["shot_taken"]:
         # Move first and shoot two seconds later, so the frame has settled.
