@@ -9,14 +9,18 @@
 
 namespace
 {
-	const FName RestPose(TEXT("ruhe"));
-
 	// The blade runs along the hand's forward axis. All sizes are centimetres.
 	constexpr float BladeLength = 110.0f;
 	constexpr float BladeStart = 6.0f;
 	const FLinearColor BladeColor(0.42f, 0.45f, 0.5f);
 	const FLinearColor GauntletColor(0.09f, 0.1f, 0.13f);
 	const FLinearColor GuardColor(0.3f, 0.22f, 0.06f);
+	const FLinearColor ShaftColor(0.12f, 0.07f, 0.03f);
+	const FLinearColor StaffHeadColor(1.0f, 0.38f, 0.06f);
+	constexpr float StaffHeadGlow = 5.0f;
+	constexpr float StaffLength = 120.0f;
+	constexpr float StaffBack = 35.0f;
+	constexpr float StaffHeadSize = 13.0f;
 
 	constexpr int32 MaxTrailSamples = 24;
 	constexpr float TrailLifeSeconds = 0.16f;
@@ -58,13 +62,20 @@ void UEIViewModelComponent::Build()
 
 	UStaticMesh* Cube = EIVisuals::GetCube();
 	// The hero is an empty suit of armour, so the gauntlet floats without an arm. It stays for every weapon.
-	AddPart(Hand, Cube, FVector(-4.0f, 0.0f, 0.0f), FVector(9.0f, 8.0f, 8.0f), GauntletColor);
+	AddPart(Hand, Cube, FVector(-3.0f, 0.0f, 0.0f), FVector(7.0f, 6.0f, 6.0f), GauntletColor);
 
 	SwordParts = NewObject<USceneComponent>(GetOwner());
 	SwordParts->SetupAttachment(Hand);
 	SwordParts->RegisterComponent();
 	AddPart(SwordParts, Cube, FVector(BladeStart + BladeLength / 2.0f, 0.0f, 0.0f), FVector(BladeLength, 2.0f, 7.0f), BladeColor);
 	AddPart(SwordParts, Cube, FVector(BladeStart - 1.0f, 0.0f, 0.0f), FVector(2.5f, 4.0f, 16.0f), GuardColor);
+
+	StaffParts = NewObject<USceneComponent>(GetOwner());
+	StaffParts->SetupAttachment(Hand);
+	StaffParts->RegisterComponent();
+	AddPart(StaffParts, Cube, FVector(StaffLength / 2.0f - StaffBack, 0.0f, 0.0f), FVector(StaffLength, 3.5f, 3.5f), ShaftColor);
+	AddPart(StaffParts, EIVisuals::GetSphere(), FVector(StaffLength - StaffBack + StaffHeadSize / 2.0f, 0.0f, 0.0f), FVector(StaffHeadSize), StaffHeadColor, StaffHeadGlow);
+	StaffParts->SetVisibility(false, true);
 
 	Trail = NewObject<UProceduralMeshComponent>(GetOwner());
 	Trail->SetupAttachment(this);
@@ -76,6 +87,15 @@ void UEIViewModelComponent::Build()
 
 	Hand->SetRelativeTransform(CurrentPose());
 	SetComponentTickEnabled(true);
+}
+
+void UEIViewModelComponent::ShowStaff(bool bStaff)
+{
+	SwordParts->SetVisibility(!bStaff, true);
+	StaffParts->SetVisibility(bStaff, true);
+	RestCurve = bStaff ? TEXT("stab_ruhe") : TEXT("ruhe");
+	PlayingCurve = NAME_None;
+	HeldCurve = NAME_None;
 }
 
 void UEIViewModelComponent::PlayPose(FName Curve, float Seconds, float TrailFrom, float TrailTo)
@@ -132,7 +152,7 @@ FTransform UEIViewModelComponent::CurrentPose() const
 	}
 	if (Curve == nullptr)
 	{
-		Curve = Poses.Find(RestPose);
+		Curve = Poses.Find(RestCurve);
 	}
 	return Curve != nullptr ? Curve->Evaluate(T) : FTransform::Identity;
 }

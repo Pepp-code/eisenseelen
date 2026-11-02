@@ -4,12 +4,12 @@
 #include "Engine/World.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
-#include "EISwordComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
 #include "InputAction.h"
+#include "InputKeyEventArgs.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
 
@@ -37,6 +37,11 @@ namespace
 	}
 }
 
+void AEIPlayerController::PreviewKey(FName KeyName, bool bPressed)
+{
+	InputKey(FInputKeyEventArgs(nullptr, INPUTDEVICEID_NONE, FKey(KeyName), bPressed ? IE_Pressed : IE_Released, FPlatformTime::Cycles64()));
+}
+
 void AEIPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -53,6 +58,8 @@ void AEIPlayerController::SetupInputComponent()
 	BattleCryAction = MakeAction(this, EInputActionValueType::Boolean);
 	HordeAction = MakeAction(this, EInputActionValueType::Boolean);
 	RestartAction = MakeAction(this, EInputActionValueType::Boolean);
+	SpellAction = MakeAction(this, EInputActionValueType::Boolean);
+	ClassAction = MakeAction(this, EInputActionValueType::Boolean);
 
 	Mapping = NewObject<UInputMappingContext>(this);
 	MapMoveKey(Mapping, MoveAction, EKeys::W, true, false);
@@ -66,6 +73,8 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(BattleCryAction, EKeys::V);
 	Mapping->MapKey(HordeAction, EKeys::H);
 	Mapping->MapKey(RestartAction, EKeys::R);
+	Mapping->MapKey(SpellAction, EKeys::Q);
+	Mapping->MapKey(ClassAction, EKeys::C);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AEIPlayerController::HandleMove);
@@ -78,6 +87,8 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(BattleCryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleBattleCry);
 	Input->BindAction(HordeAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleHorde);
 	Input->BindAction(RestartAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleRestart);
+	Input->BindAction(SpellAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSpell);
+	Input->BindAction(ClassAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleClass);
 
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 	Subsystem->AddMappingContext(Mapping, 0);
@@ -139,17 +150,17 @@ void AEIPlayerController::HandleDash()
 
 void AEIPlayerController::HandlePrimaryPressed()
 {
-	if (const AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetLivingHero())
 	{
-		Hero->GetSword()->PressPrimary();
+		Hero->PressPrimary();
 	}
 }
 
 void AEIPlayerController::HandlePrimaryReleased()
 {
-	if (const AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetLivingHero())
 	{
-		Hero->GetSword()->ReleasePrimary();
+		Hero->ReleasePrimary();
 	}
 }
 
@@ -184,5 +195,27 @@ void AEIPlayerController::ServerRestartRun_Implementation()
 	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
 		GameMode->RestartRun();
+	}
+}
+
+void AEIPlayerController::HandleSpell()
+{
+	if (AEIHeroCharacter* Hero = GetLivingHero())
+	{
+		Hero->PressSpell();
+	}
+}
+
+void AEIPlayerController::HandleClass()
+{
+	ServerToggleClass();
+}
+
+void AEIPlayerController::ServerToggleClass_Implementation()
+{
+	SelectedClass = SelectedClass == EEIHeroClass::Arcanist ? EEIHeroClass::Bladewarden : EEIHeroClass::Arcanist;
+	if (AEIHeroCharacter* Hero = GetLivingHero())
+	{
+		Hero->SetHeroClass(SelectedClass);
 	}
 }

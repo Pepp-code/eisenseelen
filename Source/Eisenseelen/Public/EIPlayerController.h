@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EIHeroCharacter.h"
 #include "GameFramework/PlayerController.h"
 #include "EIPlayerController.generated.h"
 
@@ -15,6 +16,13 @@ class EISENSEELEN_API AEIPlayerController : public APlayerController
 	GENERATED_BODY()
 
 public:
+	/** The class a new hero of this player starts as. It survives a restart. */
+	EEIHeroClass GetSelectedClass() const { return SelectedClass; }
+
+	/** For preview pictures: presses or releases a key through the real controls. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewKey(FName KeyName, bool bPressed);
+
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);
 
@@ -32,6 +40,11 @@ private:
 	void HandleBattleCry();
 	void HandleHorde();
 	void HandleRestart();
+	void HandleSpell();
+	void HandleClass();
+
+	UFUNCTION(Server, Reliable)
+	void ServerToggleClass();
 
 	UFUNCTION(Server, Reliable)
 	void ServerToggleHorde();
@@ -39,7 +52,7 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerRestartRun();
 
-	class AEIHeroCharacter* GetLivingHero() const;
+	AEIHeroCharacter* GetLivingHero() const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> Mapping;
@@ -67,4 +80,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> RestartAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> SpellAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> ClassAction;
+
+	EEIHeroClass SelectedClass = EEIHeroClass::Bladewarden;
 };

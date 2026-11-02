@@ -13,7 +13,6 @@ struct EISENSEELEN_API FEIHordeValues
 	float SpawnsPerSecond = 3.0f;
 	float MinDistanceMeters = 25.0f;
 	float MaxDistanceMeters = 40.0f;
-	float HeroLife = 150.0f;
 
 	static bool LoadFromProjectFile(FEIHordeValues& OutValues, FString& OutError);
 };

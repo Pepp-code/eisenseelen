@@ -23,6 +23,7 @@ public:
 	/** Builds the parts. Called once the owner is known to be local. */
 	void Build();
 
+	void ShowStaff(bool bStaff);
 	void PlayPose(FName Curve, float Seconds, float TrailFrom = 2.0f, float TrailTo = 2.0f);
 	void HoldPose(FName Curve, float T);
 	void ClearHold();
@@ -53,10 +54,14 @@ private:
 	TObjectPtr<USceneComponent> SwordParts;
 
 	UPROPERTY(Transient)
+	TObjectPtr<USceneComponent> StaffParts;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UProceduralMeshComponent> Trail;
 
 	TArray<FTrailSample> TrailSamples;
 
+	FName RestCurve = TEXT("ruhe");
 	FName PlayingCurve = NAME_None;
 	float PlayingT = 0.0f;
 	float PlayingSeconds = 1.0f;

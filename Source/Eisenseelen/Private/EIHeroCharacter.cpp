@@ -2,15 +2,18 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Dom/JsonObject.h"
+#include "EICasterComponent.h"
 #include "EIDataFile.h"
 #include "EIHealthComponent.h"
 #include "EIHeroMovementComponent.h"
-#include "EIHordeDirector.h"
+#include "EIPlayerController.h"
 #include "EISwordComponent.h"
 #include "EIViewModelComponent.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Net/UnrealNetwork.h"
 
 namespace
 {
@@ -20,6 +23,30 @@ namespace
 	constexpr float HurtFlashSeconds = 0.35f;
 	constexpr float HurtKickDegrees = 2.0f;
 	constexpr float DeadEyeDropCm = 110.0f;
+}
+
+bool FEIClassValues::LoadFromProjectFile(EEIHeroClass HeroClass, FEIClassValues& OutValues, FString& OutError)
+{
+	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("klassen.json"), OutError);
+	if (!Root.IsValid())
+	{
+		return false;
+	}
+	const TCHAR* Section = HeroClass == EEIHeroClass::Arcanist ? TEXT("arkanist") : TEXT("klingenwacht");
+	const TSharedPtr<FJsonObject>* Object = nullptr;
+	if (!Root->TryGetObjectField(Section, Object))
+	{
+		OutError = FString::Printf(TEXT("Der Abschnitt %s fehlt."), Section);
+		return false;
+	}
+	FEIClassValues Loaded;
+	if (!FEIDataFile::ReadNumber(**Object, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
+		|| !FEIDataFile::ReadNumber(**Object, TEXT("zauber_abklingzeit_faktor"), 0.05, 10.0, Loaded.SpellCooldownFactor, OutError))
+	{
+		return false;
+	}
+	OutValues = Loaded;
+	return true;
 }
 
 AEIHeroCharacter::AEIHeroCharacter(const FObjectInitializer& ObjectInitializer)
@@ -40,6 +67,7 @@ AEIHeroCharacter::AEIHeroCharacter(const FObjectInitializer& ObjectInitializer)
 
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
 	Sword = CreateDefaultSubobject<UEISwordComponent>(TEXT("Sword"));
+	Caster = CreateDefaultSubobject<UEICasterComponent>(TEXT("Caster"));
 }
 
 void AEIHeroCharacter::BeginPlay()
@@ -58,16 +86,92 @@ void AEIHeroCharacter::BeginPlay()
 		FEIDataFile::ReportError(TEXT("posen.json"), Error);
 	}
 	Sword->LoadValues();
+	Caster->LoadValues();
+	LoadClassValues();
 	if (HasAuthority())
 	{
-		FEIHordeValues HordeValues;
-		if (!FEIHordeValues::LoadFromProjectFile(HordeValues, Error))
-		{
-			FEIDataFile::ReportError(TEXT("gegner.json"), Error);
-		}
-		Health->Reset(HordeValues.HeroLife);
+		Health->Reset(ClassValues.Life);
 		Health->OnDied.AddUObject(this, &AEIHeroCharacter::HandleDied);
 	}
+}
+
+void AEIHeroCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AEIHeroCharacter, HeroClass);
+}
+
+void AEIHeroCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	if (const AEIPlayerController* Player = Cast<AEIPlayerController>(NewController))
+	{
+		SetHeroClass(Player->GetSelectedClass());
+	}
+}
+
+void AEIHeroCharacter::LoadClassValues()
+{
+	FString Error;
+	if (!FEIClassValues::LoadFromProjectFile(HeroClass, ClassValues, Error))
+	{
+		FEIDataFile::ReportError(TEXT("klassen.json"), Error);
+	}
+}
+
+void AEIHeroCharacter::SetHeroClass(EEIHeroClass NewClass)
+{
+	const float LifeShare = Health->GetHealth() / FMath::Max(Health->GetMaxHealth(), 1.0f);
+	HeroClass = NewClass;
+	LoadClassValues();
+	Health->Reset(ClassValues.Life);
+	Health->ApplyDamage(ClassValues.Life * (1.0f - LifeShare));
+	OnRep_HeroClass();
+}
+
+void AEIHeroCharacter::OnRep_HeroClass()
+{
+	LoadClassValues();
+	Sword->Deactivate();
+	Caster->Deactivate();
+	ApplyClassToView();
+}
+
+void AEIHeroCharacter::ApplyClassToView()
+{
+	if (GetViewModel() != nullptr)
+	{
+		GetViewModel()->ShowStaff(HeroClass == EEIHeroClass::Arcanist);
+	}
+}
+
+void AEIHeroCharacter::PressPrimary()
+{
+	if (HeroClass == EEIHeroClass::Arcanist)
+	{
+		Caster->PressStaff();
+	}
+	else
+	{
+		Sword->PressPrimary();
+	}
+}
+
+void AEIHeroCharacter::ReleasePrimary()
+{
+	if (HeroClass == EEIHeroClass::Arcanist)
+	{
+		Caster->ReleaseStaff();
+	}
+	else
+	{
+		Sword->ReleasePrimary();
+	}
+}
+
+void AEIHeroCharacter::PressSpell()
+{
+	Caster->CastFireball();
 }
 
 bool AEIHeroCharacter::IsDead() const
@@ -83,10 +187,12 @@ void AEIHeroCharacter::HandleDied()
 void AEIHeroCharacter::MulticastDied_Implementation()
 {
 	Sword->Deactivate();
+	Caster->Deactivate();
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
-	// No model yet, so the view simply drops to the floor.
+	// No model yet, so the view simply drops to the floor and the hand is gone.
 	Camera->SetRelativeLocation(FVector(0.0f, 0.0f, EyeHeightCm - DeadEyeDropCm));
+	ViewModel->SetVisibility(false, true);
 }
 
 void AEIHeroCharacter::ClientHurt_Implementation()
@@ -105,6 +211,7 @@ void AEIHeroCharacter::Tick(float DeltaSeconds)
 	{
 		bViewModelBuilt = true;
 		ViewModel->Build();
+		ApplyClassToView();
 	}
 	UpdateCameraKick(DeltaSeconds);
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);

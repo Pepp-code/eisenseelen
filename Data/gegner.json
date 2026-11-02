@@ -13,8 +13,5 @@
 		"neue_pro_s": 3,
 		"abstand_min_m": 25,
 		"abstand_max_m": 40
-	},
-	"held": {
-		"leben": 150
 	}
 }

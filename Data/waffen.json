@@ -25,5 +25,20 @@
 		"treff_stopp_s": 0.05,
 		"kamera_stoss_grad": 1.2,
 		"schwerer_kamera_stoss_grad": 3.0
+	},
+	"feuerstab": {
+		"schuss": {
+			"schaden": 40,
+			"radius_m": 1.5,
+			"tempo_m_pro_s": 60,
+			"abklingzeit_s": 0.5
+		},
+		"feuerball": {
+			"schaden": 120,
+			"radius_m": 4,
+			"tempo_m_pro_s": 30,
+			"abklingzeit_s": 6
+		},
+		"halten_fuer_feuerball_s": 0.4
 	}
 }

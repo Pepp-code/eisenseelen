@@ -36,13 +36,15 @@ Nur die Tests:
 pwsh tools/check.ps1 -NoBuild
 ```
 
-Testkarte neu erzeugen:
+Materialien, Töne und Testkarte neu erzeugen:
 
 ```
-C:\Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe Eisenseelen.uproject -run=pythonscript -script=C:/Users/Phillip/dev/game-project/tools/make_testarena.py -unattended -nullrhi
+pwsh tools/rebuild_content.ps1
 ```
 
-Der Aufbau der Testkarte steht in `Data/testarena.json`. Nach einer Änderung dort muss die Karte neu erzeugt werden.
+Der Aufbau der Testkarte steht in `Data/testarena.json`. Nach einer Änderung dort muss die Karte neu erzeugt werden. Alle anderen Dateien in `Data/` liest das Spiel beim Start und nach der Taste R.
+
+Läuft noch ein Editor, kann der Linker die DLL nicht schreiben. Prüfe dann, wem der Prozess gehört, bevor du etwas beendest.
 
 Vorschaubilder ohne sichtbares Fenster, sie landen in `Saved\Screenshots\WindowsEditor`:
 
@@ -56,13 +58,20 @@ Der Entwickler startet den Editor mit `Editor_starten.bat`. Öffne selbst kein E
 
 ## Aktueller Stand
 
-Stufe 0 ist technisch fertig: Laufen und Springen in einer Testkarte mit Rampen und Sprungklötzen, Werte aus `Data/held.json`, vier grüne Tests. Der Entwickler hat die Sprunghöhe auf 1,0 m gesetzt.
+Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 16 Tests sind grün, darunter zwei mit echtem Gast im Netz.
 
-Die Sicherung liegt im privaten Repository https://github.com/Pepp-code/eisenseelen. Pushe am Ende jeder Sitzung dorthin.
+- **Bewegung:** Laufen, Sprung 1 m, Schwerkraft-Faktor 1,6, Dash, Tempo-Kette, Sprungfelder.
+- **Klingenwacht:** Hiebkette, schwerer Hieb, Treff-Stopp, Klingenspur.
+- **Arkanist:** Feuerstab, Feuerball, Klassenwechsel auf C.
+- **Gegner:** Knochenläufer als graue Kapseln, Horde auf H, Neustart auf R.
 
-Offen in Stufe 0: Der Entwickler probiert es einmal aus.
+Der Entwickler hat die Sprunghöhe 1 m bestätigt und wollte schnelleres Fallen. Den Rest hat er noch nicht gespielt.
 
-Als Nächstes laut Plan, Abschnitt 17: Dash, Tempo-Kette und Sprungfelder (Woche 3–4).
+**Als Nächstes:** Woche 12 ist sein Spieltest mit Lust-Check. Baue nichts Neues, bevor er sich dazu geäußert hat, außer er sagt es.
+
+**Bewusst noch nicht dabei:** Blocken, Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Wegfindung der Gegner, Klassen-Passive.
+
+**Nicht geprüft:** Töne kann der Agent nicht hören, und die Klingenspur erscheint in keinem Standbild.
 
 ## Das alte Projekt
 

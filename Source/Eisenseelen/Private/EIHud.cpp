@@ -1,5 +1,6 @@
 #include "EIHud.h"
 
+#include "EICasterComponent.h"
 #include "EIEnemy.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
@@ -18,6 +19,7 @@ namespace
 	const FLinearColor LifeColor(0.75f, 0.12f, 0.1f);
 	const FLinearColor DashColor(0.3f, 0.7f, 1.0f);
 	const FLinearColor ChargeColor(1.0f, 0.7f, 0.2f);
+	const FLinearColor SpellColor(1.0f, 0.42f, 0.1f);
 	const FLinearColor BarBack(0.0f, 0.0f, 0.0f, 0.55f);
 	constexpr float Margin = 24.0f;
 	constexpr float BarWidth = 260.0f;
@@ -49,7 +51,7 @@ void AEIHud::DrawHUD()
 	const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(GetOwningPawn());
 	const float Width = Canvas->SizeX;
 	const float Height = Canvas->SizeY;
-	DrawLine(TEXT("WASD laufen   Leertaste springen   Shift Dash   Linke Maus Hieb (halten: schwer)   V Schlachtruf   H Horde   R Neustart"), Margin, Margin, TextColor);
+	DrawLine(TEXT("WASD laufen   Leertaste springen   Shift Dash   Linke Maus Angriff (halten: stark)   Q Feuerball   V Schlachtruf   C Klasse   H Horde   R Neustart"), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -62,7 +64,8 @@ void AEIHud::DrawHUD()
 	}
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	const bool bHorde = State != nullptr && State->IsHordeActive();
-	DrawLine(FString::Printf(TEXT("Horde %s   Gegner %d"), bHorde ? TEXT("an") : TEXT("aus"), Enemies), Margin, Margin + 24.0f, TextColor);
+	const TCHAR* ClassName = Hero->GetHeroClass() == EEIHeroClass::Arcanist ? TEXT("Arkanist") : TEXT("Klingenwacht");
+	DrawLine(FString::Printf(TEXT("%s   Horde %s   Gegner %d"), ClassName, bHorde ? TEXT("an") : TEXT("aus"), Enemies), Margin, Margin + 24.0f, TextColor);
 
 	if (Hero->GetHurtFlash() > 0.0f)
 	{
@@ -92,7 +95,13 @@ void AEIHud::DrawHUD()
 	const float Speed = static_cast<float>(Hero->GetVelocity().Size2D()) / 100.0f;
 	DrawLine(FString::Printf(TEXT("%.1f m/s"), Speed), Margin + BarWidth + Margin + BarWidth / 2.0f + Margin, LifeY - 8.0f, TextColor);
 
-	const float Charge = Hero->GetSword()->GetChargeFraction();
+	const UEICasterComponent* Caster = Hero->GetCaster();
+	const float SpellX = Margin + BarWidth + Margin;
+	const float SpellY = LifeY - 56.0f;
+	DrawBar(SpellX, SpellY, BarWidth / 2.0f, BarHeight, 1.0f - Caster->GetFireballCooldownFraction(), SpellColor);
+	DrawLine(TEXT("Feuerball"), SpellX, SpellY - 24.0f, TextColor);
+
+	const float Charge = Hero->GetHeroClass() == EEIHeroClass::Arcanist ? Caster->GetChargeFraction() : Hero->GetSword()->GetChargeFraction();
 	if (Charge > 0.25f)
 	{
 		DrawBar(Width / 2.0f - 60.0f, Height / 2.0f + 40.0f, 120.0f, 8.0f, Charge, Charge >= 1.0f ? FLinearColor::White : ChargeColor);

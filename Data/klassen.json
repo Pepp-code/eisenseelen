@@ -1,0 +1,10 @@
+{
+	"klingenwacht": {
+		"leben": 150,
+		"zauber_abklingzeit_faktor": 1.0
+	},
+	"arkanist": {
+		"leben": 90,
+		"zauber_abklingzeit_faktor": 0.8
+	}
+}

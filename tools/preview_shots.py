@@ -1,59 +1,131 @@
 """Takes preview pictures of the running game. Started by tools/preview.ps1. Ends the game after the last picture.
 
-Runs inside `-game`, where only the engine's runtime is up, so it steers the player directly. The first shot waits
-until shaders had time to compile.
+Runs inside `-game`, where only the engine's runtime is up. The scenario below is a generator: it does something,
+then yields how many seconds to wait. Keys go through the real controls.
 """
 import unreal
 
 WORLD_PATH = "/Game/Maps/L_Testarena.L_Testarena"
 SHADER_WAIT_SECONDS = 25.0
-SECONDS_BETWEEN_SHOTS = 3.0
 SETTLE_SECONDS = 1.5
+AFTER_SHOT_SECONDS = 1.0
 RESOLUTION = "1600x900"
 
+# Before the dummies: hand poses are easiest to judge against something.
 BEFORE_DUMMIES = (620, 1020, 100)
+TEN_METRES_BEFORE_DUMMIES = (-200, 1020, 92)
+AIM_AT_DUMMY_PITCH = -3.7
 
-# location in cm, (pitch, yaw) in degrees, and optionally a hand pose as (curve, position from 0 to 1)
-VIEWS = [
-    ((0, 0, 100), (0, 0), None),
-    ((500, -1800, 1500), (-30, 45), None),
-    (BEFORE_DUMMIES, (0, 0), None),
-    (BEFORE_DUMMIES, (0, 0), ("leicht_1", 0.2)),
-    (BEFORE_DUMMIES, (0, 0), ("leicht_1", 0.42)),
-    (BEFORE_DUMMIES, (0, 0), ("leicht_1", 0.65)),
-    (BEFORE_DUMMIES, (0, 0), ("leicht_3", 0.42)),
-    (BEFORE_DUMMIES, (0, 0), ("schwer_laden", 1.0)),
-    (BEFORE_DUMMIES, (0, 0), ("schwer", 0.45)),
-]
 
-state = {"elapsed": 0.0, "next_view": 0, "moved": False}
+def world():
+    return unreal.find_object(None, WORLD_PATH)
+
+
+def player():
+    return unreal.GameplayStatics.get_player_controller(world(), 0)
+
+
+def pawn():
+    return unreal.GameplayStatics.get_player_pawn(world(), 0)
+
+
+def movement():
+    return pawn().get_component_by_class(unreal.CharacterMovementComponent)
+
+
+def fly_to(location, pitch=0, yaw=0):
+    """Hangs in the air for a picture."""
+    movement().set_movement_mode(unreal.MovementMode.MOVE_FLYING)
+    pawn().set_actor_location(unreal.Vector(*location), False, True)
+    player().set_control_rotation(unreal.Rotator(0, pitch, yaw))
+
+
+def stand_at(location, pitch=0, yaw=0):
+    pawn().set_actor_location(unreal.Vector(*location), False, True)
+    movement().set_movement_mode(unreal.MovementMode.MOVE_WALKING)
+    player().set_control_rotation(unreal.Rotator(0, pitch, yaw))
+
+
+def pose(curve, position):
+    pawn().get_component_by_class(unreal.EIViewModelComponent).preview_pose(curve, position)
+
+
+def shot():
+    unreal.SystemLibrary.execute_console_command(world(), f"HighResShot {RESOLUTION}")
+
+
+def tap(key):
+    player().preview_key(key, True)
+    yield 0.05
+    player().preview_key(key, False)
+
+
+def scenario():
+    yield SHADER_WAIT_SECONDS
+
+    # The arena as the player first sees it, and from above.
+    fly_to((0, 0, 100))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    fly_to((500, -1800, 1500), -30, 45)
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+
+    # The sword's poses.
+    fly_to(BEFORE_DUMMIES)
+    for curve, position in [
+        ("None", 0.0),
+        ("leicht_1", 0.2),
+        ("leicht_1", 0.42),
+        ("leicht_1", 0.65),
+        ("schwer_laden", 1.0),
+        ("schwer", 0.45),
+    ]:
+        pose(curve, position)
+        yield SETTLE_SECONDS
+        shot()
+        yield AFTER_SHOT_SECONDS
+    pose("None", 0.0)
+
+    # The arcanist, and a fireball at the dummies: flying, then bursting.
+    yield from tap("C")
+    stand_at(TEN_METRES_BEFORE_DUMMIES, AIM_AT_DUMMY_PITCH)
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("Q")
+    yield 0.05
+    shot()
+    yield 0.28
+    shot()
+    yield AFTER_SHOT_SECONDS
+
+    # The horde reaches the hero.
+    yield from tap("C")
+    stand_at((0, 0, 92))
+    yield from tap("H")
+    yield 6.0
+    shot()
+    yield 1.5
+    shot()
+    yield AFTER_SHOT_SECONDS
+
+    unreal.SystemLibrary.execute_console_command(world(), "Quit")
+    yield 60.0
+
+
+steps = scenario()
+state = {"wait": 0.0}
 
 
 def tick(delta_seconds):
-    state["elapsed"] += delta_seconds
-    world = unreal.find_object(None, WORLD_PATH)
-    if world is None:
+    if world() is None:
         return
-    index = state["next_view"]
-    due = SHADER_WAIT_SECONDS + index * SECONDS_BETWEEN_SHOTS
-    if index >= len(VIEWS):
-        if state["elapsed"] >= due:
-            unreal.SystemLibrary.execute_console_command(world, "Quit")
-        return
-
-    if state["elapsed"] >= due - SETTLE_SECONDS and not state["moved"]:
-        location, (pitch, yaw), pose = VIEWS[index]
-        pawn = unreal.GameplayStatics.get_player_pawn(world, 0)
-        pawn.get_component_by_class(unreal.CharacterMovementComponent).set_movement_mode(unreal.MovementMode.MOVE_FLYING)
-        pawn.set_actor_location(unreal.Vector(*location), False, True)
-        unreal.GameplayStatics.get_player_controller(world, 0).set_control_rotation(unreal.Rotator(0, pitch, yaw))
-        curve, position = pose if pose else ("None", 0.0)
-        pawn.get_component_by_class(unreal.EIViewModelComponent).preview_pose(curve, position)
-        state["moved"] = True
-    if state["elapsed"] >= due:
-        unreal.SystemLibrary.execute_console_command(world, f"HighResShot {RESOLUTION}")
-        state["next_view"] = index + 1
-        state["moved"] = False
+    state["wait"] -= delta_seconds
+    if state["wait"] <= 0.0:
+        state["wait"] = next(steps, 60.0)
 
 
 unreal.register_slate_post_tick_callback(tick)

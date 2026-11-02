@@ -19,22 +19,20 @@ bool FEIHordeValues::LoadFromProjectFile(FEIHordeValues& OutValues, FString& Out
 {
 	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("gegner.json"), OutError);
 	const TSharedPtr<FJsonObject>* Horde = nullptr;
-	const TSharedPtr<FJsonObject>* Hero = nullptr;
 	if (!Root.IsValid())
 	{
 		return false;
 	}
-	if (!Root->TryGetObjectField(TEXT("horde"), Horde) || !Root->TryGetObjectField(TEXT("held"), Hero))
+	if (!Root->TryGetObjectField(TEXT("horde"), Horde))
 	{
-		OutError = TEXT("Der Abschnitt horde oder held fehlt.");
+		OutError = TEXT("Der Abschnitt horde fehlt.");
 		return false;
 	}
 	FEIHordeValues Loaded;
 	if (!FEIDataFile::ReadNumber(**Horde, TEXT("gleichzeitig_max"), 0.0, 200.0, Loaded.MaxAlive, OutError)
 		|| !FEIDataFile::ReadNumber(**Horde, TEXT("neue_pro_s"), 0.1, 100.0, Loaded.SpawnsPerSecond, OutError)
 		|| !FEIDataFile::ReadNumber(**Horde, TEXT("abstand_min_m"), 1.0, 500.0, Loaded.MinDistanceMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Horde, TEXT("abstand_max_m"), 1.0, 500.0, Loaded.MaxDistanceMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Hero, TEXT("leben"), 1.0, 100000.0, Loaded.HeroLife, OutError))
+		|| !FEIDataFile::ReadNumber(**Horde, TEXT("abstand_max_m"), 1.0, 500.0, Loaded.MaxDistanceMeters, OutError))
 	{
 		return false;
 	}
