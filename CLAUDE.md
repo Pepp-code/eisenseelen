@@ -48,7 +48,9 @@ Der Entwickler startet den Editor mit `Editor_starten.bat`. Öffne selbst kein E
 
 Stufe 0 ist technisch fertig: leeres Projekt, Laufen und Springen in einer grauen Testkarte, Werte aus `Data/held.json`, drei grüne Tests.
 
-Offen in Stufe 0: Der Entwickler probiert es einmal aus, und ein privates Online-Repository fehlt noch.
+Die Sicherung liegt im privaten Repository https://github.com/Pepp-code/eisenseelen. Pushe am Ende jeder Sitzung dorthin.
+
+Offen in Stufe 0: Der Entwickler probiert es einmal aus.
 
 Als Nächstes laut Plan, Abschnitt 17: Testarena mit Rampen (Woche 2), dann Dash, Tempo-Kette und Sprungfelder (Woche 3–4).
 
