@@ -6,8 +6,7 @@ Startet das Spiel ohne sichtbares Fenster und nimmt Vorschaubilder auf.
 Die Bilder landen in Saved\Screenshots\WindowsEditor.
 #>
 param(
-	[int]$ExpectedShots = 3,
-	[int]$TimeoutSeconds = 240
+	[int]$TimeoutSeconds = 300
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,20 +23,18 @@ $Arguments = @(
 	'-nosound', '-nosplash', '-unattended', "-ExecCmds=`"py $Script`""
 )
 $Game = Start-Process -FilePath "$Engine\Binaries\Win64\UnrealEditor.exe" -ArgumentList $Arguments -PassThru
-$Deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-$Count = 0
-while (-not $Game.HasExited -and (Get-Date) -lt $Deadline) {
-	Start-Sleep -Seconds 3
-	$Count = @(Get-ChildItem $Shots -Filter '*.png' -ErrorAction SilentlyContinue).Count
-	if ($Count -ge $ExpectedShots) {
-		Start-Sleep -Seconds 3
-		break
-	}
-}
-if (-not $Game.HasExited) {
+$Finished = $Game.WaitForExit($TimeoutSeconds * 1000)
+if (-not $Finished) {
 	Stop-Process -Id $Game.Id -Force
 }
-Write-Host "$Count von $ExpectedShots Bildern in $Shots"
-if ($Count -lt $ExpectedShots) {
+$Count = @(Get-ChildItem $Shots -Filter '*.png' -ErrorAction SilentlyContinue).Count
+Write-Host "$Count Bilder in $Shots"
+$Log = Join-Path $Root 'Saved\Logs\Eisenseelen.log'
+$Broken = Select-String -Path $Log -Pattern 'Failed to compile Material|LogPython: Error'
+if ($Broken) {
+	$Broken | Select-Object -Last 5 | ForEach-Object { Write-Host $_.Line }
+}
+if (-not $Finished -or $Count -eq 0 -or $Broken) {
+	Write-Host 'ROT: Die Vorschau ist nicht sauber durchgelaufen'
 	exit 1
 }

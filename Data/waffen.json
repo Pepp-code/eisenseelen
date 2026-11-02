@@ -1,0 +1,29 @@
+{
+	"schwert": {
+		"leichter_hieb": {
+			"dauer_s": 0.45,
+			"schaden": 35,
+			"reichweite_m": 2.8,
+			"klingenbreite_m": 0.25,
+			"treffer_von_0_bis_1": 0.2,
+			"treffer_bis_0_bis_1": 0.65,
+			"ziele_max": 5,
+			"abzug_je_ziel_0_bis_1": 0.15
+		},
+		"schwerer_hieb": {
+			"dauer_s": 0.55,
+			"schaden": 110,
+			"reichweite_m": 3.2,
+			"klingenbreite_m": 0.6,
+			"treffer_von_0_bis_1": 0.25,
+			"treffer_bis_0_bis_1": 0.6,
+			"ziele_max": 5,
+			"abzug_je_ziel_0_bis_1": 0.15
+		},
+		"aufladen_s": 0.6,
+		"ketten_fenster_s": 0.5,
+		"treff_stopp_s": 0.05,
+		"kamera_stoss_grad": 1.2,
+		"schwerer_kamera_stoss_grad": 3.0
+	}
+}

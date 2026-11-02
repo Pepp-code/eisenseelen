@@ -13,8 +13,8 @@ AUDIO_FOLDER = "/Game/Audio"
 CHECKER_CELL_CM = 100
 # Surfaces lie on whole and half metres. This shift keeps them off the cell borders, where the pattern would flicker.
 CHECKER_SHIFT_CELLS = 0.13
-CHECKER_LIGHT = 0.42
-CHECKER_DARK = 0.30
+CHECKER_LIGHT = 0.2
+CHECKER_DARK = 0.13
 CHECKER_ROUGHNESS = 0.85
 
 library = unreal.MaterialEditingLibrary
@@ -114,11 +114,8 @@ def make_glow():
     strength = graph.number_parameter("Leuchten", 4.0)
     opacity = graph.number_parameter("Deckkraft", 1.0)
     vertex_color = graph.node(unreal.MaterialExpressionVertexColor)
-    vertex_alpha = graph.node(
-        unreal.MaterialExpressionComponentMask, r=False, g=False, b=False, a=True,
-    )
-    library.connect_material_expressions(vertex_color, "", vertex_alpha, "")
-    fade = graph.multiply(opacity, vertex_alpha)
+    fade = graph.node(unreal.MaterialExpressionMultiply, ("A", opacity))
+    library.connect_material_expressions(vertex_color, "A", fade, "B")
     graph.output(graph.multiply(graph.multiply(color, strength), fade), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     graph.finish()
 

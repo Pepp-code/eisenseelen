@@ -1,0 +1,20 @@
+{
+	"knochenlaeufer": {
+		"leben": 40,
+		"tempo_m_pro_s": 4.5,
+		"schaden": 10,
+		"angriff_ab_abstand_m": 1.7,
+		"ausholen_s": 0.5,
+		"trefferzone_m": 2.2,
+		"erholung_s": 0.6
+	},
+	"horde": {
+		"gleichzeitig_max": 20,
+		"neue_pro_s": 3,
+		"abstand_min_m": 25,
+		"abstand_max_m": 40
+	},
+	"held": {
+		"leben": 150
+	}
+}

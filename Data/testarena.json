@@ -15,5 +15,10 @@
 	},
 	"sprungfelder": [
 		{ "x_m": 10, "y_m": -12, "turm_hoehe_m": 5 }
+	],
+	"trainingspuppen": [
+		{ "x_m": 8, "y_m": 9 },
+		{ "x_m": 8, "y_m": 10.2 },
+		{ "x_m": 8, "y_m": 11.4 }
 	]
 }

@@ -98,6 +98,13 @@ def add_launch_pads(actors, pads):
         add_label(actors, "Sprungfeld", x, y)
 
 
+def add_training_dummies(actors, dummies):
+    dummy_class = unreal.load_class(None, "/Script/Eisenseelen.EITrainingDummy")
+    for dummy in dummies:
+        location = (dummy["x_m"] * CM_PER_M, dummy["y_m"] * CM_PER_M, MARKER_HEIGHT_CM)
+        spawn(actors, dummy_class, location=location, label="Trainingspuppe")
+
+
 def add_courses(actors, layout):
     """Lays all objects in one row in front of the start, ramps on the left and blocks on the right."""
     ramps = layout["rampen"]
@@ -134,6 +141,7 @@ def main():
     add_box(actors, "Boden", (0, 0, -0.5), (floor_size, floor_size, 1))
     add_courses(actors, layout)
     add_launch_pads(actors, layout["sprungfelder"])
+    add_training_dummies(actors, layout["trainingspuppen"])
 
     sun = spawn(actors, unreal.DirectionalLight, location=(0, 0, 1000), rotation=(0, -50, 30), label="Sonne")
     sun.light_component.set_editor_property("atmosphere_sun_light", True)

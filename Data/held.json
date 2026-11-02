@@ -8,5 +8,6 @@
 	"dash_hopser_m_pro_s": 3.0,
 	"dash_abklingzeit_s": 1.0,
 	"tempo_kette_fenster_s": 0.12,
-	"hoechsttempo_m_pro_s": 22.0
+	"hoechsttempo_m_pro_s": 22.0,
+	"schlachtruf_abklingzeit_s": 3.0
 }

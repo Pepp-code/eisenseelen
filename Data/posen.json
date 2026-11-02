@@ -1,0 +1,78 @@
+{
+	"ruhe": {
+		"schluessel": [
+			{ "t": 0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 }
+		]
+	},
+	"leicht_1": {
+		"bogen": { "gier_von": 65, "gier_bis": -65, "nick_von": 5, "nick_bis": -5 },
+		"schluessel": [
+			{ "t": 0.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 },
+			{ "t": 0.2, "vor": 40, "rechts": 38, "hoch": 6, "nick": 40, "gier": 70, "roll": 0 },
+			{ "t": 0.42, "vor": 50, "rechts": 6, "hoch": -22, "nick": 55, "gier": 0, "roll": 0 },
+			{ "t": 0.65, "vor": 40, "rechts": -34, "hoch": -24, "nick": 10, "gier": -75, "roll": 0 },
+			{ "t": 1.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 }
+		]
+	},
+	"leicht_2": {
+		"bogen": { "gier_von": -65, "gier_bis": 65, "nick_von": 5, "nick_bis": -5 },
+		"schluessel": [
+			{ "t": 0.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 },
+			{ "t": 0.2, "vor": 40, "rechts": -36, "hoch": 4, "nick": 35, "gier": -70, "roll": 0 },
+			{ "t": 0.42, "vor": 50, "rechts": 2, "hoch": -24, "nick": 50, "gier": 0, "roll": 0 },
+			{ "t": 0.65, "vor": 40, "rechts": 36, "hoch": -22, "nick": 5, "gier": 75, "roll": 0 },
+			{ "t": 1.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 }
+		]
+	},
+	"leicht_3": {
+		"bogen": { "gier_von": 0, "gier_bis": 0, "nick_von": 55, "nick_bis": -35 },
+		"schluessel": [
+			{ "t": 0.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 },
+			{ "t": 0.2, "vor": 30, "rechts": 12, "hoch": 18, "nick": 80, "gier": 5, "roll": 0 },
+			{ "t": 0.42, "vor": 50, "rechts": 8, "hoch": -6, "nick": 35, "gier": 0, "roll": 0 },
+			{ "t": 0.65, "vor": 45, "rechts": 8, "hoch": -32, "nick": -35, "gier": 0, "roll": 0 },
+			{ "t": 1.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 }
+		]
+	},
+	"schwer_laden": {
+		"schluessel": [
+			{ "t": 0.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 },
+			{ "t": 1.0, "vor": 35, "rechts": 22, "hoch": 2, "nick": 62, "gier": 12, "roll": 0 }
+		]
+	},
+	"schwer": {
+		"bogen": { "gier_von": 0, "gier_bis": 0, "nick_von": 60, "nick_bis": -40 },
+		"schluessel": [
+			{ "t": 0.0, "vor": 35, "rechts": 22, "hoch": 2, "nick": 62, "gier": 12, "roll": 0 },
+			{ "t": 0.25, "vor": 35, "rechts": 22, "hoch": 6, "nick": 70, "gier": 12, "roll": 0 },
+			{ "t": 0.45, "vor": 50, "rechts": 8, "hoch": -6, "nick": 30, "gier": 0, "roll": 0 },
+			{ "t": 0.6, "vor": 45, "rechts": 8, "hoch": -34, "nick": -40, "gier": 0, "roll": 0 },
+			{ "t": 1.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 }
+		]
+	},
+	"stab_ruhe": {
+		"schluessel": [
+			{ "t": 0, "vor": 45, "rechts": 26, "hoch": -30, "nick": 62, "gier": -8, "roll": 0 }
+		]
+	},
+	"stab_schuss": {
+		"schluessel": [
+			{ "t": 0.0, "vor": 45, "rechts": 26, "hoch": -30, "nick": 62, "gier": -8, "roll": 0 },
+			{ "t": 0.18, "vor": 62, "rechts": 16, "hoch": -24, "nick": 30, "gier": -8, "roll": 0 },
+			{ "t": 1.0, "vor": 45, "rechts": 26, "hoch": -30, "nick": 62, "gier": -8, "roll": 0 }
+		]
+	},
+	"stab_laden": {
+		"schluessel": [
+			{ "t": 0.0, "vor": 45, "rechts": 26, "hoch": -30, "nick": 62, "gier": -8, "roll": 0 },
+			{ "t": 1.0, "vor": 35, "rechts": 18, "hoch": -14, "nick": 78, "gier": -14, "roll": 0 }
+		]
+	},
+	"stab_feuerball": {
+		"schluessel": [
+			{ "t": 0.0, "vor": 35, "rechts": 18, "hoch": -14, "nick": 78, "gier": -14, "roll": 0 },
+			{ "t": 0.2, "vor": 70, "rechts": 8, "hoch": -22, "nick": 18, "gier": -6, "roll": 0 },
+			{ "t": 1.0, "vor": 45, "rechts": 26, "hoch": -30, "nick": 62, "gier": -8, "roll": 0 }
+		]
+	}
+}

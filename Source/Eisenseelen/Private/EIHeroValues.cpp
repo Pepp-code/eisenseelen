@@ -16,7 +16,8 @@ namespace
 			&& FEIDataFile::ReadNumber(Root, TEXT("dash_hopser_m_pro_s"), 0.0, 20.0, OutValues.DashHopMetersPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("dash_abklingzeit_s"), 0.0, 30.0, OutValues.DashCooldownSeconds, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("tempo_kette_fenster_s"), 0.0, 1.0, OutValues.SpeedChainWindowSeconds, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("hoechsttempo_m_pro_s"), 1.0, 100.0, OutValues.MaxSpeedMetersPerSecond, OutError);
+			&& FEIDataFile::ReadNumber(Root, TEXT("hoechsttempo_m_pro_s"), 1.0, 100.0, OutValues.MaxSpeedMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("schlachtruf_abklingzeit_s"), 0.0, 60.0, OutValues.BattleCryCooldownSeconds, OutError);
 	}
 }
 

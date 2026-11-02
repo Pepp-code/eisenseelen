@@ -27,6 +27,19 @@ private:
 	void HandleJumpStarted();
 	void HandleJumpEnded();
 	void HandleDash();
+	void HandlePrimaryPressed();
+	void HandlePrimaryReleased();
+	void HandleBattleCry();
+	void HandleHorde();
+	void HandleRestart();
+
+	UFUNCTION(Server, Reliable)
+	void ServerToggleHorde();
+
+	UFUNCTION(Server, Reliable)
+	void ServerRestartRun();
+
+	class AEIHeroCharacter* GetLivingHero() const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> Mapping;
@@ -42,4 +55,16 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> DashAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> PrimaryAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> BattleCryAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> HordeAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> RestartAction;
 };

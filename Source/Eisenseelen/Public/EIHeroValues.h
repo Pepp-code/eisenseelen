@@ -15,6 +15,7 @@ struct EISENSEELEN_API FEIHeroValues
 	float DashCooldownSeconds = 1.0f;
 	float SpeedChainWindowSeconds = 0.12f;
 	float MaxSpeedMetersPerSecond = 22.0f;
+	float BattleCryCooldownSeconds = 3.0f;
 
 	/** OutValues only changes when the whole file is valid. */
 	static bool LoadFromString(const FString& Json, FEIHeroValues& OutValues, FString& OutError);
