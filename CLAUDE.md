@@ -65,9 +65,9 @@ Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 16 
 - **Arkanist:** Feuerstab, Feuerball, Klassenwechsel auf C.
 - **Gegner:** Knochenläufer als graue Kapseln, Horde auf H, Neustart auf R.
 
-Der Entwickler hat die Sprunghöhe 1 m bestätigt und wollte schnelleres Fallen. Den Rest hat er noch nicht gespielt.
+Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war ein Wunsch nach dem ersten Spielen. Alles andere wurde noch nicht selbst gespielt.
 
-**Als Nächstes:** Woche 12 ist sein Spieltest mit Lust-Check. Baue nichts Neues, bevor er sich dazu geäußert hat, außer er sagt es.
+**Als Nächstes:** Woche 12 ist der Spieltest des Entwicklers mit Lust-Check. Vor einer Rückmeldung dazu entsteht nichts Neues, außer auf ausdrücklichen Wunsch.
 
 **Bewusst noch nicht dabei:** Blocken, Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Wegfindung der Gegner, Klassen-Passive.
 
