@@ -1,0 +1,16 @@
+# Unreal generated
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.sln
+*.slnx
+*.suo
+
+# Python
+__pycache__/
