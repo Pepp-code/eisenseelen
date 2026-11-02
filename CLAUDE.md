@@ -42,17 +42,27 @@ Testkarte neu erzeugen:
 C:\Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe Eisenseelen.uproject -run=pythonscript -script=C:/Users/Phillip/dev/game-project/tools/make_testarena.py -unattended -nullrhi
 ```
 
-Der Entwickler startet den Editor mit `Editor_starten.bat`. Öffne selbst kein Editor-Fenster ohne Rückfrage, alles läuft sonst mit `-nullrhi`.
+Der Aufbau der Testkarte steht in `Data/testarena.json`. Nach einer Änderung dort muss die Karte neu erzeugt werden.
+
+Vorschaubilder ohne sichtbares Fenster, sie landen in `Saved\Screenshots\WindowsEditor`:
+
+```
+pwsh tools/preview.ps1
+```
+
+Schau dir die Bilder nach jeder sichtbaren Änderung selbst an, denn Tests sehen keine Grafikfehler.
+
+Der Entwickler startet den Editor mit `Editor_starten.bat`. Öffne selbst kein Editor-Fenster ohne Rückfrage, alles läuft sonst mit `-nullrhi` oder `-RenderOffscreen`.
 
 ## Aktueller Stand
 
-Stufe 0 ist technisch fertig: leeres Projekt, Laufen und Springen in einer grauen Testkarte, Werte aus `Data/held.json`, drei grüne Tests.
+Stufe 0 ist technisch fertig: Laufen und Springen in einer Testkarte mit Rampen und Sprungklötzen, Werte aus `Data/held.json`, vier grüne Tests. Der Entwickler hat die Sprunghöhe auf 1,0 m gesetzt.
 
 Die Sicherung liegt im privaten Repository https://github.com/Pepp-code/eisenseelen. Pushe am Ende jeder Sitzung dorthin.
 
 Offen in Stufe 0: Der Entwickler probiert es einmal aus.
 
-Als Nächstes laut Plan, Abschnitt 17: Testarena mit Rampen (Woche 2), dann Dash, Tempo-Kette und Sprungfelder (Woche 3–4).
+Als Nächstes laut Plan, Abschnitt 17: Dash, Tempo-Kette und Sprungfelder (Woche 3–4).
 
 ## Das alte Projekt
 

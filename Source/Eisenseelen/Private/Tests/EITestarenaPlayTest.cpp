@@ -4,11 +4,10 @@
 
 #include "EIHeroCharacter.h"
 #include "EIPlayerController.h"
+#include "EITestKeys.h"
 #include "Editor.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "InputCoreTypes.h"
-#include "InputKeyEventArgs.h"
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationCommon.h"
 #include "Tests/AutomationEditorCommon.h"
@@ -64,7 +63,7 @@ public:
 			}
 			CheckValuesAndLook(Player, Hero);
 			Player->SetControlRotation(FRotator::ZeroRotator);
-			SendKey(Player, EKeys::W, IE_Pressed);
+			EISendTestKey(Player, EKeys::W, IE_Pressed);
 			Step = EStep::Run;
 			StepAt = Now;
 			return false;
@@ -75,7 +74,7 @@ public:
 				return false;
 			}
 			CheckRun(Hero);
-			SendKey(Player, EKeys::W, IE_Released);
+			EISendTestKey(Player, EKeys::W, IE_Released);
 			Step = EStep::Settle;
 			StepAt = Now;
 			return false;
@@ -87,7 +86,7 @@ public:
 			}
 			JumpStartZ = Hero->GetActorLocation().Z;
 			JumpPeakZ = JumpStartZ;
-			SendKey(Player, EKeys::SpaceBar, IE_Pressed);
+			EISendTestKey(Player, EKeys::SpaceBar, IE_Pressed);
 			Step = EStep::Jump;
 			StepAt = Now;
 			return false;
@@ -100,7 +99,7 @@ public:
 			}
 			if (!bJumpReleased)
 			{
-				SendKey(Player, EKeys::SpaceBar, IE_Released);
+				EISendTestKey(Player, EKeys::SpaceBar, IE_Released);
 				bJumpReleased = true;
 			}
 			if (!Movement->IsMovingOnGround())
@@ -120,11 +119,6 @@ public:
 
 private:
 	enum class EStep { WaitForGround, Run, Settle, Jump };
-
-	static void SendKey(AEIPlayerController* Player, const FKey& Key, EInputEvent Event)
-	{
-		Player->InputKey(FInputKeyEventArgs(nullptr, INPUTDEVICEID_NONE, Key, Event, FPlatformTime::Cycles64()));
-	}
 
 	void CheckValuesAndLook(AEIPlayerController* Player, const AEIHeroCharacter* Hero) const
 	{

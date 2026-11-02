@@ -1,0 +1,16 @@
+{
+	"boden_m": 200,
+	"abstand_vom_start_m": 25,
+	"luecke_zwischen_objekten_m": 2,
+	"rampen": {
+		"hoehe_m": 3,
+		"breite_m": 4,
+		"plattform_tiefe_m": 3,
+		"winkel_grad": [10, 20, 30, 40, 50]
+	},
+	"sprungkloetze": {
+		"breite_m": 4,
+		"tiefe_m": 4,
+		"hoehen_m": [0.5, 1.0, 1.5, 2.0]
+	}
+}
