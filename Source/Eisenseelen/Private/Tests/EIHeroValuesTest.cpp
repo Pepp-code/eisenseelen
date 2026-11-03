@@ -16,7 +16,7 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 	{
 		return FEIHeroValues::LoadFromString(Json, OutValues, OutError);
 	};
-	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprunghoehe_m\": 3, \"schwerkraft_faktor\": 2, \"luftkontrolle_0_bis_1\": 0.25, \"maus_faktor\": 2, ")
+	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprunghoehe_m\": 3, \"schwerkraft_faktor\": 2, \"luftkontrolle_0_bis_1\": 0.25, \"luft_lenkung_grad_pro_s\": 150, \"maus_faktor\": 2, ")
 		TEXT("\"dash_tempo_bonus_m_pro_s\": 5, \"dash_hopser_m_pro_s\": 2, \"dash_abklingzeit_s\": 1.5, \"tempo_kette_fenster_s\": 0.2, \"hoechsttempo_m_pro_s\": 20, \"schlachtruf_abklingzeit_s\": 2}");
 
 	FEIHeroValues Values;
@@ -25,6 +25,7 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Run speed"), Values.RunSpeedMetersPerSecond, 7.0f);
 	TestEqual(TEXT("Jump height"), Values.JumpHeightMeters, 3.0f);
 	TestEqual(TEXT("Air control"), Values.AirControl, 0.25f);
+	TestEqual(TEXT("Air turn rate"), Values.AirTurnDegreesPerSecond, 150.0f);
 	TestEqual(TEXT("Mouse factor"), Values.MouseFactor, 2.0f);
 	TestEqual(TEXT("Gravity"), Values.GravityFactor, 2.0f);
 	TestEqual(TEXT("Dash bonus"), Values.DashSpeedBonusMetersPerSecond, 5.0f);

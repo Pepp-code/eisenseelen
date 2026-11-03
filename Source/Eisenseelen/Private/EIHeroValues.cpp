@@ -11,6 +11,7 @@ namespace
 			&& FEIDataFile::ReadNumber(Root, TEXT("sprunghoehe_m"), 0.2, 10.0, OutValues.JumpHeightMeters, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("schwerkraft_faktor"), 0.2, 5.0, OutValues.GravityFactor, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("luftkontrolle_0_bis_1"), 0.0, 1.0, OutValues.AirControl, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("luft_lenkung_grad_pro_s"), 0.0, 2000.0, OutValues.AirTurnDegreesPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("maus_faktor"), 0.1, 5.0, OutValues.MouseFactor, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("dash_tempo_bonus_m_pro_s"), 0.0, 30.0, OutValues.DashSpeedBonusMetersPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("dash_hopser_m_pro_s"), 0.0, 20.0, OutValues.DashHopMetersPerSecond, OutError)

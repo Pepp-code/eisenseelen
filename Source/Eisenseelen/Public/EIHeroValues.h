@@ -9,6 +9,7 @@ struct EISENSEELEN_API FEIHeroValues
 	float JumpHeightMeters = 1.0f;
 	float GravityFactor = 1.6f;
 	float AirControl = 0.55f;
+	float AirTurnDegreesPerSecond = 200.0f;
 	float MouseFactor = 1.0f;
 	float DashSpeedBonusMetersPerSecond = 6.0f;
 	float DashHopMetersPerSecond = 3.0f;

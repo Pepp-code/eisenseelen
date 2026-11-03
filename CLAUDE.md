@@ -58,9 +58,9 @@ Der Entwickler startet den Editor mit `Editor_starten.bat`. Öffne selbst kein E
 
 ## Aktueller Stand
 
-Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 16 Tests sind grün, darunter zwei mit echtem Gast im Netz.
+Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 17 Tests sind grün, darunter zwei mit echtem Gast im Netz.
 
-- **Bewegung:** Laufen, Sprung 1 m, Schwerkraft-Faktor 1,6, Dash, Tempo-Kette, Sprungfelder.
+- **Bewegung:** Laufen, Sprung 1 m, Schwerkraft-Faktor 1,6, Dash, Tempo-Kette, Luftlenkung, Sprungfelder.
 - **Klingenwacht:** Hiebkette, schwerer Hieb, Treff-Stopp, Klingenspur.
 - **Arkanist:** Feuerstab, Feuerball, Klassenwechsel auf C.
 - **Gegner:** Knochenläufer als graue Kapseln, Horde auf H, Neustart auf R.

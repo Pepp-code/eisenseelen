@@ -140,6 +140,8 @@ public:
 			GuestSpeed = static_cast<float>(Session.ClientHero->GetVelocity().Size2D());
 			Test->AddInfo(FString::Printf(TEXT("The guest dashes at %.0f cm/s"), GuestSpeed));
 			Test->TestTrue(TEXT("The guest feels the dash at once"), GuestSpeed > 1000.0f);
+			// Steering in the air is part of the predicted move, so it must not make guest and server drift apart.
+			Session.ClientPlayer->SetControlRotation(FRotator(0.0f, 230.0f, 0.0f));
 			EnterStep(4);
 			return false;
 		case 4:

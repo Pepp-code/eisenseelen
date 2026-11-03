@@ -35,12 +35,14 @@ private:
 	friend class FEIHeroSavedMove;
 
 	void PerformDash();
+	void SteerTowardsInput(float DeltaTime);
 
 	float DashSpeedBonusCm = 0.0f;
 	float DashHopCm = 0.0f;
 	float DashCooldownSeconds = 0.0f;
 	float SpeedChainWindowSeconds = 0.0f;
 	float MaxSpeedCm = 0.0f;
+	float AirTurnDegreesPerSecond = 0.0f;
 
 	// The predicted state. FEIHeroSavedMove saves it, so a replayed move starts from the same values.
 	bool bWantsToDash = false;

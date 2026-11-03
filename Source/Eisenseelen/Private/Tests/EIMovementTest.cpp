@@ -216,6 +216,84 @@ bool FEISpeedChainTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIAirSteeringTest,
+	"Eisenseelen.Play.Movement.AirSteering",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIAirSteeringTest::RunTest(const FString& Parameters)
+{
+	constexpr double SteerSeconds = 0.25;
+	constexpr float FastSpeedCm = 1150.0f;
+	constexpr float LookSidewaysYaw = 270.0f;
+	const TSharedRef<double> SteerStartedAt = MakeShared<double>(0.0);
+
+	// Flies fast along -X, high enough to stay in the air for the whole measurement.
+	const auto FlyFast = [](const FEIPlayContext& Context)
+	{
+		Teleport(Context, OpenFloor + FVector(0.0f, 0.0f, 500.0f), BackwardsYaw);
+		Context.Movement->SetMovementMode(MOVE_Falling);
+		Context.Movement->Velocity = FVector(-FastSpeedCm, 0.0, 0.0);
+	};
+
+	TArray<FEIPlayStep> Steps;
+
+	// The reported case: run, dash, jump, then look to the side with W held.
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, BackwardsYaw); }));
+	Steps.Add(Wait(0.3));
+	Steps.Add(Press(EKeys::W));
+	Steps.Add(Wait(0.5));
+	AddTap(Steps, EKeys::LeftShift);
+	AddTap(Steps, EKeys::SpaceBar);
+	Steps.Add(Wait(0.03));
+	Steps.Add(Do([SteerStartedAt](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("The hero flies fast after dash and jump"), HorizontalSpeed(Context) > FastSpeedCm * 0.9f);
+		Context.Player->SetControlRotation(FRotator(0.0f, LookSidewaysYaw, 0.0f));
+		*SteerStartedAt = Context.Now;
+	}));
+	Steps.Add(Wait(SteerSeconds));
+	Steps.Add(Do([SteerStartedAt](const FEIPlayContext& Context)
+	{
+		const FVector Velocity = Context.Hero->GetVelocity();
+		const double Seconds = Context.Now - *SteerStartedAt;
+		const double Turned = FMath::RadiansToDegrees(FMath::Atan2(FMath::Abs(Velocity.Y), FMath::Abs(Velocity.X)));
+		const double Expected = FMath::Min(90.0, Context.Hero->GetValues().AirTurnDegreesPerSecond * Seconds);
+		Context.Test->AddInfo(FString::Printf(TEXT("In %.2f s the flight turned %.0f degrees at %.0f cm/s, expected about %.0f"), Seconds, Turned, HorizontalSpeed(Context), Expected));
+		Context.Test->TestTrue(TEXT("The flight direction follows the input"), Turned >= Expected * 0.8);
+		Context.Test->TestTrue(TEXT("Steering costs no speed"), HorizontalSpeed(Context) > FastSpeedCm * 0.95f);
+	}));
+	Steps.Add(Release(EKeys::W));
+	Steps.Add(WaitForGround());
+
+	// Input against the flight brakes instead of turning around.
+	Steps.Add(Do(FlyFast));
+	Steps.Add(Press(EKeys::S));
+	Steps.Add(Wait(SteerSeconds));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const FVector Velocity = Context.Hero->GetVelocity();
+		Context.Test->AddInfo(FString::Printf(TEXT("Holding S in the air: %.0f cm/s after 0.25 s"), HorizontalSpeed(Context)));
+		Context.Test->TestTrue(TEXT("Input against the flight slows it"), HorizontalSpeed(Context) < FastSpeedCm * 0.92f);
+		Context.Test->TestTrue(TEXT("Input against the flight does not turn it"), FMath::Abs(Velocity.Y) < 50.0 && Velocity.X < 0.0);
+	}));
+	Steps.Add(Release(EKeys::S));
+	Steps.Add(WaitForGround());
+
+	// Without input the flight stays as it is, wherever the player looks.
+	Steps.Add(Do(FlyFast));
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Player->SetControlRotation(FRotator(0.0f, LookSidewaysYaw, 0.0f)); }));
+	Steps.Add(Wait(SteerSeconds));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const FVector Velocity = Context.Hero->GetVelocity();
+		Context.Test->TestTrue(TEXT("Without input the flight keeps its direction"), FMath::Abs(Velocity.Y) < 5.0);
+		Context.Test->TestNearlyEqual(TEXT("Without input the flight keeps its speed"), HorizontalSpeed(Context), FastSpeedCm, 5.0f);
+	}));
+	Steps.Add(WaitForGround());
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEILaunchPadTest,
 	"Eisenseelen.Play.Movement.LaunchPad",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

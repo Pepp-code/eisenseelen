@@ -7,6 +7,8 @@
 namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
+	// Input further away than this from the flight direction means "stop", not "turn around at full speed".
+	constexpr double MaxSteerAngleDegrees = 135.0;
 }
 
 /** Sends the dash wish to the server and restores the predicted state when a move is replayed. */
@@ -104,6 +106,7 @@ void UEIHeroMovementComponent::ApplyValues(const FEIHeroValues& Values)
 	DashCooldownSeconds = Values.DashCooldownSeconds;
 	SpeedChainWindowSeconds = Values.SpeedChainWindowSeconds;
 	MaxSpeedCm = Values.MaxSpeedMetersPerSecond * CentimetersPerMeter;
+	AirTurnDegreesPerSecond = Values.AirTurnDegreesPerSecond;
 }
 
 void UEIHeroMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
@@ -157,6 +160,10 @@ void UEIHeroMovementComponent::CalcVelocity(float DeltaTime, float Friction, boo
 	{
 		Super::CalcVelocity(DeltaTime, Friction, bFluid, BrakingDeceleration);
 	}
+	if (bKeepSpeed || IsFalling())
+	{
+		SteerTowardsInput(DeltaTime);
+	}
 
 	const FVector Horizontal(Velocity.X, Velocity.Y, 0.0);
 	if (MaxSpeedCm > 0.0f && Horizontal.SizeSquared() > FMath::Square(MaxSpeedCm))
@@ -165,4 +172,28 @@ void UEIHeroMovementComponent::CalcVelocity(float DeltaTime, float Friction, boo
 		Velocity.X = Clamped.X;
 		Velocity.Y = Clamped.Y;
 	}
+}
+
+void UEIHeroMovementComponent::SteerTowardsInput(float DeltaTime)
+{
+	// The engine steers in the air with a fixed acceleration, so the faster the flight, the slower the turn. Above the
+	// run speed the flight direction turns at a fixed rate instead, and the speed stays.
+	const FVector Horizontal(Velocity.X, Velocity.Y, 0.0);
+	const double Speed = Horizontal.Size();
+	const FVector Wish = Acceleration.GetSafeNormal2D();
+	if (Speed <= MaxWalkSpeed || Wish.IsNearlyZero())
+	{
+		return;
+	}
+	const FVector Current = Horizontal / Speed;
+	const double AngleDegrees = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Current, Wish), -1.0, 1.0)));
+	if (AngleDegrees > MaxSteerAngleDegrees)
+	{
+		return;
+	}
+	const double Step = FMath::Min(AngleDegrees, static_cast<double>(AirTurnDegreesPerSecond) * DeltaTime);
+	const double Side = FVector::CrossProduct(Current, Wish).Z >= 0.0 ? 1.0 : -1.0;
+	const FVector Turned = Current.RotateAngleAxis(Step * Side, FVector::UpVector);
+	Velocity.X = Turned.X * Speed;
+	Velocity.Y = Turned.Y * Speed;
 }
