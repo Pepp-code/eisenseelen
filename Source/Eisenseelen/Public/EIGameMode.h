@@ -5,6 +5,7 @@
 #include "EIGameMode.generated.h"
 
 class UEIHordeDirector;
+class UEIRunDirector;
 
 UCLASS()
 class EISENSEELEN_API AEIGameMode : public AGameModeBase
@@ -15,7 +16,9 @@ public:
 	AEIGameMode();
 
 	UEIHordeDirector* GetHorde() const { return Horde; }
+	UEIRunDirector* GetRun() const { return Run; }
 
+	/** For the test arena. During a run the run director decides about the horde. */
 	void ToggleHorde();
 
 	/** Removes all enemies and starts every hero fresh. All Data files are read again. */
@@ -27,4 +30,7 @@ protected:
 private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIHordeDirector> Horde;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEIRunDirector> Run;
 };

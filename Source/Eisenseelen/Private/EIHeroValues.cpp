@@ -18,7 +18,10 @@ namespace
 			&& FEIDataFile::ReadNumber(Root, TEXT("ausweichen_tempo_m_pro_s"), 0.0, 60.0, OutValues.DodgeSpeedMetersPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("ausweichen_hopser_m_pro_s"), 0.0, 20.0, OutValues.DodgeHopMetersPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("ausweichen_abklingzeit_s"), 0.0, 30.0, OutValues.DodgeCooldownSeconds, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("sprung_puffer_s"), 0.0, 1.0, OutValues.JumpBufferSeconds, OutError);
+			&& FEIDataFile::ReadNumber(Root, TEXT("sprung_puffer_s"), 0.0, 1.0, OutValues.JumpBufferSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("absprung_ab_hoehe_m"), 1.0, 1000.0, OutValues.DiveFromHeightMeters, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("absprung_tempo_m_pro_s"), 1.0, 100.0, OutValues.DiveSpeedMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("absprung_fall_tempo_m_pro_s"), 1.0, 100.0, OutValues.DiveFallSpeedMetersPerSecond, OutError);
 	}
 }
 

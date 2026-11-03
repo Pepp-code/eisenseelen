@@ -117,6 +117,9 @@ void UEIHeroMovementComponent::ApplyValues(const FEIHeroValues& Values)
 
 	SprintSpeedCm = Values.SprintSpeedMetersPerSecond * CentimetersPerMeter;
 	BlockSpeedCm = Values.BlockSpeedMetersPerSecond * CentimetersPerMeter;
+	DiveFromHeightCm = Values.DiveFromHeightMeters * CentimetersPerMeter;
+	DiveSpeedCm = Values.DiveSpeedMetersPerSecond * CentimetersPerMeter;
+	DiveFallSpeedCm = Values.DiveFallSpeedMetersPerSecond * CentimetersPerMeter;
 	DodgeSpeedCm = Values.DodgeSpeedMetersPerSecond * CentimetersPerMeter;
 	DodgeHopCm = Values.DodgeHopMetersPerSecond * CentimetersPerMeter;
 	DodgeCooldownSeconds = Values.DodgeCooldownSeconds;
@@ -145,11 +148,30 @@ float UEIHeroMovementComponent::GetMaxSpeed() const
 	{
 		return Super::GetMaxSpeed();
 	}
+	if (IsDiving())
+	{
+		return DiveSpeedCm;
+	}
 	if (bWantsToBlock)
 	{
 		return BlockSpeedCm;
 	}
 	return bWantsToSprint ? SprintSpeedCm : Super::GetMaxSpeed();
+}
+
+bool UEIHeroMovementComponent::IsDiving() const
+{
+	return IsFalling() && UpdatedComponent != nullptr && UpdatedComponent->GetComponentLocation().Z > DiveFromHeightCm;
+}
+
+FVector UEIHeroMovementComponent::NewFallVelocity(const FVector& InitialVelocity, const FVector& Gravity, float DeltaTime) const
+{
+	FVector Result = Super::NewFallVelocity(InitialVelocity, Gravity, DeltaTime);
+	if (IsDiving())
+	{
+		Result.Z = FMath::Max(Result.Z, static_cast<double>(-DiveFallSpeedCm));
+	}
+	return Result;
 }
 
 void UEIHeroMovementComponent::PerformDodge()

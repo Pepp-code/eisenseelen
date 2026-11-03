@@ -1,0 +1,26 @@
+{
+	"boden_m": 300,
+	"rand_hoehe_m": 3,
+	"barke": { "x_m": 0, "y_m": 0, "hoehe_m": 120 },
+	"leuchtfeuer": [
+		{ "x_m": -105, "y_m": 95 },
+		{ "x_m": 105, "y_m": -95 }
+	],
+	"orte": [
+		{ "x_m": 0, "y_m": 110 },
+		{ "x_m": 80, "y_m": 80 },
+		{ "x_m": 115, "y_m": 0 },
+		{ "x_m": 40, "y_m": -105 },
+		{ "x_m": -45, "y_m": -100 },
+		{ "x_m": -115, "y_m": -30 },
+		{ "x_m": -60, "y_m": 30 },
+		{ "x_m": 45, "y_m": 30 }
+	],
+	"sprungfelder": [
+		{ "x_m": -30, "y_m": -40, "turm_hoehe_m": 5 },
+		{ "x_m": 70, "y_m": -40, "turm_hoehe_m": 5 },
+		{ "x_m": -90, "y_m": 60, "turm_hoehe_m": 5 }
+	],
+	"deckung_anzahl": 30,
+	"deckung_zufall": 7
+}

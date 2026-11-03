@@ -23,6 +23,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewKey(FName KeyName, bool bPressed);
 
+	/** For preview pictures: the hero survives everything, so a long scene can be photographed to its end. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewInvulnerable();
+
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);
 
@@ -41,10 +45,14 @@ private:
 	void HandlePrimaryReleased();
 	void HandleSecondaryPressed();
 	void HandleSecondaryReleased();
+	void HandleInteract();
 	void HandleHorde();
 	void HandleRestart();
 	void HandleSpell();
 	void HandleClass();
+
+	UFUNCTION(Server, Reliable)
+	void ServerInteract();
 
 	UFUNCTION(Server, Reliable)
 	void ServerToggleClass();
@@ -80,6 +88,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> SecondaryAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> InteractAction;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> HordeAction;

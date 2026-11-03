@@ -1,11 +1,14 @@
 <#
 Startet das Spiel ohne sichtbares Fenster und nimmt Vorschaubilder auf.
 
-    pwsh tools/preview.ps1
+    pwsh tools/preview.ps1              Waffen und Gegner in der Testarena
+    pwsh tools/preview.ps1 -Szene lauf  ein ganzer Lauf auf der Laufkarte
 
 Die Bilder landen in Saved\Screenshots\WindowsEditor.
 #>
 param(
+	[ValidateSet('waffen', 'lauf')]
+	[string]$Szene = 'waffen',
 	[int]$TimeoutSeconds = 300
 )
 
@@ -17,9 +20,11 @@ if (Test-Path $Shots) {
 	Remove-Item $Shots -Recurse -Force
 }
 
-$Script = (Join-Path $PSScriptRoot 'preview_shots.py') -replace '\\', '/'
+$ScriptName = if ($Szene -eq 'lauf') { 'preview_run.py' } else { 'preview_shots.py' }
+$Map = if ($Szene -eq 'lauf') { '/Game/Maps/L_ErsterLauf' } else { '/Game/Maps/L_Testarena' }
+$Script = (Join-Path $PSScriptRoot $ScriptName) -replace '\\', '/'
 $Arguments = @(
-	"`"$(Join-Path $Root 'Eisenseelen.uproject')`"", '-game', '-RenderOffscreen', '-ResX=1600', '-ResY=900',
+	"`"$(Join-Path $Root 'Eisenseelen.uproject')`"", $Map, '-game', '-RenderOffscreen', '-ResX=1600', '-ResY=900',
 	'-nosound', '-nosplash', '-unattended', "-ExecCmds=`"py $Script`""
 )
 $Game = Start-Process -FilePath "$Engine\Binaries\Win64\UnrealEditor.exe" -ArgumentList $Arguments -PassThru

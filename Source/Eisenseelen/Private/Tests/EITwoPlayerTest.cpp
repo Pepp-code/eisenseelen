@@ -2,12 +2,17 @@
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
+#include "EIBeacon.h"
 #include "EICasterComponent.h"
+#include "EIGameMode.h"
+#include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EISwordComponent.h"
 #include "EIProjectile.h"
+#include "EIRunDirector.h"
+#include "EISkyBarge.h"
 #include "EITrainingDummy.h"
 #include "EngineUtils.h"
 #include "EIPlayerController.h"
@@ -388,6 +393,151 @@ private:
 };
 
 /**
+ * The guest plays a run alone, the host has fallen: the use key lights a beacon on the server, the guest sees how the
+ * run goes on, and the barge takes the guest home.
+ */
+class FEITwoPlayerRunCommand : public IAutomationLatentCommand
+{
+public:
+	explicit FEITwoPlayerRunCommand(FAutomationTestBase* InTest) : Test(InTest), StartedAt(FPlatformTime::Seconds()) {}
+
+	virtual bool Update() override
+	{
+		if (FPlatformTime::Seconds() - StartedAt > TimeoutSeconds)
+		{
+			Test->AddError(FString::Printf(TEXT("The two-player run test timed out in step %d"), Step));
+			return true;
+		}
+		const FTwoPlayerSession Session = FTwoPlayerSession::Find();
+		if (!Session.IsReady() && Step == 0)
+		{
+			return false;
+		}
+		if (Session.ClientHero == nullptr || Session.ServerCopyOfClientHero == nullptr)
+		{
+			Test->AddError(TEXT("The guest disappeared from the session"));
+			return true;
+		}
+
+		const double Now = Session.ClientWorld->GetTimeSeconds();
+		const auto EnterStep = [this, Now](int32 NewStep)
+		{
+			Step = NewStep;
+			StepAt = Now;
+		};
+		UWorld* ServerWorld = Session.ServerCopyOfClientHero->GetWorld();
+		AEIGameMode* GameMode = ServerWorld->GetAuthGameMode<AEIGameMode>();
+		const AEIGameState* GuestState = Session.ClientWorld->GetGameState<AEIGameState>();
+		switch (Step)
+		{
+		case 0:
+		{
+			Test->TestEqual(TEXT("The guest knows the run has not begun"), GuestState->GetRunPhase(), EEIRunPhase::OnBarge);
+			FEIRunValues Short = GameMode->GetRun()->GetValues();
+			Short.BeaconHoldSeconds = 1.0f;
+			GameMode->GetRun()->ApplyValues(Short);
+			for (FConstPlayerControllerIterator It = ServerWorld->GetPlayerControllerIterator(); It; ++It)
+			{
+				if (It->Get()->IsLocalController())
+				{
+					It->Get()->GetPawn()->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+				}
+			}
+			Session.ServerCopyOfClientHero->SetCanBeDamaged(false);
+			TActorIterator<AEIBeacon> Beacon(ServerWorld);
+			Session.ServerCopyOfClientHero->TeleportTo(Beacon->GetActorLocation() + FVector(200.0f, 0.0f, 100.0f), FRotator::ZeroRotator);
+			EnterStep(1);
+			return false;
+		}
+		case 1:
+			if (Now - StepAt < 0.6)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("The guest sees the run begin"), GuestState->GetRunPhase(), EEIRunPhase::Exploring);
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Pressed);
+			EnterStep(2);
+			return false;
+		case 2:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Released);
+			EnterStep(3);
+			return false;
+		case 3:
+		{
+			if (Now - StepAt < 0.3)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("The guest's use key lights the beacon"), GuestState->GetRunPhase(), EEIRunPhase::BeaconLit);
+			TActorIterator<AEIBeacon> GuestBeacon(Session.ClientWorld);
+			bool bAnyLit = false;
+			for (; GuestBeacon; ++GuestBeacon)
+			{
+				bAnyLit = bAnyLit || GuestBeacon->IsLit();
+			}
+			Test->TestTrue(TEXT("The guest sees the fire"), bAnyLit);
+			EnterStep(4);
+			return false;
+		}
+		case 4:
+			if (GuestState->GetRunPhase() != EEIRunPhase::BargeWaiting)
+			{
+				return false;
+			}
+			Session.ServerCopyOfClientHero->TeleportTo(GameMode->GetRun()->GetBarge()->GetActorLocation() + FVector(0.0f, 0.0f, -40.0f), FRotator::ZeroRotator);
+			EnterStep(5);
+			return false;
+		case 5:
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Pressed);
+			EnterStep(6);
+			return false;
+		case 6:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Released);
+			EnterStep(7);
+			return false;
+		case 7:
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("The guest gets away"), GuestState->GetRunPhase(), EEIRunPhase::Escaped);
+			Test->TestNotNull(TEXT("The guest stands on the barge"), Session.ClientHero->GetAttachParentActor());
+			HeightAtBoarding = Session.ClientHero->GetActorLocation().Z;
+			EnterStep(8);
+			return false;
+		case 8:
+			if (Now - StepAt < 0.6)
+			{
+				return false;
+			}
+			Test->TestTrue(TEXT("The barge carries the guest away"), Session.ClientHero->GetActorLocation().Z > HeightAtBoarding + 100.0);
+			return true;
+		default:
+			return true;
+		}
+	}
+
+private:
+	FAutomationTestBase* Test;
+	double StartedAt;
+	int32 Step = 0;
+	double StepAt = 0.0;
+	double HeightAtBoarding = 0.0;
+};
+
+/**
  * The guest blocks: the server must know about the block from the guest's moves alone, and decides about the hit.
  */
 class FEITwoPlayerBlockCommand : public IAutomationLatentCommand
@@ -546,6 +696,20 @@ bool FEITwoPlayerBlockTest::RunTest(const FString& Parameters)
 	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(ArenaMap)));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
 	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerBlockCommand(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEITwoPlayerRunTest,
+	"Eisenseelen.Net.GuestRun",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEITwoPlayerRunTest::RunTest(const FString& Parameters)
+{
+	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(TEXT("/Game/Maps/L_ErsterLauf"))));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
+	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerRunCommand(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	return true;
 }

@@ -15,7 +15,7 @@ if ($LASTEXITCODE -ne 0) {
 	exit 1
 }
 
-foreach ($Script in 'make_assets.py', 'make_testarena.py') {
+foreach ($Script in 'make_assets.py', 'make_testarena.py', 'make_runmap.py') {
 	$ScriptPath = (Join-Path $PSScriptRoot $Script) -replace '\\', '/'
 	$Arguments = @("`"$Project`"", '-run=pythonscript', "-script=$ScriptPath", '-unattended', '-nullrhi', '-nosplash')
 	$Editor = Start-Process -FilePath "$Engine\Binaries\Win64\UnrealEditor-Cmd.exe" -ArgumentList $Arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $Log

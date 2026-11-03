@@ -10,6 +10,7 @@ class UCameraComponent;
 class UEICasterComponent;
 class UEIHealthComponent;
 class UEIHeroMovementComponent;
+class AEISkyBarge;
 class UEISwordComponent;
 class UEIViewModelComponent;
 
@@ -64,6 +65,10 @@ public:
 	void PressSecondary();
 	void ReleaseSecondary();
 	void SetSprintKey(bool bHeld) { bSprintKeyHeld = bHeld; }
+
+	/** Server only: from now on this hero stands on the barge and rides it. */
+	void BoardBarge(AEISkyBarge* Barge);
+	bool IsAboard() const { return bAboard; }
 	void PressSpell();
 	const FEIPoseLibrary& GetPoses() const { return Poses; }
 
@@ -104,6 +109,9 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastDied();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastBoardBarge(AEISkyBarge* Barge);
+
 	void HandleDied();
 
 	void UpdateCameraKick(float DeltaSeconds);
@@ -137,4 +145,5 @@ private:
 	double BufferedJumpUntil = -1.0;
 	bool bJumpOnGround = false;
 	bool bSprintKeyHeld = false;
+	bool bAboard = false;
 };

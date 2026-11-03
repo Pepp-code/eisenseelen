@@ -8,6 +8,7 @@
 #include "EIHealthComponent.h"
 #include "EIHeroMovementComponent.h"
 #include "EIPlayerController.h"
+#include "EISkyBarge.h"
 #include "EISwordComponent.h"
 #include "EIViewModelComponent.h"
 #include "EIVisuals.h"
@@ -23,6 +24,8 @@ namespace
 	constexpr float HurtFlashSeconds = 0.35f;
 	constexpr float HurtKickDegrees = 2.0f;
 	constexpr float DeadEyeDropCm = 110.0f;
+	constexpr float HardLandingSpeedCm = 1500.0f;
+	constexpr float HardLandingKickDegrees = 4.0f;
 }
 
 bool FEIClassValues::LoadFromProjectFile(EEIHeroClass HeroClass, FEIClassValues& OutValues, FString& OutError)
@@ -297,9 +300,34 @@ void AEIHeroCharacter::PressJump()
 	}
 }
 
+void AEIHeroCharacter::BoardBarge(AEISkyBarge* Barge)
+{
+	bAboard = true;
+	SetCanBeDamaged(false);
+	MulticastBoardBarge(Barge);
+}
+
+void AEIHeroCharacter::MulticastBoardBarge_Implementation(AEISkyBarge* Barge)
+{
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->DisableMovement();
+	SetActorLocation(Barge->GetDeckSpotNear(GetActorLocation(), GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
+	AttachToActor(Barge, FAttachmentTransformRules::KeepWorldTransform);
+	if (IsLocallyControlled())
+	{
+		EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
+	}
+}
+
 void AEIHeroCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
+	// Landing from the barge hits hard for the eye and the ear, but it does no damage.
+	if (IsLocallyControlled() && !bClientUpdating && GetVelocity().Z < -HardLandingSpeedCm)
+	{
+		AddCameraKick(HardLandingKickDegrees);
+		EIVisuals::PlaySound2D(this, TEXT("TrefferSchwer"));
+	}
 	if (IsLocallyControlled() && GetWorld()->GetTimeSeconds() <= BufferedJumpUntil)
 	{
 		BufferedJumpUntil = -1.0;

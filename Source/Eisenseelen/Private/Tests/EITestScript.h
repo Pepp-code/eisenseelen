@@ -77,6 +77,7 @@ private:
 namespace EITestScript
 {
 	inline const TCHAR* ArenaMap = TEXT("/Game/Maps/L_Testarena");
+	inline const TCHAR* RunMap = TEXT("/Game/Maps/L_ErsterLauf");
 
 	inline FEIPlayStep Wait(double Seconds)
 	{
@@ -152,15 +153,20 @@ namespace EITestScript
 		return WaitUntil(TEXT("the hero lands"), 6.0, [](const FEIPlayContext& Context) { return Context.Movement->IsMovingOnGround(); });
 	}
 
-	inline bool RunInArena(FAutomationTestBase* Test, TArray<FEIPlayStep> Steps)
+	inline bool RunInMap(FAutomationTestBase* Test, const TCHAR* Map, TArray<FEIPlayStep> Steps)
 	{
-		if (!AutomationOpenMap(ArenaMap))
+		if (!AutomationOpenMap(Map))
 		{
-			Test->AddError(TEXT("Cannot open the test arena for PIE"));
+			Test->AddError(FString::Printf(TEXT("Cannot open %s for PIE"), Map));
 			return false;
 		}
 		ADD_LATENT_AUTOMATION_COMMAND(FEIPlayScriptCommand(Test, MoveTemp(Steps)));
 		ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 		return true;
+	}
+
+	inline bool RunInArena(FAutomationTestBase* Test, TArray<FEIPlayStep> Steps)
+	{
+		return RunInMap(Test, ArenaMap, MoveTemp(Steps));
 	}
 }

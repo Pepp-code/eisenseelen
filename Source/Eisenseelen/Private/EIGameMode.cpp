@@ -5,6 +5,7 @@
 #include "EIHordeDirector.h"
 #include "EIHud.h"
 #include "EIPlayerController.h"
+#include "EIRunDirector.h"
 #include "Engine/World.h"
 
 AEIGameMode::AEIGameMode()
@@ -15,16 +16,22 @@ AEIGameMode::AEIGameMode()
 	GameStateClass = AEIGameState::StaticClass();
 
 	Horde = CreateDefaultSubobject<UEIHordeDirector>(TEXT("Horde"));
+	Run = CreateDefaultSubobject<UEIRunDirector>(TEXT("Run"));
 }
 
 void AEIGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	Horde->LoadValues();
+	Run->LoadValues();
 }
 
 void AEIGameMode::ToggleHorde()
 {
+	if (GetGameState<AEIGameState>()->GetRunPhase() != EEIRunPhase::None)
+	{
+		return;
+	}
 	const bool bActive = !Horde->IsHordeActive();
 	Horde->SetHordeActive(bActive);
 	GetGameState<AEIGameState>()->SetHordeActive(bActive);
@@ -40,6 +47,8 @@ void AEIGameMode::RestartRun()
 	GetGameState<AEIGameState>()->SetHordeActive(false);
 	Horde->RemoveAllEnemies();
 	Horde->LoadValues();
+	Run->LoadValues();
+	Run->ResetRun();
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		APlayerController* Player = It->Get();

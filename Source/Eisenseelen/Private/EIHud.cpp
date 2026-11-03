@@ -1,11 +1,13 @@
 #include "EIHud.h"
 
+#include "EIBeacon.h"
 #include "EICasterComponent.h"
 #include "EIEnemy.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EISkyBarge.h"
 #include "EISwordComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -33,6 +35,11 @@ namespace
 	constexpr float ThreatInViewDot = 0.6f;
 	constexpr float ThreatMarkSize = 18.0f;
 	constexpr float ThreatEdgeShare = 0.42f;
+	const FLinearColor BeaconMarkColor(1.0f, 0.55f, 0.1f);
+	const FLinearColor BargeMarkColor(0.5f, 0.85f, 1.0f);
+	const FLinearColor WarningTextColor(1.0f, 0.25f, 0.15f);
+	constexpr float WorldMarkSize = 10.0f;
+	constexpr float CentimetersPerMeter = 100.0f;
 }
 
 void AEIHud::DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Color)
@@ -53,7 +60,9 @@ void AEIHud::DrawHUD()
 	const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(GetOwningPawn());
 	const float Width = Canvas->SizeX;
 	const float Height = Canvas->SizeY;
-	DrawLine(TEXT("WASD laufen   Shift sprinten   Leertaste springen   V ausweichen   Q Feuerball   C Klasse   H Horde   R Neustart"), Margin, Margin, TextColor);
+	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	const bool bHasRun = State != nullptr && State->GetRunPhase() != EEIRunPhase::None;
+	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   V ausweichen   Q Feuerball   F benutzen   C Klasse   %sR Neustart"), bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -64,7 +73,6 @@ void AEIHud::DrawHUD()
 	{
 		Enemies += It->IsDead() ? 0 : 1;
 	}
-	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	const bool bHorde = State != nullptr && State->IsHordeActive();
 	const bool bArcanist = Hero->GetHeroClass() == EEIHeroClass::Arcanist;
 	const TCHAR* ClassName = bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht");
@@ -77,9 +85,14 @@ void AEIHud::DrawHUD()
 		Flash.A *= FMath::Min(1.0f, Hero->GetHurtFlash() / 0.35f);
 		DrawRect(Flash, 0.0f, 0.0f, Width, Height);
 	}
+	if (bHasRun)
+	{
+		DrawRun(Hero, State);
+	}
 	if (Hero->IsDead())
 	{
-		DrawLine(TEXT("Gefallen. R startet neu."), Width / 2.0f - 170.0f, Height / 2.0f - 20.0f, TextColor, 2.0f);
+		const bool bRunLost = State != nullptr && State->GetRunPhase() == EEIRunPhase::Failed;
+		DrawLine(bRunLost ? TEXT("Lauf gescheitert. R startet neu.") : TEXT("Gefallen. R startet neu."), Width / 2.0f - 170.0f, Height / 2.0f - 20.0f, TextColor, 2.0f);
 		return;
 	}
 	DrawThreats(Hero);
@@ -126,6 +139,85 @@ void AEIHud::DrawHUD()
 	{
 		const FLinearColor ChargeBarColor = bArcanist && !Caster->CanAffordFireball() ? NoManaColor : (Charge >= 1.0f ? FLinearColor::White : ChargeColor);
 		DrawBar(Width / 2.0f - 60.0f, Height / 2.0f + 40.0f, 120.0f, 8.0f, Charge, ChargeBarColor);
+	}
+}
+
+void AEIHud::DrawWorldMark(const FVector& Location, const FString& Label, const FLinearColor& Color)
+{
+	const FVector OnScreen = Project(Location);
+	// Behind the camera the projection has no depth.
+	if (OnScreen.Z <= 0.0)
+	{
+		return;
+	}
+	DrawRect(Color, OnScreen.X - WorldMarkSize / 2.0f, OnScreen.Y - WorldMarkSize / 2.0f, WorldMarkSize, WorldMarkSize);
+	DrawLine(Label, OnScreen.X + WorldMarkSize, OnScreen.Y - WorldMarkSize, TextColor);
+}
+
+void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
+{
+	const int32 Seconds = FMath::Max(0, FMath::FloorToInt(State->GetRunSeconds()));
+	const FString Clock = FString::Printf(TEXT("%d:%02d"), Seconds / 60, Seconds % 60);
+	const float LineY = Margin + 48.0f;
+	const float CenterX = Canvas->SizeX / 2.0f;
+	const float PromptY = Canvas->SizeY / 2.0f + 100.0f;
+	const auto DistanceLabel = [Hero](const TCHAR* Name, const FVector& Location)
+	{
+		return FString::Printf(TEXT("%s %.0f m"), Name, FVector::Dist(Hero->GetActorLocation(), Location) / CentimetersPerMeter);
+	};
+
+	switch (State->GetRunPhase())
+	{
+	case EEIRunPhase::OnBarge:
+		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse."), Margin, LineY, TextColor);
+		break;
+
+	case EEIRunPhase::Exploring:
+		DrawLine(FString::Printf(TEXT("%s   Entz\u00FCnde ein Leuchtfeuer, um die Barke zu rufen"), *Clock), Margin, LineY, TextColor);
+		for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)
+		{
+			DrawWorldMark(It->GetFireLocation(), DistanceLabel(TEXT("Leuchtfeuer"), It->GetActorLocation()), BeaconMarkColor);
+			if (It->IsInReach(Hero))
+			{
+				DrawLine(TEXT("F: Leuchtfeuer entz\u00FCnden"), CenterX - 120.0f, PromptY, TextColor, 1.5f);
+			}
+		}
+		break;
+
+	case EEIRunPhase::BeaconLit:
+		DrawLine(FString::Printf(TEXT("%s   Halte das Feuer noch %.0f s, bis die Barke da ist"), *Clock, State->GetBeaconHoldLeft()), Margin, LineY, TextColor);
+		for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)
+		{
+			if (It->IsLit())
+			{
+				DrawWorldMark(It->GetFireLocation(), DistanceLabel(TEXT("Feuer"), It->GetActorLocation()), BeaconMarkColor);
+			}
+		}
+		if (!State->IsBeaconHeld())
+		{
+			DrawLine(TEXT("Zur\u00FCck zum Feuer!"), CenterX - 110.0f, PromptY, WarningTextColor, 1.5f);
+		}
+		break;
+
+	case EEIRunPhase::BargeWaiting:
+		DrawLine(FString::Printf(TEXT("%s   Die Barke ist da. Steig ein!"), *Clock), Margin, LineY, TextColor);
+		for (TActorIterator<AEISkyBarge> It(GetWorld()); It; ++It)
+		{
+			DrawWorldMark(It->GetActorLocation(), DistanceLabel(TEXT("Barke"), It->GetActorLocation()), BargeMarkColor);
+			if (It->IsInBoardingZone(Hero))
+			{
+				DrawLine(TEXT("F: Einsteigen"), CenterX - 70.0f, PromptY, TextColor, 1.5f);
+			}
+		}
+		break;
+
+	case EEIRunPhase::Escaped:
+		DrawLine(TEXT("Entkommen!"), CenterX - 95.0f, Canvas->SizeY / 2.0f - 90.0f, TextColor, 2.0f);
+		DrawLine(FString::Printf(TEXT("Laufzeit %s. R startet neu."), *Clock), CenterX - 130.0f, Canvas->SizeY / 2.0f - 40.0f, TextColor, 1.5f);
+		break;
+
+	default:
+		break;
 	}
 }
 

@@ -4,6 +4,7 @@
 #include "Engine/World.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EIRunDirector.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -42,6 +43,14 @@ void AEIPlayerController::PreviewKey(FName KeyName, bool bPressed)
 	InputKey(FInputKeyEventArgs(nullptr, INPUTDEVICEID_NONE, FKey(KeyName), bPressed ? IE_Pressed : IE_Released, FPlatformTime::Cycles64()));
 }
 
+void AEIPlayerController::PreviewInvulnerable()
+{
+	if (APawn* Hero = GetPawn())
+	{
+		Hero->SetCanBeDamaged(false);
+	}
+}
+
 void AEIPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -57,6 +66,7 @@ void AEIPlayerController::SetupInputComponent()
 	DodgeAction = MakeAction(this, EInputActionValueType::Boolean);
 	PrimaryAction = MakeAction(this, EInputActionValueType::Boolean);
 	SecondaryAction = MakeAction(this, EInputActionValueType::Boolean);
+	InteractAction = MakeAction(this, EInputActionValueType::Boolean);
 	HordeAction = MakeAction(this, EInputActionValueType::Boolean);
 	RestartAction = MakeAction(this, EInputActionValueType::Boolean);
 	SpellAction = MakeAction(this, EInputActionValueType::Boolean);
@@ -73,6 +83,7 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(DodgeAction, EKeys::V);
 	Mapping->MapKey(PrimaryAction, EKeys::LeftMouseButton);
 	Mapping->MapKey(SecondaryAction, EKeys::RightMouseButton);
+	Mapping->MapKey(InteractAction, EKeys::F);
 	Mapping->MapKey(HordeAction, EKeys::H);
 	Mapping->MapKey(RestartAction, EKeys::R);
 	Mapping->MapKey(SpellAction, EKeys::Q);
@@ -90,6 +101,7 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(PrimaryAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandlePrimaryReleased);
 	Input->BindAction(SecondaryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSecondaryPressed);
 	Input->BindAction(SecondaryAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandleSecondaryReleased);
+	Input->BindAction(InteractAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleInteract);
 	Input->BindAction(HordeAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleHorde);
 	Input->BindAction(RestartAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleRestart);
 	Input->BindAction(SpellAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSpell);
@@ -198,6 +210,21 @@ void AEIPlayerController::HandleSecondaryReleased()
 	if (AEIHeroCharacter* Hero = GetLivingHero())
 	{
 		Hero->ReleaseSecondary();
+	}
+}
+
+void AEIPlayerController::HandleInteract()
+{
+	ServerInteract();
+}
+
+void AEIPlayerController::ServerInteract_Implementation()
+{
+	AEIHeroCharacter* Hero = GetLivingHero();
+	AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>();
+	if (Hero != nullptr && GameMode != nullptr)
+	{
+		GameMode->GetRun()->Interact(Hero);
 	}
 }
 
