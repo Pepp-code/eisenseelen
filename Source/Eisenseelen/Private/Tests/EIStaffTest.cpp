@@ -70,9 +70,9 @@ namespace
 
 	void AddChargedRelease(TArray<FEIPlayStep>& Steps)
 	{
-		Steps.Add(Press(EKeys::LeftMouseButton));
+		Steps.Add(Press(EKeys::RightMouseButton));
 		Steps.Add(WaitUntil(TEXT("the staff charges"), 2.0, [](const FEIPlayContext& Context) { return Context.Hero->GetCaster()->GetChargeFraction() >= 1.0f; }));
-		Steps.Add(Release(EKeys::LeftMouseButton));
+		Steps.Add(Release(EKeys::RightMouseButton));
 	}
 }
 
@@ -121,6 +121,35 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("Fire does not hurt heroes"), Context.Hero->GetHealth()->GetHealth(), *LifeBefore);
 	}));
 	Steps.Add(WaitForNoProjectiles());
+	Steps.Add(WaitForFullMana());
+
+	// Holding the attack key charges nothing, so a shot never turns into something else.
+	Steps.Add(Do([](const FEIPlayContext& Context) { AimAtMiddleDummy(Context); }));
+	Steps.Add(Press(EKeys::LeftMouseButton));
+	Steps.Add(Wait(0.6));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("Holding the attack key charges nothing"), Context.Hero->GetCaster()->GetChargeFraction(), 0.0f);
+	}));
+	Steps.Add(Release(EKeys::LeftMouseButton));
+	Steps.Add(Wait(0.05));
+	Steps.Add(WaitForNoProjectiles());
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const AEITrainingDummy* Middle = SortedDummies(Context.World)[1];
+		Context.Test->TestEqual(TEXT("A long press is still one bolt"), Middle->GetHitCount(), 1);
+		Context.Test->TestEqual(TEXT("A long press does a bolt's damage"), Middle->GetLastDamage(), Context.Hero->GetCaster()->GetValues().Bolt.Damage);
+	}));
+
+	// Letting go of the second key too early fires nothing.
+	Steps.Add(Press(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Release(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("An early release fires nothing"), CountProjectiles(Context), 0);
+	}));
 	Steps.Add(WaitForFullMana());
 
 	// The reported case: fully charged fireballs right after each other. The wide burst reaches all dummies.

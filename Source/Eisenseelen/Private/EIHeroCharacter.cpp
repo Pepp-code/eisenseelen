@@ -153,7 +153,7 @@ void AEIHeroCharacter::PressPrimary()
 {
 	if (HeroClass == EEIHeroClass::Arcanist)
 	{
-		Caster->PressStaff();
+		Caster->FireBolt();
 	}
 	else
 	{
@@ -163,14 +163,23 @@ void AEIHeroCharacter::PressPrimary()
 
 void AEIHeroCharacter::ReleasePrimary()
 {
-	if (HeroClass == EEIHeroClass::Arcanist)
-	{
-		Caster->ReleaseStaff();
-	}
-	else
+	if (HeroClass != EEIHeroClass::Arcanist)
 	{
 		Sword->ReleasePrimary();
 	}
+}
+
+void AEIHeroCharacter::PressSecondary()
+{
+	if (HeroClass == EEIHeroClass::Arcanist)
+	{
+		Caster->PressCharge();
+	}
+}
+
+void AEIHeroCharacter::ReleaseSecondary()
+{
+	Caster->ReleaseCharge();
 }
 
 void AEIHeroCharacter::PressSpell()

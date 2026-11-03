@@ -56,6 +56,7 @@ void AEIPlayerController::SetupInputComponent()
 	SprintAction = MakeAction(this, EInputActionValueType::Boolean);
 	DodgeAction = MakeAction(this, EInputActionValueType::Boolean);
 	PrimaryAction = MakeAction(this, EInputActionValueType::Boolean);
+	SecondaryAction = MakeAction(this, EInputActionValueType::Boolean);
 	BattleCryAction = MakeAction(this, EInputActionValueType::Boolean);
 	HordeAction = MakeAction(this, EInputActionValueType::Boolean);
 	RestartAction = MakeAction(this, EInputActionValueType::Boolean);
@@ -72,6 +73,7 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(SprintAction, EKeys::LeftShift);
 	Mapping->MapKey(DodgeAction, EKeys::V);
 	Mapping->MapKey(PrimaryAction, EKeys::LeftMouseButton);
+	Mapping->MapKey(SecondaryAction, EKeys::RightMouseButton);
 	Mapping->MapKey(BattleCryAction, EKeys::E);
 	Mapping->MapKey(HordeAction, EKeys::H);
 	Mapping->MapKey(RestartAction, EKeys::R);
@@ -88,6 +90,8 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(DodgeAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleDodge);
 	Input->BindAction(PrimaryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandlePrimaryPressed);
 	Input->BindAction(PrimaryAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandlePrimaryReleased);
+	Input->BindAction(SecondaryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSecondaryPressed);
+	Input->BindAction(SecondaryAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandleSecondaryReleased);
 	Input->BindAction(BattleCryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleBattleCry);
 	Input->BindAction(HordeAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleHorde);
 	Input->BindAction(RestartAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleRestart);
@@ -181,6 +185,22 @@ void AEIPlayerController::HandlePrimaryReleased()
 	if (AEIHeroCharacter* Hero = GetLivingHero())
 	{
 		Hero->ReleasePrimary();
+	}
+}
+
+void AEIPlayerController::HandleSecondaryPressed()
+{
+	if (AEIHeroCharacter* Hero = GetLivingHero())
+	{
+		Hero->PressSecondary();
+	}
+}
+
+void AEIPlayerController::HandleSecondaryReleased()
+{
+	if (AEIHeroCharacter* Hero = GetLivingHero())
+	{
+		Hero->ReleaseSecondary();
 	}
 }
 

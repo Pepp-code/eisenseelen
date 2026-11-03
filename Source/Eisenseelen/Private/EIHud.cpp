@@ -53,7 +53,7 @@ void AEIHud::DrawHUD()
 	const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(GetOwningPawn());
 	const float Width = Canvas->SizeX;
 	const float Height = Canvas->SizeY;
-	DrawLine(TEXT("WASD laufen   Shift sprinten   Leertaste springen   V ausweichen   Linke Maus Angriff (halten: stark)   Q Feuerball   E Schlachtruf   C Klasse   H Horde   R Neustart"), Margin, Margin, TextColor);
+	DrawLine(TEXT("WASD laufen   Shift sprinten   Leertaste springen   V ausweichen   Q Feuerball   E Schlachtruf   C Klasse   H Horde   R Neustart"), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -66,8 +66,10 @@ void AEIHud::DrawHUD()
 	}
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	const bool bHorde = State != nullptr && State->IsHordeActive();
-	const TCHAR* ClassName = Hero->GetHeroClass() == EEIHeroClass::Arcanist ? TEXT("Arkanist") : TEXT("Klingenwacht");
-	DrawLine(FString::Printf(TEXT("%s   Horde %s   Gegner %d"), ClassName, bHorde ? TEXT("an") : TEXT("aus"), Enemies), Margin, Margin + 24.0f, TextColor);
+	const bool bArcanist = Hero->GetHeroClass() == EEIHeroClass::Arcanist;
+	const TCHAR* ClassName = bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht");
+	const TCHAR* ClassKeys = bArcanist ? TEXT("Linke Maus Schuss   Rechte Maus halten: Feuerball") : TEXT("Linke Maus Hieb (halten: schwerer Hieb)");
+	DrawLine(FString::Printf(TEXT("%s   %s   Horde %s   Gegner %d"), ClassName, ClassKeys, bHorde ? TEXT("an") : TEXT("aus"), Enemies), Margin, Margin + 24.0f, TextColor);
 
 	if (Hero->GetHurtFlash() > 0.0f)
 	{
@@ -113,7 +115,6 @@ void AEIHud::DrawHUD()
 		DrawLine(FString::Printf(TEXT("Mana %.0f / %.0f"), Caster->GetMana(), Caster->GetMaxMana()), Margin, SpellY - 24.0f, TextColor);
 	}
 
-	const bool bArcanist = Hero->GetHeroClass() == EEIHeroClass::Arcanist;
 	const float Charge = bArcanist ? Caster->GetChargeFraction() : Hero->GetSword()->GetChargeFraction();
 	if (Charge > 0.25f)
 	{

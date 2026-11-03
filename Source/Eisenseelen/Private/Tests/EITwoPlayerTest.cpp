@@ -200,8 +200,8 @@ private:
 };
 
 /**
- * The guest fights: a sword swing and a staff bolt must count on the server and show up on the guest's machine, and
- * the server has the last word on the guest's mana.
+ * The guest fights: a sword swing, a staff bolt and a charged fireball must count on the server and show up on the
+ * guest's machine, and the server has the last word on the guest's mana.
  */
 class FEITwoPlayerCombatCommand : public IAutomationLatentCommand
 {
@@ -322,20 +322,39 @@ public:
 			Test->AddInfo(FString::Printf(TEXT("The guest's bolt: the server counts %d hits for %.0f damage"), ServerDummy->GetHitCount(), ServerDummy->GetLastDamage()));
 			Test->TestEqual(TEXT("The guest's bolt counts on the server"), ServerDummy->GetHitCount(), 1);
 			ServerDummy->ResetHits();
-			// Only the server's mana runs out, so the guest still fires and the server has to refuse.
-			Session.ServerCopyOfClientHero->GetCaster()->SpendMana(Session.ServerCopyOfClientHero->GetCaster()->GetMaxMana());
-			EISendTestKey(Session.ClientPlayer, EKeys::LeftMouseButton, IE_Pressed);
+			EISendTestKey(Session.ClientPlayer, EKeys::RightMouseButton, IE_Pressed);
 			EnterStep(9);
 			return false;
 		case 9:
+			if (Now - StepAt < 0.6)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::RightMouseButton, IE_Released);
+			EnterStep(10);
+			return false;
+		case 10:
+			if (Now - StepAt < 0.7)
+			{
+				return false;
+			}
+			Test->AddInfo(FString::Printf(TEXT("The guest's charged fireball: %d hits for %.0f damage at 180 cm"), ServerDummy->GetHitCount(), ServerDummy->GetLastDamage()));
+			Test->TestEqual(TEXT("The guest's fireball counts on the server"), ServerDummy->GetLastDamage(), Session.ClientHero->GetCaster()->GetValues().Fireball.Damage);
+			ServerDummy->ResetHits();
+			// Only the server's mana runs out, so the guest still fires and the server has to refuse.
+			Session.ServerCopyOfClientHero->GetCaster()->SpendMana(Session.ServerCopyOfClientHero->GetCaster()->GetMaxMana());
+			EISendTestKey(Session.ClientPlayer, EKeys::LeftMouseButton, IE_Pressed);
+			EnterStep(11);
+			return false;
+		case 11:
 			if (Now - StepAt < 0.05)
 			{
 				return false;
 			}
 			EISendTestKey(Session.ClientPlayer, EKeys::LeftMouseButton, IE_Released);
-			EnterStep(10);
+			EnterStep(12);
 			return false;
-		case 10:
+		case 12:
 			if (Now - StepAt < 0.5)
 			{
 				return false;

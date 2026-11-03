@@ -142,13 +142,18 @@ const FEIProjectileValues& UEICasterComponent::GetProjectile(EEICast Kind) const
 	return Kind == EEICast::Bolt ? Values.Bolt : Values.Fireball;
 }
 
-void UEICasterComponent::PressStaff()
+void UEICasterComponent::FireBolt()
+{
+	FireAsOwner(EEICast::Bolt);
+}
+
+void UEICasterComponent::PressCharge()
 {
 	bHolding = true;
 	HoldStartedAt = GetWorld()->GetTimeSeconds();
 }
 
-void UEICasterComponent::ReleaseStaff()
+void UEICasterComponent::ReleaseCharge()
 {
 	if (!bHolding)
 	{
@@ -160,7 +165,10 @@ void UEICasterComponent::ReleaseStaff()
 	{
 		GetHero()->GetViewModel()->ClearHold();
 	}
-	FireAsOwner(bCharged ? EEICast::ChargedFireball : EEICast::Bolt);
+	if (bCharged)
+	{
+		FireAsOwner(EEICast::ChargedFireball);
+	}
 }
 
 void UEICasterComponent::CastFireball()

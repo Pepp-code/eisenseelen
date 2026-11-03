@@ -58,9 +58,11 @@ public:
 	/** Server only. Keeps the share of life the hero has left. */
 	void SetHeroClass(EEIHeroClass NewClass);
 
-	/** Owner only: the attack key and the spell key, routed to the class's weapon. */
+	/** Owner only: the attack key, the second key and the spell key, routed to the class's weapon. */
 	void PressPrimary();
 	void ReleasePrimary();
+	void PressSecondary();
+	void ReleaseSecondary();
 	void PressSpell();
 	const FEIPoseLibrary& GetPoses() const { return Poses; }
 

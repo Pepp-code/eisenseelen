@@ -35,9 +35,10 @@ struct EISENSEELEN_API FEICasterValues
 };
 
 /**
- * Fire magic. The arcanist's staff fires a bolt on a tap and a fireball on a hold, without any wait but for mana. Both
- * classes also cast the fireball with the spell key, which needs no charge but has a cooldown. The owner sees it at
- * once, the server spawns the real projectile and checks cooldown and mana.
+ * Fire magic. The arcanist's staff fires a bolt on every press of the attack key and a fireball after a full charge of
+ * the second key, without any wait but for mana. Both classes also cast the fireball with the spell key, which needs no
+ * charge but has a cooldown. The owner sees it at once, the server spawns the real projectile and checks cooldown and
+ * mana.
  */
 UCLASS()
 class EISENSEELEN_API UEICasterComponent : public UActorComponent
@@ -51,8 +52,9 @@ public:
 	const FEICasterValues& GetValues() const { return Values; }
 
 	/** Owner only. */
-	void PressStaff();
-	void ReleaseStaff();
+	void FireBolt();
+	void PressCharge();
+	void ReleaseCharge();
 	void CastFireball();
 	void Deactivate();
 
