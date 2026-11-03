@@ -31,6 +31,9 @@ COVER_CLEAR_M = 22
 COVER_MIN_SIZE_M = 2
 COVER_MAX_SIZE_M = 5
 COVER_MAX_HEIGHT_M = 3
+# A new volume's brush is a cube of this size. Paths are only needed near the floor.
+VOLUME_BRUSH_M = 2
+NAVIGATION_HEIGHT_M = 12
 
 
 def spawn(actors, actor_class, location=(0, 0, 0), rotation=(0, 0, 0), label=""):
@@ -126,6 +129,10 @@ def main():
         add_place(actors, place, index)
     add_cover(actors, layout)
     add_launch_pads(actors, layout["sprungfelder"])
+
+    navigation = spawn(actors, unreal.NavMeshBoundsVolume, label="Wegfindung")
+    scale = floor_size / VOLUME_BRUSH_M
+    navigation.set_actor_scale3d(unreal.Vector(scale, scale, NAVIGATION_HEIGHT_M / VOLUME_BRUSH_M))
 
     beacon_class = unreal.load_class(None, "/Script/Eisenseelen.EIBeacon")
     for beacon in layout["leuchtfeuer"]:

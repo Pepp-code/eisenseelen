@@ -13,6 +13,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "NavigationSystem.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -36,6 +38,8 @@ namespace
 	constexpr float StuckBelowSpeedCm = 80.0f;
 	constexpr float StuckAfterSeconds = 0.6f;
 	constexpr float SidestepSeconds = 0.9f;
+	constexpr float PathGoalReachCm = 50.0f;
+	constexpr float PathRetrySeconds = 0.5f;
 
 	constexpr int32 DebrisPieces = 7;
 	constexpr float DebrisLifeSeconds = 1.8f;
@@ -174,7 +178,7 @@ AActor* AEIEnemy::FindNearestHero() const
 void AEIEnemy::TickServer(float DeltaSeconds)
 {
 	StateTime += DeltaSeconds;
-	const AActor* Target = FindNearestHero();
+	AActor* Target = FindNearestHero();
 	switch (State)
 	{
 	case EState::Chase:
@@ -184,6 +188,7 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		}
 		if (FVector::Dist(Target->GetActorLocation(), GetActorLocation()) <= Values.AttackFromMeters * CentimetersPerMeter)
 		{
+			StopWalking();
 			State = EState::Windup;
 			StateTime = 0.0f;
 			bTelegraphing = true;
@@ -230,6 +235,7 @@ void AEIEnemy::Stagger(float Seconds)
 	{
 		return;
 	}
+	StopWalking();
 	State = EState::Stagger;
 	StateTime = 0.0f;
 	StaggerSeconds = Seconds;
@@ -247,9 +253,52 @@ void AEIEnemy::StaggerFromHeavyHit(float Seconds)
 	}
 }
 
-void AEIEnemy::Steer(const AActor* Target, float DeltaSeconds)
+void AEIEnemy::StopWalking()
 {
-	// A plain straight line for now. If something blocks the way, sidestep for a moment. Paths come with the real map.
+	if (AAIController* AI = GetController<AAIController>())
+	{
+		AI->StopMovement();
+	}
+}
+
+void AEIEnemy::Steer(AActor* Target, float DeltaSeconds)
+{
+	AAIController* AI = GetController<AAIController>();
+	if (AI == nullptr)
+	{
+		return;
+	}
+	if (AI->GetMoveStatus() == EPathFollowingStatus::Moving)
+	{
+		return;
+	}
+	// A failed request stops the walker on the spot, so it is not tried again on every frame.
+	PathRetryRemaining -= DeltaSeconds;
+	if (PathRetryRemaining <= 0.0f && StandsOnPaths())
+	{
+		const bool bStopOnOverlap = false;
+		const bool bUsePathfinding = true;
+		const bool bCanStrafe = false;
+		const bool bAllowPartialPath = true;
+		if (AI->MoveToActor(Target, PathGoalReachCm, bStopOnOverlap, bUsePathfinding, bCanStrafe, nullptr, bAllowPartialPath) != EPathFollowingRequestResult::Failed)
+		{
+			return;
+		}
+		PathRetryRemaining = PathRetrySeconds;
+	}
+	SteerStraight(Target, DeltaSeconds);
+}
+
+bool AEIEnemy::StandsOnPaths() const
+{
+	const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	FNavLocation OnPaths;
+	return Navigation != nullptr && Navigation->GetDefaultNavDataInstance() != nullptr && Navigation->ProjectPointToNavigation(GetActorLocation(), OnPaths);
+}
+
+void AEIEnemy::SteerStraight(const AActor* Target, float DeltaSeconds)
+{
+	// Without paths, as in the test arena or while they are still being built: if something blocks the way, sidestep for a moment.
 	FVector Direction = (Target->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 	if (SidestepRemaining > 0.0f)
 	{

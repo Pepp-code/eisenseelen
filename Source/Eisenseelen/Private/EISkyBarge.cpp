@@ -27,6 +27,8 @@ UStaticMeshComponent* AEISkyBarge::AddPart(const TCHAR* Name, UStaticMesh* Mesh,
 	Part->SetStaticMesh(Mesh);
 	Part->SetRelativeLocation(Location);
 	Part->SetRelativeScale3D(SizeCm / 100.0f);
+	// Otherwise the paths on the ground would be rebuilt all along its flight.
+	Part->SetCanEverAffectNavigation(false);
 	return Part;
 }
 

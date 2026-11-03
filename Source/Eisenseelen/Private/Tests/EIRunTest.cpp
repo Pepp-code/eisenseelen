@@ -2,6 +2,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
+#include "AIController.h"
 #include "EIBeacon.h"
 #include "EIEnemy.h"
 #include "EIGameMode.h"
@@ -14,6 +15,8 @@
 #include "Engine/DamageEvents.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "NavigationSystem.h"
+#include "Navigation/PathFollowingComponent.h"
 
 using namespace EITestScript;
 
@@ -213,6 +216,64 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 			Context.Test->TestFalse(TEXT("The fires are out"), Beacon->IsLit());
 		}
 		Context.Test->TestEqual(TEXT("All enemies are gone"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIPathfindingTest,
+	"Eisenseelen.Play.Run.Pathfinding",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIPathfindingTest::RunTest(const FString& Parameters)
+{
+	// The northern wall of the first place on the run map: 10 m long, along X at y = 117 m.
+	const FVector HeroSpot(0.0f, 12300.0f, HeroHeight);
+	const FVector EnemySpot(0.0f, 11100.0f, HeroHeight);
+	const TSharedRef<double> StartedAt = MakeShared<double>(0.0);
+
+	const auto FindEnemy = [](const FEIPlayContext& Context) -> AEIEnemy*
+	{
+		TActorIterator<AEIEnemy> It(Context.World);
+		return It ? *It : nullptr;
+	};
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(WaitUntil(TEXT("the paths are built"), 30.0, [](const FEIPlayContext& Context)
+	{
+		const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
+		return Navigation != nullptr && Navigation->GetDefaultNavDataInstance() != nullptr && !Navigation->IsNavigationBeingBuilt(Context.World);
+	}));
+	Steps.Add(Do([HeroSpot, EnemySpot, StartedAt](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		Teleport(Context, HeroSpot, 270.0f);
+		FHitResult Wall;
+		const bool bBlocked = Context.World->LineTraceSingleByObjectType(Wall, EnemySpot, HeroSpot, FCollisionObjectQueryParams(ECC_WorldStatic));
+		Context.Test->TestTrue(TEXT("A wall stands between enemy and hero"), bBlocked);
+		Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), EnemySpot, FRotator::ZeroRotator);
+		*StartedAt = Context.Now;
+	}));
+	Steps.Add(Wait(0.3));
+	Steps.Add(Do([FindEnemy](const FEIPlayContext& Context)
+	{
+		const AEIEnemy* Enemy = FindEnemy(Context);
+		const AAIController* AI = Enemy->GetController<AAIController>();
+		Context.Test->TestEqual(TEXT("The enemy follows a path"), AI->GetMoveStatus(), EPathFollowingStatus::Moving);
+		const FNavPathSharedPtr Path = AI->GetPathFollowingComponent()->GetPath();
+		Context.Test->TestTrue(TEXT("The path has a real course"), Path.IsValid() && Path->GetPathPoints().Num() > 2);
+		if (Path.IsValid())
+		{
+			Context.Test->AddInfo(FString::Printf(TEXT("The path around the wall has %d points, %.0f cm long"), Path->GetPathPoints().Num(), Path->GetLength()));
+		}
+	}));
+	Steps.Add(WaitUntil(TEXT("the enemy winds up beside the hero"), 8.0, [FindEnemy](const FEIPlayContext& Context) { return FindEnemy(Context)->IsTelegraphing(); }));
+	Steps.Add(Do([StartedAt, FindEnemy](const FEIPlayContext& Context)
+	{
+		const AEIEnemy* Enemy = FindEnemy(Context);
+		Context.Test->AddInfo(FString::Printf(TEXT("Around the wall in %.1f s, %.0f cm from the hero"), Context.Now - *StartedAt, FVector::Dist(Enemy->GetActorLocation(), Context.Hero->GetActorLocation())));
+		const AAIController* AI = Enemy->GetController<AAIController>();
+		Context.Test->TestNotEqual(TEXT("The enemy stands still to strike"), AI->GetMoveStatus(), EPathFollowingStatus::Moving);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

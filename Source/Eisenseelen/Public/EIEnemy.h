@@ -24,7 +24,7 @@ struct EISENSEELEN_API FEIEnemyValues
 };
 
 /**
- * The bone runner, a grey capsule for now. It runs at the nearest hero, winds up visibly and audibly, and only then
+ * The bone runner, a grey capsule for now. It finds its way to the nearest hero, winds up visibly and audibly, and only then
  * strikes, so a hero who moves away in time takes no damage. A parry or a heavy hit staggers it, which interrupts
  * everything it does. All of its decisions happen on the server.
  */
@@ -81,7 +81,10 @@ private:
 
 	void TickServer(float DeltaSeconds);
 	AActor* FindNearestHero() const;
-	void Steer(const AActor* Target, float DeltaSeconds);
+	void Steer(AActor* Target, float DeltaSeconds);
+	void SteerStraight(const AActor* Target, float DeltaSeconds);
+	bool StandsOnPaths() const;
+	void StopWalking();
 	void Strike();
 	void HandleDied();
 	void UpdateLook(float DeltaSeconds);
@@ -114,6 +117,7 @@ private:
 	float StuckSeconds = 0.0f;
 	float SidestepRemaining = 0.0f;
 	float SidestepSign = 1.0f;
+	float PathRetryRemaining = 0.0f;
 	float HurtFlashRemaining = 0.0f;
 	float TelegraphBlend = 0.0f;
 	float StaggerBlend = 0.0f;
