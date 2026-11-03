@@ -6,7 +6,8 @@
 		"angriff_ab_abstand_m": 1.7,
 		"ausholen_s": 0.5,
 		"trefferzone_m": 2.2,
-		"erholung_s": 0.6
+		"erholung_s": 0.6,
+		"taumeln_faktor_schwerer_hieb_0_bis_1": 1.0
 	},
 	"horde": {
 		"gleichzeitig_max": 20,

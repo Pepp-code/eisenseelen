@@ -28,6 +28,7 @@
 			"taumeln_s": 1.0
 		},
 		"aufladen_s": 0.6,
+		"schwerer_hieb_taumeln_s": 1.0,
 		"ketten_fenster_s": 0.5,
 		"treff_stopp_s": 0.05,
 		"kamera_stoss_grad": 1.2,

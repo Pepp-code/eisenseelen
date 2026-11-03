@@ -44,6 +44,7 @@ struct EISENSEELEN_API FEISwordValues
 	FEISwingValues Heavy;
 	FEIBlockValues Block;
 	float ChargeSeconds = 0.6f;
+	float HeavyStaggerSeconds = 1.0f;
 	float ChainWindowSeconds = 0.5f;
 	float HitStopSeconds = 0.05f;
 	float CameraKickDegrees = 1.2f;

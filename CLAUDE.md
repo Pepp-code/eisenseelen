@@ -58,10 +58,10 @@ Der Entwickler startet den Editor mit `Editor_starten.bat`. Öffne selbst kein E
 
 ## Aktueller Stand
 
-Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 20 Tests sind grün, darunter drei mit echtem Gast im Netz.
+Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 21 Tests sind grün, darunter drei mit echtem Gast im Netz.
 
 - **Bewegung:** Laufen, Sprint auf Shift, Sprung 1 m, Schwerkraft-Faktor 1,6, Ausweichen auf V, Luftlenkung, Sprungfelder. Bunnyhop und Tempo-Kette sind auf Wunsch des Entwicklers gestrichen: Ein Sprung nimmt nie mehr Tempo mit als am Boden erlaubt.
-- **Klingenwacht:** Hiebkette, schwerer Hieb, Treff-Stopp, Klingenspur. Rechte Maus halten blockt von vorn, in den ersten 0,2 s ist es eine Parade, die den Gegner taumeln lässt.
+- **Klingenwacht:** Hiebkette, schwerer Hieb, der Gegner taumeln lässt (pro Gegnerart in `Data/gegner.json` einstellbar), Treff-Stopp, Klingenspur. Rechte Maus halten blockt von vorn, in den ersten 0,2 s ist es eine Parade, die den Gegner taumeln lässt.
 - **Arkanist:** Linke Maus Feuerstab ohne Wartezeit, rechte Maus halten für den Feuerball, beides kostet Mana mit Anzeige. Feuerball auch auf Q mit Abklingzeit. Klassenwechsel auf C.
 - **Gegner:** Knochenläufer als graue Kapseln, Horde auf H, Neustart auf R. Der Schlachtruf liegt auf E.
 

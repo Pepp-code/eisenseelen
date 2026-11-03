@@ -62,7 +62,8 @@ bool FEIEnemyValues::LoadFromProjectFile(FEIEnemyValues& OutValues, FString& Out
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("angriff_ab_abstand_m"), 0.5, 20.0, Loaded.AttackFromMeters, OutError)
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("ausholen_s"), 0.0, 10.0, Loaded.WindupSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("trefferzone_m"), 0.5, 20.0, Loaded.HitZoneMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("erholung_s"), 0.0, 10.0, Loaded.RecoverSeconds, OutError))
+		|| !FEIDataFile::ReadNumber(**Runner, TEXT("erholung_s"), 0.0, 10.0, Loaded.RecoverSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(**Runner, TEXT("taumeln_faktor_schwerer_hieb_0_bis_1"), 0.0, 1.0, Loaded.HeavyHitStaggerFactor, OutError))
 	{
 		return false;
 	}
@@ -116,13 +117,20 @@ void AEIEnemy::BeginPlay()
 		return;
 	}
 	FString Error;
-	if (!FEIEnemyValues::LoadFromProjectFile(Values, Error))
+	FEIEnemyValues Loaded;
+	if (!FEIEnemyValues::LoadFromProjectFile(Loaded, Error))
 	{
 		FEIDataFile::ReportError(TEXT("gegner.json"), Error);
 	}
-	GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter;
+	ApplyValues(Loaded);
 	Health->Reset(Values.Life);
 	Health->OnDied.AddUObject(this, &AEIEnemy::HandleDied);
+}
+
+void AEIEnemy::ApplyValues(const FEIEnemyValues& NewValues)
+{
+	Values = NewValues;
+	GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter;
 }
 
 void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -228,6 +236,15 @@ void AEIEnemy::Stagger(float Seconds)
 	bStaggering = true;
 	bTelegraphing = false;
 	OnRep_Telegraphing();
+}
+
+void AEIEnemy::StaggerFromHeavyHit(float Seconds)
+{
+	const float Arriving = Seconds * Values.HeavyHitStaggerFactor;
+	if (Arriving > 0.0f)
+	{
+		Stagger(Arriving);
+	}
 }
 
 void AEIEnemy::Steer(const AActor* Target, float DeltaSeconds)

@@ -256,6 +256,68 @@ bool FEIBlockTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIHeavyStaggerTest,
+	"Eisenseelen.Play.Enemy.HeavyStagger",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIHeavyStaggerTest::RunTest(const FString& Parameters)
+{
+	// Tough enough to survive, because a heavy swing kills a normal runner outright.
+	constexpr float ToughLife = 1000.0f;
+	const auto SwingHits = [ToughLife](const TCHAR* What)
+	{
+		return WaitUntil(What, 2.0, [ToughLife](const FEIPlayContext& Context) { return FindEnemy(Context)->GetHealth()->GetHealth() < ToughLife; });
+	};
+	const auto WaitForSwingEnd = []()
+	{
+		return WaitUntil(TEXT("the swing ends"), 2.0, [](const FEIPlayContext& Context) { return !Context.Hero->GetSword()->IsSwinging(); });
+	};
+	const auto AddHeavySwing = [](TArray<FEIPlayStep>& InSteps)
+	{
+		InSteps.Add(Press(EKeys::LeftMouseButton));
+		InSteps.Add(WaitUntil(TEXT("the sword charges"), 2.0, [](const FEIPlayContext& Context) { return Context.Hero->GetSword()->GetChargeFraction() >= 1.0f; }));
+		InSteps.Add(Release(EKeys::LeftMouseButton));
+	};
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, 0.0f); }));
+	Steps.Add(Wait(0.2));
+	Steps.Add(Do([ToughLife](const FEIPlayContext& Context) { SpawnEnemyAhead(Context, 180.0f)->GetHealth()->Reset(ToughLife); }));
+
+	// A light swing does not stagger.
+	AddTap(Steps, EKeys::LeftMouseButton);
+	Steps.Add(SwingHits(TEXT("the light swing hits")));
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Test->TestFalse(TEXT("A light swing does not stagger"), FindEnemy(Context)->IsStaggering()); }));
+	Steps.Add(WaitForSwingEnd());
+	Steps.Add(Do([ToughLife](const FEIPlayContext& Context) { FindEnemy(Context)->GetHealth()->Reset(ToughLife); }));
+
+	// A heavy swing does, and the runner goes on afterwards.
+	AddHeavySwing(Steps);
+	Steps.Add(SwingHits(TEXT("the heavy swing hits")));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("A heavy swing staggers"), FindEnemy(Context)->IsStaggering());
+		Context.Test->TestFalse(TEXT("The stagger stops the windup"), FindEnemy(Context)->IsTelegraphing());
+	}));
+	Steps.Add(WaitUntil(TEXT("the stagger ends"), 3.0, [](const FEIPlayContext& Context) { return !FindEnemy(Context)->IsStaggering(); }));
+	Steps.Add(WaitForSwingEnd());
+
+	// A kind of enemy with a factor of 0 does not care.
+	Steps.Add(Do([ToughLife](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Enemy = FindEnemy(Context);
+		FEIEnemyValues Resistant = Enemy->GetValues();
+		Resistant.HeavyHitStaggerFactor = 0.0f;
+		Enemy->ApplyValues(Resistant);
+		Enemy->GetHealth()->Reset(ToughLife);
+	}));
+	AddHeavySwing(Steps);
+	Steps.Add(SwingHits(TEXT("the heavy swing hits the resistant kind")));
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Test->TestFalse(TEXT("A resistant kind does not stagger"), FindEnemy(Context)->IsStaggering()); }));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEIHordeTest,
 	"Eisenseelen.Play.Enemy.Horde",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

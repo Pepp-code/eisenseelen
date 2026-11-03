@@ -93,6 +93,7 @@ bool FEISwordValues::LoadFromProjectFile(FEISwordValues& OutValues, FString& Out
 		|| !ReadSwing(**Sword, TEXT("schwerer_hieb"), Loaded.Heavy, OutError)
 		|| !ReadBlock(**Sword, Loaded.Block, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("aufladen_s"), 0.1, 5.0, Loaded.ChargeSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(**Sword, TEXT("schwerer_hieb_taumeln_s"), 0.0, 30.0, Loaded.HeavyStaggerSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("ketten_fenster_s"), 0.0, 5.0, Loaded.ChainWindowSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("treff_stopp_s"), 0.0, 0.5, Loaded.HitStopSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("kamera_stoss_grad"), 0.0, 30.0, Loaded.CameraKickDegrees, OutError)
@@ -420,6 +421,10 @@ void UEISwordComponent::HitActor(AActor* Target, const FVector& Location)
 	const float Damage = Swing.Damage * FMath::Max(0.0f, 1.0f - Swing.TargetFalloff * HitThisSwing.Num());
 	HitThisSwing.Add(Target);
 	UGameplayStatics::ApplyDamage(Target, Damage, Hero->GetController(), Hero, nullptr);
+	if (AEIEnemy* Enemy = Cast<AEIEnemy>(Target); Enemy != nullptr && SwingKind == EEISwingKind::Heavy)
+	{
+		Enemy->StaggerFromHeavyHit(Values.HeavyStaggerSeconds);
+	}
 	MulticastHitFeedback(Location, SwingKind == EEISwingKind::Heavy);
 }
 

@@ -18,14 +18,15 @@ struct EISENSEELEN_API FEIEnemyValues
 	float WindupSeconds = 0.5f;
 	float HitZoneMeters = 2.2f;
 	float RecoverSeconds = 0.6f;
+	float HeavyHitStaggerFactor = 1.0f;
 
 	static bool LoadFromProjectFile(FEIEnemyValues& OutValues, FString& OutError);
 };
 
 /**
  * The bone runner, a grey capsule for now. It runs at the nearest hero, winds up visibly and audibly, and only then
- * strikes, so a hero who moves away in time takes no damage. A parry staggers it, which interrupts everything it does.
- * All of its decisions happen on the server.
+ * strikes, so a hero who moves away in time takes no damage. A parry or a heavy hit staggers it, which interrupts
+ * everything it does. All of its decisions happen on the server.
  */
 UCLASS()
 class EISENSEELEN_API AEIEnemy : public ACharacter
@@ -42,9 +43,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void Stagger(float Seconds);
 
+	/** Server only. How much of this stagger arrives depends on the kind of enemy, down to nothing at all. */
+	void StaggerFromHeavyHit(float Seconds);
+
 	bool IsDead() const;
 	UEIHealthComponent* GetHealth() const { return Health; }
 	const FEIEnemyValues& GetValues() const { return Values; }
+	void ApplyValues(const FEIEnemyValues& NewValues);
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
