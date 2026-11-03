@@ -139,9 +139,6 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	{
 		SwitchOffDirector(Context);
 		SkipRitual(Context);
-		FEIHeroValues WithDodge = Context.Hero->GetValues();
-		WithDodge.DodgeSwitch = 1.0f;
-		Context.Hero->ApplyValues(WithDodge);
 		Context.Test->TestEqual(TEXT("The run starts on the barge"), GetState(Context)->GetRunPhase(), EEIRunPhase::OnBarge);
 		Context.Test->TestTrue(TEXT("The barge flies high"), Context.Hero->GetActorLocation().Z > GetBarge(Context)->GetDeckHeight());
 		Context.Test->TestTrue(TEXT("The hero stands on the deck"), Context.Movement->IsMovingOnGround());
@@ -170,15 +167,13 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		Context.Test->TestTrue(TEXT("The dive limits the fall"), -Velocity.Z <= FallSpeed + SpeedToleranceCm);
 	}));
 
-	// Neither dodging nor jumping stops the dive.
-	AddTap(Steps, EKeys::V);
+	// Jumping does not stop the dive.
 	AddTap(Steps, EKeys::SpaceBar);
 	Steps.Add(Wait(0.03));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		const float FallSpeed = Context.Hero->GetValues().DiveFallSpeedMetersPerSecond * CentimetersPerMeter;
 		Context.Test->TestTrue(TEXT("The dive goes on"), Context.Movement->IsDiving());
-		Context.Test->TestTrue(TEXT("No dodge in the dive"), Context.Movement->IsDodgeReady());
 		Context.Test->TestNearlyEqual(TEXT("Nothing stops the fall in the dive"), static_cast<float>(-Context.Hero->GetVelocity().Z), FallSpeed, SpeedToleranceCm);
 	}));
 	Steps.Add(WaitUntil(TEXT("the hero lands"), 15.0, [](const FEIPlayContext& Context) { return Context.Movement->IsMovingOnGround(); }));

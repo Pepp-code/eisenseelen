@@ -59,7 +59,6 @@ private:
 	void HandleJumpEnded();
 	void HandleSprintStarted();
 	void HandleSprintEnded();
-	void HandleDodge();
 	void HandlePrimaryPressed();
 	void HandlePrimaryReleased();
 	void HandleSecondaryPressed();
@@ -103,9 +102,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> SprintAction;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UInputAction> DodgeAction;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> PrimaryAction;

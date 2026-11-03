@@ -91,9 +91,6 @@ public:
 	/** A press shortly before landing counts as a jump on landing, so it does not get lost to bad luck. */
 	void PressJump();
 
-	/** Called by the movement component once per dodge, not again when a move is replayed. */
-	void OnDodgePerformed();
-
 	virtual void Landed(const FHitResult& Hit) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PossessedBy(AController* NewController) override;
@@ -104,7 +101,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	/** The one jump stays unused after a dodge or a fall, it is only spent by jumping. Only the dive has none to offer. */
+	/** The one jump stays unused after a fall, it is only spent by jumping. Only the dive has none to offer. */
 	virtual bool CanJumpWhileFalling() const override;
 
 private:

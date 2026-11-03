@@ -388,11 +388,3 @@ void AEIHeroCharacter::OnMovementModeChanged(EMovementMode PreviousMovementMode,
 		Jump();
 	}
 }
-
-void AEIHeroCharacter::OnDodgePerformed()
-{
-	if (IsLocallyControlled())
-	{
-		EIVisuals::PlaySound2D(this, TEXT("Dash"));
-	}
-}

@@ -17,10 +17,7 @@ namespace
 	constexpr float CentimetersPerMeter = 100.0f;
 	constexpr float SpeedToleranceCm = 40.0f;
 
-	float DodgeSpeedCm(const FEIPlayContext& Context)
-	{
-		return Context.Hero->GetValues().DodgeSpeedMetersPerSecond * CentimetersPerMeter;
-	}
+	constexpr float FastSpeedCm = 1150.0f;
 
 	float SprintSpeedCm(const FEIPlayContext& Context)
 	{
@@ -37,145 +34,12 @@ namespace
 		return static_cast<float>(Context.Hero->GetVelocity().Size2D());
 	}
 
-	/** The dodge is switched off in the project's values for now, and these tests keep it working for when it comes back. */
-	void SetDodge(const FEIPlayContext& Context, bool bOn)
+	/** Faster than running, as after a jump pad, and in the air. */
+	void FlingForwards(const FEIPlayContext& Context)
 	{
-		FEIHeroValues Values = Context.Hero->GetValues();
-		Values.DodgeSwitch = bOn ? 1.0f : 0.0f;
-		Context.Hero->ApplyValues(Values);
-	}
-
-	FEIPlayStep WaitForDodgeReady()
-	{
-		return WaitUntil(TEXT("the dodge is ready"), 6.0, [](const FEIPlayContext& Context) { return Context.Movement->IsDodgeReady(); });
-	}
-}
-
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FEIDodgeTest,
-	"Eisenseelen.Play.Movement.Dodge",
-	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-bool FEIDodgeTest::RunTest(const FString& Parameters)
-{
-	TArray<FEIPlayStep> Steps;
-
-	// Switched off, the key does nothing.
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		SetDodge(Context, false);
-		Teleport(Context, OpenFloor, BackwardsYaw);
-	}));
-	Steps.Add(Wait(0.3));
-	AddTap(Steps, EKeys::V);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestTrue(TEXT("Switched off, the key does not dodge"), Context.Movement->IsDodgeReady());
-		SetDodge(Context, true);
-	}));
-
-	// From a standstill: full speed, small hop, cooldown.
-	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, BackwardsYaw); }));
-	Steps.Add(Wait(0.3));
-	AddTap(Steps, EKeys::V);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->AddInfo(FString::Printf(TEXT("Dodge from a standstill: %.0f cm/s"), HorizontalSpeed(Context)));
-		Context.Test->TestNearlyEqual(TEXT("A dodge from a standstill has its speed"), HorizontalSpeed(Context), DodgeSpeedCm(Context), SpeedToleranceCm);
-		Context.Test->TestTrue(TEXT("The dodge is a small hop"), Context.Movement->IsFalling());
-		Context.Test->TestTrue(TEXT("The dodge goes backwards without input"), FVector::DotProduct(Context.Hero->GetVelocity(), Context.Hero->GetActorForwardVector()) < 0.0);
-		Context.Test->TestFalse(TEXT("The dodge starts its cooldown"), Context.Movement->IsDodgeReady());
-	}));
-
-	// A second dodge during the cooldown does nothing.
-	AddTap(Steps, EKeys::V);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestTrue(TEXT("No second dodge during the cooldown"), HorizontalSpeed(Context) < DodgeSpeedCm(Context) + SpeedToleranceCm);
-	}));
-
-	// The dodge leaves the jump unused, and the air jump is only there once.
-	AddTap(Steps, EKeys::SpaceBar);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestTrue(TEXT("A jump still works in the air after a dodge"), Context.Hero->GetVelocity().Z > Context.Movement->JumpZVelocity * 0.7);
-		Context.Hero->GetCharacterMovement()->Velocity.Z = -100.0;
-	}));
-	AddTap(Steps, EKeys::SpaceBar);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestTrue(TEXT("There is no second jump in the air"), Context.Hero->GetVelocity().Z < 0.0);
-	}));
-	Steps.Add(WaitForGround());
-	Steps.Add(WaitForDodgeReady());
-
-	// Running: the speed of the dodge does not come on top.
-	Steps.Add(Wait(0.4));
-	Steps.Add(Press(EKeys::W));
-	Steps.Add(Wait(0.6));
-	AddTap(Steps, EKeys::V);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->AddInfo(FString::Printf(TEXT("Dodge while running: %.0f cm/s"), HorizontalSpeed(Context)));
-		Context.Test->TestNearlyEqual(TEXT("A dodge while running has the same speed"), HorizontalSpeed(Context), DodgeSpeedCm(Context), SpeedToleranceCm);
-	}));
-	Steps.Add(Release(EKeys::W));
-	Steps.Add(WaitForGround());
-	Steps.Add(WaitForDodgeReady());
-
-	// The dodge follows the input, here to the right.
-	Steps.Add(Wait(0.4));
-	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, 0.0f); }));
-	Steps.Add(Wait(0.2));
-	Steps.Add(Press(EKeys::D));
-	Steps.Add(Wait(0.05));
-	AddTap(Steps, EKeys::V);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		const FVector Velocity = Context.Hero->GetVelocity();
-		Context.Test->TestTrue(TEXT("The dodge follows the input"), Velocity.Y > 400.0 && FMath::Abs(Velocity.X) < 100.0);
-	}));
-	Steps.Add(Release(EKeys::D));
-	Steps.Add(WaitForGround());
-	Steps.Add(WaitForDodgeReady());
-
-	// A dodge also works in the air.
-	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, BackwardsYaw); }));
-	Steps.Add(Wait(0.3));
-	AddTap(Steps, EKeys::SpaceBar);
-	Steps.Add(Wait(0.05));
-	AddTap(Steps, EKeys::V);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestNearlyEqual(TEXT("A dodge works in the air"), HorizontalSpeed(Context), DodgeSpeedCm(Context), SpeedToleranceCm);
-	}));
-	Steps.Add(WaitForGround());
-	Steps.Add(WaitForDodgeReady());
-
-	// But it does not stop a fall.
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Teleport(Context, OpenFloor + FVector(0.0f, 0.0f, 500.0f), BackwardsYaw);
 		Context.Movement->SetMovementMode(MOVE_Falling);
-		Context.Movement->Velocity = FVector(0.0, 0.0, -300.0);
-	}));
-	AddTap(Steps, EKeys::V);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestFalse(TEXT("The dodge in the fall happens"), Context.Movement->IsDodgeReady());
-		Context.Test->TestTrue(TEXT("A dodge does not stop a fall"), Context.Hero->GetVelocity().Z < -300.0);
-	}));
-	Steps.Add(WaitForGround());
-	return RunInArena(this, MoveTemp(Steps));
+		Context.Movement->Velocity = Context.Hero->GetActorForwardVector() * FastSpeedCm + FVector(0.0, 0.0, 300.0);
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -186,14 +50,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FEINoBunnyHopTest::RunTest(const FString& Parameters)
 {
 	TArray<FEIPlayStep> Steps;
-	Steps.Add(Do([](const FEIPlayContext& Context) { SetDodge(Context, true); }));
-	const auto DodgeWhileRunning = [&Steps]()
+	const auto FlungWhileRunning = [&Steps]()
 	{
 		Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, BackwardsYaw); }));
 		Steps.Add(Wait(0.3));
 		Steps.Add(Press(EKeys::W));
 		Steps.Add(Wait(0.5));
-		AddTap(Steps, EKeys::V);
+		Steps.Add(Do(FlingForwards));
 		Steps.Add(Wait(0.03));
 	};
 	const auto ExpectRunSpeedAtMost = [](const TCHAR* What)
@@ -205,8 +68,8 @@ bool FEINoBunnyHopTest::RunTest(const FString& Parameters)
 		});
 	};
 
-	// A jump at the moment of landing keeps nothing of the dodge.
-	DodgeWhileRunning();
+	// A jump at the moment of landing keeps nothing of the flight.
+	FlungWhileRunning();
 	Steps.Add(WaitForGround());
 	Steps.Add(Press(EKeys::SpaceBar));
 	Steps.Add(WaitUntil(TEXT("the jump after landing happens"), 0.3, [](const FEIPlayContext& Context) { return Context.Movement->IsFalling(); }));
@@ -214,23 +77,28 @@ bool FEINoBunnyHopTest::RunTest(const FString& Parameters)
 	Steps.Add(Release(EKeys::SpaceBar));
 	Steps.Add(WaitForGround());
 	Steps.Add(Release(EKeys::W));
-	Steps.Add(WaitForDodgeReady());
 
-	// Neither does a jump during the dodge's hop.
-	DodgeWhileRunning();
+	// Neither does a jump during the flight, and there is only one of them.
+	FlungWhileRunning();
 	AddTap(Steps, EKeys::SpaceBar);
 	Steps.Add(Wait(0.03));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestTrue(TEXT("The jump in the hop happens"), Context.Hero->GetVelocity().Z > Context.Movement->JumpZVelocity * 0.7);
+		Context.Test->TestTrue(TEXT("The jump in the flight happens"), Context.Hero->GetVelocity().Z > Context.Movement->JumpZVelocity * 0.7);
 	}));
-	Steps.Add(ExpectRunSpeedAtMost(TEXT("A jump during the hop keeps no speed")));
+	Steps.Add(ExpectRunSpeedAtMost(TEXT("A jump during the flight keeps no speed")));
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Movement->Velocity.Z = -100.0; }));
+	AddTap(Steps, EKeys::SpaceBar);
+	Steps.Add(Wait(0.03));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("There is no second jump in the air"), Context.Hero->GetVelocity().Z < 0.0);
+	}));
 	Steps.Add(WaitForGround());
 	Steps.Add(Release(EKeys::W));
-	Steps.Add(WaitForDodgeReady());
 
-	// Without a jump the ground brakes the dodge away.
-	DodgeWhileRunning();
+	// Without a jump the ground brakes the flight away.
+	FlungWhileRunning();
 	Steps.Add(WaitForGround());
 	Steps.Add(Wait(0.6));
 	Steps.Add(ExpectRunSpeedAtMost(TEXT("Without a jump the ground brakes back to the run speed")));
@@ -290,7 +158,7 @@ bool FEISprintTest::RunTest(const FString& Parameters)
 	{
 		Context.Test->AddInfo(FString::Printf(TEXT("Sprinting at %.0f cm/s"), HorizontalSpeed(Context)));
 		Context.Test->TestNearlyEqual(TEXT("Shift sprints"), HorizontalSpeed(Context), SprintSpeedCm(Context), SpeedToleranceCm);
-		Context.Test->TestTrue(TEXT("Shift does not dodge"), Context.Movement->IsMovingOnGround() && Context.Movement->IsDodgeReady());
+		Context.Test->TestTrue(TEXT("A sprint stays on the ground"), Context.Movement->IsMovingOnGround());
 	}));
 
 	// A jump while sprinting keeps the sprint speed and adds nothing.
@@ -308,17 +176,6 @@ bool FEISprintTest::RunTest(const FString& Parameters)
 		Context.Test->TestNearlyEqual(TEXT("Without shift the hero runs again"), HorizontalSpeed(Context), RunSpeedCm(Context), SpeedToleranceCm);
 	}));
 	Steps.Add(Release(EKeys::W));
-	Steps.Add(Wait(0.3));
-
-	// Shift only sprints, the dodge stays on V.
-	Steps.Add(Do([](const FEIPlayContext& Context) { SetDodge(Context, true); }));
-	AddTap(Steps, EKeys::V);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestFalse(TEXT("V dodges"), Context.Movement->IsDodgeReady());
-	}));
-	Steps.Add(WaitForGround());
 	return RunInArena(this, MoveTemp(Steps));
 }
 
@@ -330,7 +187,6 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FEIAirSteeringTest::RunTest(const FString& Parameters)
 {
 	constexpr double SteerSeconds = 0.25;
-	constexpr float FastSpeedCm = 1150.0f;
 	constexpr float LookSidewaysYaw = 270.0f;
 	const TSharedRef<double> SteerStartedAt = MakeShared<double>(0.0);
 
@@ -344,21 +200,16 @@ bool FEIAirSteeringTest::RunTest(const FString& Parameters)
 
 	TArray<FEIPlayStep> Steps;
 
-	// The reported case: run, jump, dodge, then look to the side with W held.
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		SetDodge(Context, true);
-		Teleport(Context, OpenFloor, BackwardsYaw);
-	}));
+	// The reported case: run, fly fast, then look to the side with W held.
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, BackwardsYaw); }));
 	Steps.Add(Wait(0.3));
 	Steps.Add(Press(EKeys::W));
 	Steps.Add(Wait(0.5));
-	AddTap(Steps, EKeys::SpaceBar);
-	AddTap(Steps, EKeys::V);
+	Steps.Add(Do(FlingForwards));
 	Steps.Add(Wait(0.03));
 	Steps.Add(Do([SteerStartedAt](const FEIPlayContext& Context)
 	{
-		Context.Test->TestTrue(TEXT("The hero flies fast after the dodge"), HorizontalSpeed(Context) > DodgeSpeedCm(Context) * 0.9f);
+		Context.Test->TestTrue(TEXT("The hero flies fast"), HorizontalSpeed(Context) > FastSpeedCm * 0.9f);
 		Context.Player->SetControlRotation(FRotator(0.0f, LookSidewaysYaw, 0.0f));
 		*SteerStartedAt = Context.Now;
 	}));
@@ -371,7 +222,7 @@ bool FEIAirSteeringTest::RunTest(const FString& Parameters)
 		const double Expected = FMath::Min(90.0, Context.Hero->GetValues().AirTurnDegreesPerSecond * Seconds);
 		Context.Test->AddInfo(FString::Printf(TEXT("In %.2f s the flight turned %.0f degrees at %.0f cm/s, expected about %.0f"), Seconds, Turned, HorizontalSpeed(Context), Expected));
 		Context.Test->TestTrue(TEXT("The flight direction follows the input"), Turned >= Expected * 0.8);
-		Context.Test->TestTrue(TEXT("Steering costs no speed"), HorizontalSpeed(Context) > DodgeSpeedCm(Context) * 0.95f);
+		Context.Test->TestTrue(TEXT("Steering costs no speed"), HorizontalSpeed(Context) > FastSpeedCm * 0.95f);
 	}));
 	Steps.Add(Release(EKeys::W));
 	Steps.Add(WaitForGround());

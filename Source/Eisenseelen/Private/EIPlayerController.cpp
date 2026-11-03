@@ -115,7 +115,6 @@ void AEIPlayerController::SetupInputComponent()
 	LookAction = MakeAction(this, EInputActionValueType::Axis2D);
 	JumpAction = MakeAction(this, EInputActionValueType::Boolean);
 	SprintAction = MakeAction(this, EInputActionValueType::Boolean);
-	DodgeAction = MakeAction(this, EInputActionValueType::Boolean);
 	PrimaryAction = MakeAction(this, EInputActionValueType::Boolean);
 	SecondaryAction = MakeAction(this, EInputActionValueType::Boolean);
 	InteractAction = MakeAction(this, EInputActionValueType::Boolean);
@@ -134,7 +133,6 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(LookAction, EKeys::Mouse2D);
 	Mapping->MapKey(JumpAction, EKeys::SpaceBar);
 	Mapping->MapKey(SprintAction, EKeys::LeftShift);
-	Mapping->MapKey(DodgeAction, EKeys::V);
 	Mapping->MapKey(PrimaryAction, EKeys::LeftMouseButton);
 	Mapping->MapKey(SecondaryAction, EKeys::RightMouseButton);
 	Mapping->MapKey(InteractAction, EKeys::F);
@@ -152,7 +150,6 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandleJumpEnded);
 	Input->BindAction(SprintAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSprintStarted);
 	Input->BindAction(SprintAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandleSprintEnded);
-	Input->BindAction(DodgeAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleDodge);
 	Input->BindAction(PrimaryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandlePrimaryPressed);
 	Input->BindAction(PrimaryAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandlePrimaryReleased);
 	Input->BindAction(SecondaryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSecondaryPressed);
@@ -228,15 +225,6 @@ void AEIPlayerController::HandleSprintEnded()
 	if (AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
 	{
 		Hero->SetSprintKey(false);
-	}
-}
-
-void AEIPlayerController::HandleDodge()
-{
-	const AEIHeroCharacter* Hero = GetLivingHero();
-	if (Hero != nullptr && Hero->GetValues().IsDodgeOn())
-	{
-		Hero->GetHeroMovement()->RequestDodge();
 	}
 }
 

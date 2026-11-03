@@ -15,16 +15,10 @@ struct EISENSEELEN_API FEIHeroValues
 	float MouseFactor = 1.0f;
 	float LifeBackAfterSeconds = 6.0f;
 	float LifeBackSharePerSecond = 0.1f;
-	float DodgeSwitch = 0.0f;
-	float DodgeSpeedMetersPerSecond = 11.5f;
-	float DodgeHopMetersPerSecond = 3.0f;
-	float DodgeCooldownSeconds = 1.0f;
 	float JumpBufferSeconds = 0.12f;
 	float DiveFromHeightMeters = 20.0f;
 	float DiveSpeedMetersPerSecond = 20.0f;
 	float DiveFallSpeedMetersPerSecond = 25.0f;
-
-	bool IsDodgeOn() const { return DodgeSwitch >= 0.5f; }
 
 	/** OutValues only changes when the whole file is valid. */
 	static bool LoadFromString(const FString& Json, FEIHeroValues& OutValues, FString& OutError);

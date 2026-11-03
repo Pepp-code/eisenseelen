@@ -7,7 +7,7 @@
 struct FEIHeroValues;
 
 /**
- * The hero's movement: sprint, dodge, the slower pace of a block and the dive from the barge on top of the engine's
+ * The hero's movement: sprint, the slower pace of a block and the dive from the barge on top of the engine's
  * character movement. All of it runs inside the predicted move, so a client feels it at once and the server still decides.
  */
 UCLASS()
@@ -29,11 +29,6 @@ public:
 	/** High above the map the hero steers fast and falls at a limited speed, which makes the jump off the barge a flight. */
 	bool IsDiving() const;
 
-	void RequestDodge() { bWantsToDodge = true; }
-	bool IsDodgeReady() const { return DodgeCooldownRemaining <= 0.0f; }
-	float GetDodgeCooldownRemaining() const { return DodgeCooldownRemaining; }
-	float GetDodgeCooldownSeconds() const { return DodgeCooldownSeconds; }
-
 	virtual float GetMaxSpeed() const override;
 	virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
 	virtual FVector NewFallVelocity(const FVector& InitialVelocity, const FVector& Gravity, float DeltaTime) const override;
@@ -45,7 +40,6 @@ public:
 private:
 	friend class FEIHeroSavedMove;
 
-	void PerformDodge();
 	void SteerTowardsInput(float DeltaTime);
 
 	float SprintSpeedCm = 0.0f;
@@ -53,16 +47,11 @@ private:
 	float DiveFromHeightCm = 0.0f;
 	float DiveSpeedCm = 0.0f;
 	float DiveFallSpeedCm = 0.0f;
-	float DodgeSpeedCm = 0.0f;
-	float DodgeHopCm = 0.0f;
-	float DodgeCooldownSeconds = 0.0f;
 	float AirTurnDegreesPerSecond = 0.0f;
 
 	// The predicted state. FEIHeroSavedMove saves it, so a replayed move starts from the same values.
 	bool bWantsToSprint = false;
 	bool bWantsToBlock = false;
-	bool bWantsToDodge = false;
-	float DodgeCooldownRemaining = 0.0f;
 
 	float BlockHeldSeconds = 0.0f;
 };
