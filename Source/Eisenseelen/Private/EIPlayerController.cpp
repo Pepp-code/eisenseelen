@@ -205,7 +205,8 @@ void AEIPlayerController::HandleSprintEnded()
 
 void AEIPlayerController::HandleDodge()
 {
-	if (const AEIHeroCharacter* Hero = GetLivingHero())
+	const AEIHeroCharacter* Hero = GetLivingHero();
+	if (Hero != nullptr && Hero->GetValues().IsDodgeOn())
 	{
 		Hero->GetHeroMovement()->RequestDodge();
 	}

@@ -49,6 +49,9 @@ public:
 	UEIHealthComponent* GetHealth() const { return Health; }
 	bool IsDead() const;
 
+	/** Server only. A hit taken or dealt holds up the recovery of life for a while. */
+	void NoteCombat();
+
 	/** Seconds of the red flash left after taking a hit. For the HUD. */
 	float GetHurtFlash() const { return HurtFlashRemaining; }
 	UEISwordComponent* GetSword() const { return Sword; }
@@ -120,6 +123,7 @@ private:
 	void HandleDied();
 
 	void UpdateCameraKick(float DeltaSeconds);
+	void UpdateRecovery(float DeltaSeconds);
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UCameraComponent> Camera;
@@ -150,6 +154,7 @@ private:
 	float CameraKickRemaining = 0.0f;
 	float CameraKickDegrees = 0.0f;
 	float HurtFlashRemaining = 0.0f;
+	double LastCombatAt = -TNumericLimits<float>::Max();
 	double BufferedJumpUntil = -1.0;
 	bool bJumpOnGround = false;
 	bool bSprintKeyHeld = false;

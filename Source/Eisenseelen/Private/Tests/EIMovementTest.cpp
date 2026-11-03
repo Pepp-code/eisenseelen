@@ -37,6 +37,14 @@ namespace
 		return static_cast<float>(Context.Hero->GetVelocity().Size2D());
 	}
 
+	/** The dodge is switched off in the project's values for now, and these tests keep it working for when it comes back. */
+	void SetDodge(const FEIPlayContext& Context, bool bOn)
+	{
+		FEIHeroValues Values = Context.Hero->GetValues();
+		Values.DodgeSwitch = bOn ? 1.0f : 0.0f;
+		Context.Hero->ApplyValues(Values);
+	}
+
 	FEIPlayStep WaitForDodgeReady()
 	{
 		return WaitUntil(TEXT("the dodge is ready"), 6.0, [](const FEIPlayContext& Context) { return Context.Movement->IsDodgeReady(); });
@@ -51,6 +59,21 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FEIDodgeTest::RunTest(const FString& Parameters)
 {
 	TArray<FEIPlayStep> Steps;
+
+	// Switched off, the key does nothing.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		SetDodge(Context, false);
+		Teleport(Context, OpenFloor, BackwardsYaw);
+	}));
+	Steps.Add(Wait(0.3));
+	AddTap(Steps, EKeys::V);
+	Steps.Add(Wait(0.03));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("Switched off, the key does not dodge"), Context.Movement->IsDodgeReady());
+		SetDodge(Context, true);
+	}));
 
 	// From a standstill: full speed, small hop, cooldown.
 	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, BackwardsYaw); }));
@@ -163,6 +186,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FEINoBunnyHopTest::RunTest(const FString& Parameters)
 {
 	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context) { SetDodge(Context, true); }));
 	const auto DodgeWhileRunning = [&Steps]()
 	{
 		Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, BackwardsYaw); }));
@@ -287,6 +311,7 @@ bool FEISprintTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.3));
 
 	// Shift only sprints, the dodge stays on V.
+	Steps.Add(Do([](const FEIPlayContext& Context) { SetDodge(Context, true); }));
 	AddTap(Steps, EKeys::V);
 	Steps.Add(Wait(0.03));
 	Steps.Add(Do([](const FEIPlayContext& Context)
@@ -320,7 +345,11 @@ bool FEIAirSteeringTest::RunTest(const FString& Parameters)
 	TArray<FEIPlayStep> Steps;
 
 	// The reported case: run, jump, dodge, then look to the side with W held.
-	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, BackwardsYaw); }));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		SetDodge(Context, true);
+		Teleport(Context, OpenFloor, BackwardsYaw);
+	}));
 	Steps.Add(Wait(0.3));
 	Steps.Add(Press(EKeys::W));
 	Steps.Add(Wait(0.5));

@@ -245,6 +245,26 @@ void AEIHeroCharacter::Tick(float DeltaSeconds)
 	}
 	UpdateCameraKick(DeltaSeconds);
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);
+	if (HasAuthority())
+	{
+		UpdateRecovery(DeltaSeconds);
+	}
+}
+
+void AEIHeroCharacter::NoteCombat()
+{
+	LastCombatAt = GetWorld()->GetTimeSeconds();
+}
+
+void AEIHeroCharacter::UpdateRecovery(float DeltaSeconds)
+{
+	const bool bQuiet = GetWorld()->GetTimeSeconds() - LastCombatAt >= Values.LifeBackAfterSeconds;
+	const bool bRecovering = bQuiet && !IsDead() && Health->GetHealth() < Health->GetMaxHealth();
+	Health->SetRecovering(bRecovering);
+	if (bRecovering)
+	{
+		Health->Heal(Health->GetMaxHealth() * Values.LifeBackSharePerSecond * DeltaSeconds);
+	}
 }
 
 void AEIHeroCharacter::AddCameraKick(float Degrees)
@@ -268,6 +288,10 @@ void AEIHeroCharacter::UpdateCameraKick(float DeltaSeconds)
 float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	const float Incoming = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	if (Incoming > 0.0f)
+	{
+		NoteCombat();
+	}
 	const float Applied = Health->ApplyDamage(Sword->BlockDamage(Incoming, DamageCauser));
 	if (Applied > 0.0f)
 	{

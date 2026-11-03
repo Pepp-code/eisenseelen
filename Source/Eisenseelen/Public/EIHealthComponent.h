@@ -17,6 +17,12 @@ public:
 
 	/** Server only. More life at once, and more room for it. */
 	void AddMaxHealth(float Amount);
+
+	/** Server only. Never above the maximum, and the dead stay dead. */
+	void Heal(float Amount);
+	void SetRecovering(bool bNow) { bRecovering = bNow; }
+	bool IsRecovering() const { return bRecovering; }
+
 	float GetHealth() const { return Health; }
 	float GetMaxHealth() const { return MaxHealth; }
 	bool IsDead() const { return Health <= 0.0f; }
@@ -34,4 +40,7 @@ private:
 
 	UPROPERTY(Replicated)
 	float MaxHealth = 100.0f;
+
+	UPROPERTY(Replicated)
+	bool bRecovering = false;
 };

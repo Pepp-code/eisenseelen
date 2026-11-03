@@ -23,6 +23,7 @@ namespace
 	const FLinearColor TextColor(0.95f, 0.95f, 0.92f);
 	const FLinearColor LifeColor(0.75f, 0.12f, 0.1f);
 	const FLinearColor DodgeColor(0.3f, 0.7f, 1.0f);
+	const FLinearColor RecoveringColor(0.3f, 0.8f, 0.35f);
 	const FLinearColor ChargeColor(1.0f, 0.7f, 0.2f);
 	const FLinearColor SpellColor(1.0f, 0.42f, 0.1f);
 	const FLinearColor ManaColor(0.2f, 0.4f, 1.0f);
@@ -74,7 +75,8 @@ void AEIHud::DrawHUD()
 	const float Height = Canvas->SizeY;
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	const bool bHasRun = State != nullptr && State->GetRunPhase() != EEIRunPhase::None;
-	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   V ausweichen   Q Feuerball   F benutzen   C Klasse   %sR Neustart"), bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
+	const TCHAR* DodgeKey = Hero != nullptr && Hero->GetValues().IsDodgeOn() ? TEXT("V ausweichen   ") : TEXT("");
+	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   %sQ Feuerball   F benutzen   C Klasse   %sR Neustart"), DodgeKey, bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -120,13 +122,16 @@ void AEIHud::DrawHUD()
 
 	const UEIHealthComponent* Health = Hero->GetHealth();
 	const float LifeY = Height - Margin - BarHeight;
-	DrawBar(Margin, LifeY, BarWidth, BarHeight, Health->GetHealth() / FMath::Max(Health->GetMaxHealth(), 1.0f), LifeColor);
-	DrawLine(FString::Printf(TEXT("Leben %.0f / %.0f"), Health->GetHealth(), Health->GetMaxHealth()), Margin, LifeY - 24.0f, TextColor);
+	DrawBar(Margin, LifeY, BarWidth, BarHeight, Health->GetHealth() / FMath::Max(Health->GetMaxHealth(), 1.0f), Health->IsRecovering() ? RecoveringColor : LifeColor);
+	DrawLine(FString::Printf(TEXT("Leben %.0f / %.0f%s"), Health->GetHealth(), Health->GetMaxHealth(), Health->IsRecovering() ? TEXT("   erholt sich") : TEXT("")), Margin, LifeY - 24.0f, TextColor);
 
-	const UEIHeroMovementComponent* Movement = Hero->GetHeroMovement();
-	const float DodgeCooldown = FMath::Max(Movement->GetDodgeCooldownSeconds(), KINDA_SMALL_NUMBER);
-	DrawBar(Margin + BarWidth + Margin, LifeY, BarWidth / 2.0f, BarHeight, 1.0f - Movement->GetDodgeCooldownRemaining() / DodgeCooldown, DodgeColor);
-	DrawLine(TEXT("Ausweichen"), Margin + BarWidth + Margin, LifeY - 24.0f, TextColor);
+	if (Hero->GetValues().IsDodgeOn())
+	{
+		const UEIHeroMovementComponent* Movement = Hero->GetHeroMovement();
+		const float DodgeCooldown = FMath::Max(Movement->GetDodgeCooldownSeconds(), KINDA_SMALL_NUMBER);
+		DrawBar(Margin + BarWidth + Margin, LifeY, BarWidth / 2.0f, BarHeight, 1.0f - Movement->GetDodgeCooldownRemaining() / DodgeCooldown, DodgeColor);
+		DrawLine(TEXT("Ausweichen"), Margin + BarWidth + Margin, LifeY - 24.0f, TextColor);
+	}
 
 	const float Speed = static_cast<float>(Hero->GetVelocity().Size2D()) / 100.0f;
 	DrawLine(FString::Printf(TEXT("%.1f m/s"), Speed), Margin + BarWidth + Margin + BarWidth / 2.0f + Margin, LifeY - 8.0f, TextColor);

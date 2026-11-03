@@ -18,6 +18,7 @@ void UEIHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UEIHealthComponent, Health);
 	DOREPLIFETIME(UEIHealthComponent, MaxHealth);
+	DOREPLIFETIME(UEIHealthComponent, bRecovering);
 }
 
 void UEIHealthComponent::Reset(float NewMaxHealth)
@@ -32,6 +33,14 @@ void UEIHealthComponent::AddMaxHealth(float Amount)
 	if (!IsDead())
 	{
 		Health += Amount;
+	}
+}
+
+void UEIHealthComponent::Heal(float Amount)
+{
+	if (!IsDead())
+	{
+		Health = FMath::Min(Health + Amount, MaxHealth);
 	}
 }
 

@@ -123,9 +123,14 @@ public:
 		switch (Step)
 		{
 		case 0:
+		{
+			FEIHeroValues WithDodge = Session.ClientHero->GetValues();
+			WithDodge.DodgeSwitch = 1.0f;
+			Session.ClientHero->ApplyValues(WithDodge);
 			Session.ClientPlayer->SetControlRotation(FRotator(0.0f, 180.0f, 0.0f));
 			EnterStep(1);
 			return false;
+		}
 		case 1:
 			if (Now - StepAt < 0.5)
 			{

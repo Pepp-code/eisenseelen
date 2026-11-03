@@ -116,6 +116,9 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	{
 		SwitchOffDirector(Context);
 		SkipRitual(Context);
+		FEIHeroValues WithDodge = Context.Hero->GetValues();
+		WithDodge.DodgeSwitch = 1.0f;
+		Context.Hero->ApplyValues(WithDodge);
 		Context.Test->TestEqual(TEXT("The run starts on the barge"), GetState(Context)->GetRunPhase(), EEIRunPhase::OnBarge);
 		Context.Test->TestTrue(TEXT("The barge flies high"), Context.Hero->GetActorLocation().Z > GetBarge(Context)->GetDeckHeight());
 		Context.Test->TestTrue(TEXT("The hero stands on the deck"), Context.Movement->IsMovingOnGround());

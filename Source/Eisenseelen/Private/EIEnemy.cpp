@@ -339,6 +339,10 @@ void AEIEnemy::Strike()
 float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	const float Applied = Health->ApplyDamage(Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser));
+	if (AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(DamageCauser); Hero != nullptr && Applied > 0.0f)
+	{
+		Hero->NoteCombat();
+	}
 	if (Applied > 0.0f && !IsDead())
 	{
 		MulticastHurt();
