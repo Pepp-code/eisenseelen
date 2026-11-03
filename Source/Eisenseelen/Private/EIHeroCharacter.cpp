@@ -269,38 +269,6 @@ float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 	return Applied;
 }
 
-void AEIHeroCharacter::PressBattleCry()
-{
-	if (IsDead() || !IsBattleCryReady())
-	{
-		return;
-	}
-	NextBattleCryAt = GetWorld()->GetTimeSeconds() + Values.BattleCryCooldownSeconds;
-	ServerBattleCry();
-}
-
-bool AEIHeroCharacter::IsBattleCryReady() const
-{
-	return GetWorld()->GetTimeSeconds() >= NextBattleCryAt;
-}
-
-void AEIHeroCharacter::ServerBattleCry_Implementation()
-{
-	MulticastBattleCry();
-}
-
-void AEIHeroCharacter::MulticastBattleCry_Implementation()
-{
-	if (IsLocallyControlled())
-	{
-		EIVisuals::PlaySound2D(this, TEXT("Schlachtruf"));
-	}
-	else
-	{
-		EIVisuals::PlaySoundAt(this, TEXT("Schlachtruf"), GetActorLocation());
-	}
-}
-
 void AEIHeroCharacter::ApplyValues(const FEIHeroValues& NewValues)
 {
 	Values = NewValues;

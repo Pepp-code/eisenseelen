@@ -72,10 +72,6 @@ public:
 
 	void AddCameraKick(float Degrees);
 
-	/** Owner only. The server plays it for everyone. */
-	void PressBattleCry();
-	bool IsBattleCryReady() const;
-
 	/** A press shortly before landing counts as a jump on landing, so it does not get lost to bad luck. */
 	void PressJump();
 
@@ -101,12 +97,6 @@ private:
 
 	void ApplyClassToView();
 	void LoadClassValues();
-
-	UFUNCTION(Server, Reliable)
-	void ServerBattleCry();
-
-	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastBattleCry();
 
 	UFUNCTION(Client, Unreliable)
 	void ClientHurt();
@@ -143,7 +133,6 @@ private:
 	bool bViewModelBuilt = false;
 	float CameraKickRemaining = 0.0f;
 	float CameraKickDegrees = 0.0f;
-	double NextBattleCryAt = 0.0;
 	float HurtFlashRemaining = 0.0f;
 	double BufferedJumpUntil = -1.0;
 	bool bJumpOnGround = false;

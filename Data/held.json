@@ -10,6 +10,5 @@
 	"ausweichen_tempo_m_pro_s": 11.5,
 	"ausweichen_hopser_m_pro_s": 3.0,
 	"ausweichen_abklingzeit_s": 1.0,
-	"sprung_puffer_s": 0.12,
-	"schlachtruf_abklingzeit_s": 3.0
+	"sprung_puffer_s": 0.12
 }

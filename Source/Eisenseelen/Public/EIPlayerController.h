@@ -41,7 +41,6 @@ private:
 	void HandlePrimaryReleased();
 	void HandleSecondaryPressed();
 	void HandleSecondaryReleased();
-	void HandleBattleCry();
 	void HandleHorde();
 	void HandleRestart();
 	void HandleSpell();
@@ -81,9 +80,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> SecondaryAction;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UInputAction> BattleCryAction;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> HordeAction;

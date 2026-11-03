@@ -269,23 +269,14 @@ bool FEISprintTest::RunTest(const FString& Parameters)
 	Steps.Add(Release(EKeys::W));
 	Steps.Add(Wait(0.3));
 
-	// V dodges and E calls the battle cry, each only that.
+	// Shift only sprints, the dodge stays on V.
 	AddTap(Steps, EKeys::V);
 	Steps.Add(Wait(0.03));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestFalse(TEXT("V dodges"), Context.Movement->IsDodgeReady());
-		Context.Test->TestTrue(TEXT("V is no battle cry"), Context.Hero->IsBattleCryReady());
 	}));
 	Steps.Add(WaitForGround());
-	Steps.Add(WaitForDodgeReady());
-	AddTap(Steps, EKeys::E);
-	Steps.Add(Wait(0.03));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestFalse(TEXT("E calls the battle cry"), Context.Hero->IsBattleCryReady());
-		Context.Test->TestTrue(TEXT("E does not dodge"), Context.Movement->IsDodgeReady());
-	}));
 	return RunInArena(this, MoveTemp(Steps));
 }
 

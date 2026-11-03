@@ -63,13 +63,13 @@ Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 21 
 - **Bewegung:** Laufen, Sprint auf Shift, Sprung 1 m, Schwerkraft-Faktor 1,6, Ausweichen auf V, Luftlenkung, Sprungfelder. Bunnyhop und Tempo-Kette sind auf Wunsch des Entwicklers gestrichen: Ein Sprung nimmt nie mehr Tempo mit als am Boden erlaubt.
 - **Klingenwacht:** Leichte Hiebe immer hin und her, schwerer Hieb, der Gegner taumeln lässt (pro Gegnerart in `Data/gegner.json` einstellbar), Treff-Stopp, Klingenspur. Rechte Maus halten blockt von vorn, in den ersten 0,2 s ist es eine Parade, die den Gegner taumeln lässt.
 - **Arkanist:** Linke Maus Feuerstab ohne Wartezeit, rechte Maus halten für den Feuerball, beides kostet Mana mit Anzeige. Feuerball auch auf Q mit Abklingzeit. Klassenwechsel auf C.
-- **Gegner:** Knochenläufer als graue Kapseln, Horde auf H, Neustart auf R. Der Schlachtruf liegt auf E.
+- **Gegner:** Knochenläufer als graue Kapseln, Horde auf H, Neustart auf R.
 
 Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war ein Wunsch nach dem ersten Spielen. Alles andere wurde noch nicht selbst gespielt.
 
 **Als Nächstes:** Woche 12 ist der Spieltest des Entwicklers mit Lust-Check. Vor einer Rückmeldung dazu entsteht nichts Neues, außer auf ausdrücklichen Wunsch.
 
-**Bewusst noch nicht dabei:** Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Wegfindung der Gegner, Klassen-Passive.
+**Bewusst noch nicht dabei:** Waffenzauber und Runen (Plan, Abschnitt zu den Zaubern), Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Wegfindung der Gegner, Klassen-Passive.
 
 **Nicht geprüft:** Töne kann der Agent nicht hören, und die Klingenspur erscheint in keinem Standbild.
 

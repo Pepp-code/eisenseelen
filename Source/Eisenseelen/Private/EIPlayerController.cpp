@@ -57,7 +57,6 @@ void AEIPlayerController::SetupInputComponent()
 	DodgeAction = MakeAction(this, EInputActionValueType::Boolean);
 	PrimaryAction = MakeAction(this, EInputActionValueType::Boolean);
 	SecondaryAction = MakeAction(this, EInputActionValueType::Boolean);
-	BattleCryAction = MakeAction(this, EInputActionValueType::Boolean);
 	HordeAction = MakeAction(this, EInputActionValueType::Boolean);
 	RestartAction = MakeAction(this, EInputActionValueType::Boolean);
 	SpellAction = MakeAction(this, EInputActionValueType::Boolean);
@@ -74,7 +73,6 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(DodgeAction, EKeys::V);
 	Mapping->MapKey(PrimaryAction, EKeys::LeftMouseButton);
 	Mapping->MapKey(SecondaryAction, EKeys::RightMouseButton);
-	Mapping->MapKey(BattleCryAction, EKeys::E);
 	Mapping->MapKey(HordeAction, EKeys::H);
 	Mapping->MapKey(RestartAction, EKeys::R);
 	Mapping->MapKey(SpellAction, EKeys::Q);
@@ -92,7 +90,6 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(PrimaryAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandlePrimaryReleased);
 	Input->BindAction(SecondaryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSecondaryPressed);
 	Input->BindAction(SecondaryAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandleSecondaryReleased);
-	Input->BindAction(BattleCryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleBattleCry);
 	Input->BindAction(HordeAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleHorde);
 	Input->BindAction(RestartAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleRestart);
 	Input->BindAction(SpellAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSpell);
@@ -201,14 +198,6 @@ void AEIPlayerController::HandleSecondaryReleased()
 	if (AEIHeroCharacter* Hero = GetLivingHero())
 	{
 		Hero->ReleaseSecondary();
-	}
-}
-
-void AEIPlayerController::HandleBattleCry()
-{
-	if (AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
-	{
-		Hero->PressBattleCry();
 	}
 }
 

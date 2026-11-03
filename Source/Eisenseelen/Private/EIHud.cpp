@@ -53,7 +53,7 @@ void AEIHud::DrawHUD()
 	const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(GetOwningPawn());
 	const float Width = Canvas->SizeX;
 	const float Height = Canvas->SizeY;
-	DrawLine(TEXT("WASD laufen   Shift sprinten   Leertaste springen   V ausweichen   Q Feuerball   E Schlachtruf   C Klasse   H Horde   R Neustart"), Margin, Margin, TextColor);
+	DrawLine(TEXT("WASD laufen   Shift sprinten   Leertaste springen   V ausweichen   Q Feuerball   C Klasse   H Horde   R Neustart"), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
