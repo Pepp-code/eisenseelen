@@ -1,14 +1,14 @@
 {
 	"lauftempo_m_pro_s": 5.5,
+	"sprint_tempo_m_pro_s": 8.0,
 	"sprunghoehe_m": 1.0,
 	"schwerkraft_faktor": 1.6,
 	"luftkontrolle_0_bis_1": 0.55,
 	"luft_lenkung_grad_pro_s": 200.0,
 	"maus_faktor": 1.0,
-	"dash_tempo_bonus_m_pro_s": 6.0,
-	"dash_hopser_m_pro_s": 3.0,
-	"dash_abklingzeit_s": 1.0,
-	"tempo_kette_fenster_s": 0.12,
-	"hoechsttempo_m_pro_s": 22.0,
+	"ausweichen_tempo_m_pro_s": 11.5,
+	"ausweichen_hopser_m_pro_s": 3.0,
+	"ausweichen_abklingzeit_s": 1.0,
+	"sprung_puffer_s": 0.12,
 	"schlachtruf_abklingzeit_s": 3.0
 }

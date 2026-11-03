@@ -58,12 +58,12 @@ Der Entwickler startet den Editor mit `Editor_starten.bat`. Öffne selbst kein E
 
 ## Aktueller Stand
 
-Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 17 Tests sind grün, darunter zwei mit echtem Gast im Netz.
+Stufe 1 ist bis auf den Spieltest gebaut (Plan, Abschnitt 17, Woche 1–11). 18 Tests sind grün, darunter zwei mit echtem Gast im Netz.
 
-- **Bewegung:** Laufen, Sprung 1 m, Schwerkraft-Faktor 1,6, Dash, Tempo-Kette, Luftlenkung, Sprungfelder.
+- **Bewegung:** Laufen, Sprint auf Shift, Sprung 1 m, Schwerkraft-Faktor 1,6, Ausweichen auf V, Luftlenkung, Sprungfelder. Bunnyhop und Tempo-Kette sind auf Wunsch des Entwicklers gestrichen: Ein Sprung nimmt nie mehr Tempo mit als am Boden erlaubt.
 - **Klingenwacht:** Hiebkette, schwerer Hieb, Treff-Stopp, Klingenspur.
 - **Arkanist:** Feuerstab, Feuerball, Klassenwechsel auf C.
-- **Gegner:** Knochenläufer als graue Kapseln, Horde auf H, Neustart auf R.
+- **Gegner:** Knochenläufer als graue Kapseln, Horde auf H, Neustart auf R. Der Schlachtruf liegt auf E.
 
 Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war ein Wunsch nach dem ersten Spielen. Alles andere wurde noch nicht selbst gespielt.
 

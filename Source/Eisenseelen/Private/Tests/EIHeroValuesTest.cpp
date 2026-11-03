@@ -16,28 +16,29 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 	{
 		return FEIHeroValues::LoadFromString(Json, OutValues, OutError);
 	};
-	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprunghoehe_m\": 3, \"schwerkraft_faktor\": 2, \"luftkontrolle_0_bis_1\": 0.25, \"luft_lenkung_grad_pro_s\": 150, \"maus_faktor\": 2, ")
-		TEXT("\"dash_tempo_bonus_m_pro_s\": 5, \"dash_hopser_m_pro_s\": 2, \"dash_abklingzeit_s\": 1.5, \"tempo_kette_fenster_s\": 0.2, \"hoechsttempo_m_pro_s\": 20, \"schlachtruf_abklingzeit_s\": 2}");
+	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprint_tempo_m_pro_s\": 9, \"sprunghoehe_m\": 3, \"schwerkraft_faktor\": 2, \"luftkontrolle_0_bis_1\": 0.25, \"luft_lenkung_grad_pro_s\": 150, \"maus_faktor\": 2, ")
+		TEXT("\"ausweichen_tempo_m_pro_s\": 12, \"ausweichen_hopser_m_pro_s\": 2, \"ausweichen_abklingzeit_s\": 1.5, \"sprung_puffer_s\": 0.2, \"schlachtruf_abklingzeit_s\": 2}");
 
 	FEIHeroValues Values;
 	FString Error;
 	TestTrue(TEXT("A complete file loads"), Parse(Valid, Values, Error));
 	TestEqual(TEXT("Run speed"), Values.RunSpeedMetersPerSecond, 7.0f);
+	TestEqual(TEXT("Sprint speed"), Values.SprintSpeedMetersPerSecond, 9.0f);
 	TestEqual(TEXT("Jump height"), Values.JumpHeightMeters, 3.0f);
 	TestEqual(TEXT("Air control"), Values.AirControl, 0.25f);
 	TestEqual(TEXT("Air turn rate"), Values.AirTurnDegreesPerSecond, 150.0f);
 	TestEqual(TEXT("Mouse factor"), Values.MouseFactor, 2.0f);
 	TestEqual(TEXT("Gravity"), Values.GravityFactor, 2.0f);
-	TestEqual(TEXT("Dash bonus"), Values.DashSpeedBonusMetersPerSecond, 5.0f);
-	TestEqual(TEXT("Dash cooldown"), Values.DashCooldownSeconds, 1.5f);
-	TestEqual(TEXT("Max speed"), Values.MaxSpeedMetersPerSecond, 20.0f);
+	TestEqual(TEXT("Dodge speed"), Values.DodgeSpeedMetersPerSecond, 12.0f);
+	TestEqual(TEXT("Dodge cooldown"), Values.DodgeCooldownSeconds, 1.5f);
+	TestEqual(TEXT("Jump buffer"), Values.JumpBufferSeconds, 0.2f);
 
 	FEIHeroValues Untouched;
 	TestFalse(TEXT("Broken JSON is refused"), Parse(TEXT("{ lauftempo"), Untouched, Error));
 	TestEqual(TEXT("A refused file changes nothing"), Untouched.RunSpeedMetersPerSecond, FEIHeroValues().RunSpeedMetersPerSecond);
 
 	TestFalse(TEXT("A missing value is refused"), Parse(TEXT("{\"lauftempo_m_pro_s\": 7}"), Untouched, Error));
-	TestTrue(TEXT("The error names the missing value"), Error.Contains(TEXT("sprunghoehe_m")));
+	TestTrue(TEXT("The error names the missing value"), Error.Contains(TEXT("sprint_tempo_m_pro_s")));
 	TestEqual(TEXT("A partly valid file changes nothing"), Untouched.RunSpeedMetersPerSecond, FEIHeroValues().RunSpeedMetersPerSecond);
 
 	const FString TooFast = Valid.Replace(TEXT("\"lauftempo_m_pro_s\": 7"), TEXT("\"lauftempo_m_pro_s\": 500"));

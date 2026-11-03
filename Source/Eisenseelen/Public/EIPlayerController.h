@@ -34,7 +34,9 @@ private:
 	void HandleLook(const FInputActionValue& Value);
 	void HandleJumpStarted();
 	void HandleJumpEnded();
-	void HandleDash();
+	void HandleSprintStarted();
+	void HandleSprintEnded();
+	void HandleDodge();
 	void HandlePrimaryPressed();
 	void HandlePrimaryReleased();
 	void HandleBattleCry();
@@ -67,7 +69,10 @@ private:
 	TObjectPtr<UInputAction> JumpAction;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UInputAction> DashAction;
+	TObjectPtr<UInputAction> SprintAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> DodgeAction;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> PrimaryAction;

@@ -8,16 +8,16 @@ namespace
 	bool ReadValues(const FJsonObject& Root, FEIHeroValues& OutValues, FString& OutError)
 	{
 		return FEIDataFile::ReadNumber(Root, TEXT("lauftempo_m_pro_s"), 1.0, 30.0, OutValues.RunSpeedMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("sprint_tempo_m_pro_s"), 1.0, 30.0, OutValues.SprintSpeedMetersPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("sprunghoehe_m"), 0.2, 10.0, OutValues.JumpHeightMeters, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("schwerkraft_faktor"), 0.2, 5.0, OutValues.GravityFactor, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("luftkontrolle_0_bis_1"), 0.0, 1.0, OutValues.AirControl, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("luft_lenkung_grad_pro_s"), 0.0, 2000.0, OutValues.AirTurnDegreesPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("maus_faktor"), 0.1, 5.0, OutValues.MouseFactor, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("dash_tempo_bonus_m_pro_s"), 0.0, 30.0, OutValues.DashSpeedBonusMetersPerSecond, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("dash_hopser_m_pro_s"), 0.0, 20.0, OutValues.DashHopMetersPerSecond, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("dash_abklingzeit_s"), 0.0, 30.0, OutValues.DashCooldownSeconds, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("tempo_kette_fenster_s"), 0.0, 1.0, OutValues.SpeedChainWindowSeconds, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("hoechsttempo_m_pro_s"), 1.0, 100.0, OutValues.MaxSpeedMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("ausweichen_tempo_m_pro_s"), 0.0, 60.0, OutValues.DodgeSpeedMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("ausweichen_hopser_m_pro_s"), 0.0, 20.0, OutValues.DodgeHopMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("ausweichen_abklingzeit_s"), 0.0, 30.0, OutValues.DodgeCooldownSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("sprung_puffer_s"), 0.0, 1.0, OutValues.JumpBufferSeconds, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("schlachtruf_abklingzeit_s"), 0.0, 60.0, OutValues.BattleCryCooldownSeconds, OutError);
 	}
 }

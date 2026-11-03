@@ -69,12 +69,13 @@ public:
 
 	/** Owner only. The server plays it for everyone. */
 	void PressBattleCry();
+	bool IsBattleCryReady() const;
 
 	/** A press shortly before landing counts as a jump on landing, so it does not get lost to bad luck. */
 	void PressJump();
 
-	/** Called by the movement component once per dash, not again when a move is replayed. */
-	void OnDashPerformed();
+	/** Called by the movement component once per dodge, not again when a move is replayed. */
+	void OnDodgePerformed();
 
 	virtual void Landed(const FHitResult& Hit) override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -86,7 +87,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	/** The one jump stays unused after a dash or a fall, it is only spent by jumping. */
+	/** The one jump stays unused after a dodge or a fall, it is only spent by jumping. */
 	virtual bool CanJumpWhileFalling() const override;
 
 private:

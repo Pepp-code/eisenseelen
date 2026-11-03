@@ -6,16 +6,16 @@
 struct EISENSEELEN_API FEIHeroValues
 {
 	float RunSpeedMetersPerSecond = 5.5f;
+	float SprintSpeedMetersPerSecond = 8.0f;
 	float JumpHeightMeters = 1.0f;
 	float GravityFactor = 1.6f;
 	float AirControl = 0.55f;
 	float AirTurnDegreesPerSecond = 200.0f;
 	float MouseFactor = 1.0f;
-	float DashSpeedBonusMetersPerSecond = 6.0f;
-	float DashHopMetersPerSecond = 3.0f;
-	float DashCooldownSeconds = 1.0f;
-	float SpeedChainWindowSeconds = 0.12f;
-	float MaxSpeedMetersPerSecond = 22.0f;
+	float DodgeSpeedMetersPerSecond = 11.5f;
+	float DodgeHopMetersPerSecond = 3.0f;
+	float DodgeCooldownSeconds = 1.0f;
+	float JumpBufferSeconds = 0.12f;
 	float BattleCryCooldownSeconds = 3.0f;
 
 	/** OutValues only changes when the whole file is valid. */

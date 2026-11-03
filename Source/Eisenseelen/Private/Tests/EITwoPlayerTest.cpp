@@ -76,13 +76,13 @@ namespace
 }
 
 /**
- * Plays as the guest of a real listen server: the guest dashes, the prediction must show it at once, and afterwards
- * guest and server must agree on where the hero stands.
+ * Plays as the guest of a real listen server: the guest sprints and dodges, the prediction must show it at once, and
+ * afterwards guest and server must agree on where the hero stands.
  */
-class FEITwoPlayerDashCommand : public IAutomationLatentCommand
+class FEITwoPlayerDodgeCommand : public IAutomationLatentCommand
 {
 public:
-	explicit FEITwoPlayerDashCommand(FAutomationTestBase* InTest) : Test(InTest), StartedAt(FPlatformTime::Seconds()) {}
+	explicit FEITwoPlayerDodgeCommand(FAutomationTestBase* InTest) : Test(InTest), StartedAt(FPlatformTime::Seconds()) {}
 
 	virtual bool Update() override
 	{
@@ -132,29 +132,42 @@ public:
 			EnterStep(3);
 			return false;
 		case 3:
+			if (Now - StepAt < 0.6)
+			{
+				return false;
+			}
+			GuestSpeed = static_cast<float>(Session.ClientHero->GetVelocity().Size2D());
+			Test->AddInfo(FString::Printf(TEXT("The guest sprints at %.0f cm/s, the server sees %.0f cm/s"), GuestSpeed, Session.ServerCopyOfClientHero->GetVelocity().Size2D()));
+			Test->TestTrue(TEXT("The guest feels the sprint at once"), GuestSpeed > Session.ClientHero->GetValues().RunSpeedMetersPerSecond * 100.0f + 100.0f);
+			Test->TestTrue(TEXT("The server lets the guest sprint"), Session.ServerCopyOfClientHero->GetVelocity().Size2D() > Session.ClientHero->GetValues().RunSpeedMetersPerSecond * 100.0f + 100.0f);
+			EISendTestKey(Session.ClientPlayer, EKeys::V, IE_Pressed);
+			EnterStep(4);
+			return false;
+		case 4:
 			if (Now - StepAt < 0.08)
 			{
 				return false;
 			}
-			EISendTestKey(Session.ClientPlayer, EKeys::LeftShift, IE_Released);
+			EISendTestKey(Session.ClientPlayer, EKeys::V, IE_Released);
 			GuestSpeed = static_cast<float>(Session.ClientHero->GetVelocity().Size2D());
-			Test->AddInfo(FString::Printf(TEXT("The guest dashes at %.0f cm/s"), GuestSpeed));
-			Test->TestTrue(TEXT("The guest feels the dash at once"), GuestSpeed > 1000.0f);
+			Test->AddInfo(FString::Printf(TEXT("The guest dodges at %.0f cm/s"), GuestSpeed));
+			Test->TestTrue(TEXT("The guest feels the dodge at once"), GuestSpeed > 1000.0f);
 			// Steering in the air is part of the predicted move, so it must not make guest and server drift apart.
 			Session.ClientPlayer->SetControlRotation(FRotator(0.0f, 230.0f, 0.0f));
-			EnterStep(4);
+			EnterStep(5);
 			return false;
-		case 4:
+		case 5:
 			if (Now - StepAt < 0.1)
 			{
 				return false;
 			}
-			Test->AddInfo(FString::Printf(TEXT("The server sees the dash at %.0f cm/s"), Session.ServerCopyOfClientHero->GetVelocity().Size2D()));
-			Test->TestFalse(TEXT("The server counts down the cooldown too"), Session.ServerCopyOfClientHero->GetHeroMovement()->IsDashReady());
+			Test->AddInfo(FString::Printf(TEXT("The server sees the dodge at %.0f cm/s"), Session.ServerCopyOfClientHero->GetVelocity().Size2D()));
+			Test->TestFalse(TEXT("The server counts down the cooldown too"), Session.ServerCopyOfClientHero->GetHeroMovement()->IsDodgeReady());
+			EISendTestKey(Session.ClientPlayer, EKeys::LeftShift, IE_Released);
 			EISendTestKey(Session.ClientPlayer, EKeys::W, IE_Released);
-			EnterStep(5);
+			EnterStep(6);
 			return false;
-		case 5:
+		case 6:
 			if (Now - StepAt < 1.2)
 			{
 				return false;
@@ -173,7 +186,7 @@ private:
 		const float Moved = static_cast<float>(FVector::Dist2D(StartLocation, GuestLocation));
 		const float Drift = static_cast<float>(FVector::Dist(GuestLocation, Session.ServerCopyOfClientHero->GetActorLocation()));
 		Test->AddInfo(FString::Printf(TEXT("The guest moved %.0f cm, guest and server differ by %.1f cm"), Moved, Drift));
-		Test->TestTrue(TEXT("The dash really moved the guest"), Moved > 500.0f);
+		Test->TestTrue(TEXT("Sprint and dodge really moved the guest"), Moved > 500.0f);
 		Test->TestTrue(TEXT("Guest and server agree on the position"), Drift < MaxDriftCm);
 	}
 
@@ -317,8 +330,8 @@ private:
 };
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FEITwoPlayerDashTest,
-	"Eisenseelen.Net.GuestDash",
+	FEITwoPlayerDodgeTest,
+	"Eisenseelen.Net.GuestDodge",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 namespace
@@ -340,11 +353,11 @@ namespace
 	}
 }
 
-bool FEITwoPlayerDashTest::RunTest(const FString& Parameters)
+bool FEITwoPlayerDodgeTest::RunTest(const FString& Parameters)
 {
 	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(ArenaMap)));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
-	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerDashCommand(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerDodgeCommand(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	return true;
 }

@@ -17,7 +17,7 @@ namespace
 {
 	const FLinearColor TextColor(0.95f, 0.95f, 0.92f);
 	const FLinearColor LifeColor(0.75f, 0.12f, 0.1f);
-	const FLinearColor DashColor(0.3f, 0.7f, 1.0f);
+	const FLinearColor DodgeColor(0.3f, 0.7f, 1.0f);
 	const FLinearColor ChargeColor(1.0f, 0.7f, 0.2f);
 	const FLinearColor SpellColor(1.0f, 0.42f, 0.1f);
 	const FLinearColor BarBack(0.0f, 0.0f, 0.0f, 0.55f);
@@ -51,7 +51,7 @@ void AEIHud::DrawHUD()
 	const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(GetOwningPawn());
 	const float Width = Canvas->SizeX;
 	const float Height = Canvas->SizeY;
-	DrawLine(TEXT("WASD laufen   Leertaste springen   Shift Dash   Linke Maus Angriff (halten: stark)   Q Feuerball   V Schlachtruf   C Klasse   H Horde   R Neustart"), Margin, Margin, TextColor);
+	DrawLine(TEXT("WASD laufen   Shift sprinten   Leertaste springen   V ausweichen   Linke Maus Angriff (halten: stark)   Q Feuerball   E Schlachtruf   C Klasse   H Horde   R Neustart"), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -88,9 +88,9 @@ void AEIHud::DrawHUD()
 	DrawLine(FString::Printf(TEXT("Leben %.0f / %.0f"), Health->GetHealth(), Health->GetMaxHealth()), Margin, LifeY - 24.0f, TextColor);
 
 	const UEIHeroMovementComponent* Movement = Hero->GetHeroMovement();
-	const float DashCooldown = FMath::Max(Movement->GetDashCooldownSeconds(), KINDA_SMALL_NUMBER);
-	DrawBar(Margin + BarWidth + Margin, LifeY, BarWidth / 2.0f, BarHeight, 1.0f - Movement->GetDashCooldownRemaining() / DashCooldown, DashColor);
-	DrawLine(TEXT("Dash"), Margin + BarWidth + Margin, LifeY - 24.0f, TextColor);
+	const float DodgeCooldown = FMath::Max(Movement->GetDodgeCooldownSeconds(), KINDA_SMALL_NUMBER);
+	DrawBar(Margin + BarWidth + Margin, LifeY, BarWidth / 2.0f, BarHeight, 1.0f - Movement->GetDodgeCooldownRemaining() / DodgeCooldown, DodgeColor);
+	DrawLine(TEXT("Ausweichen"), Margin + BarWidth + Margin, LifeY - 24.0f, TextColor);
 
 	const float Speed = static_cast<float>(Hero->GetVelocity().Size2D()) / 100.0f;
 	DrawLine(FString::Printf(TEXT("%.1f m/s"), Speed), Margin + BarWidth + Margin + BarWidth / 2.0f + Margin, LifeY - 8.0f, TextColor);

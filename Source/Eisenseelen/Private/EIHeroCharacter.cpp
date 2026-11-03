@@ -247,13 +247,17 @@ float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 
 void AEIHeroCharacter::PressBattleCry()
 {
-	const double Now = GetWorld()->GetTimeSeconds();
-	if (IsDead() || Now < NextBattleCryAt)
+	if (IsDead() || !IsBattleCryReady())
 	{
 		return;
 	}
-	NextBattleCryAt = Now + Values.BattleCryCooldownSeconds;
+	NextBattleCryAt = GetWorld()->GetTimeSeconds() + Values.BattleCryCooldownSeconds;
 	ServerBattleCry();
+}
+
+bool AEIHeroCharacter::IsBattleCryReady() const
+{
+	return GetWorld()->GetTimeSeconds() >= NextBattleCryAt;
 }
 
 void AEIHeroCharacter::ServerBattleCry_Implementation()
@@ -297,7 +301,7 @@ void AEIHeroCharacter::PressJump()
 	}
 	else
 	{
-		BufferedJumpUntil = GetWorld()->GetTimeSeconds() + Values.SpeedChainWindowSeconds;
+		BufferedJumpUntil = GetWorld()->GetTimeSeconds() + Values.JumpBufferSeconds;
 	}
 }
 
@@ -322,7 +326,7 @@ void AEIHeroCharacter::OnMovementModeChanged(EMovementMode PreviousMovementMode,
 	}
 }
 
-void AEIHeroCharacter::OnDashPerformed()
+void AEIHeroCharacter::OnDodgePerformed()
 {
 	if (IsLocallyControlled())
 	{

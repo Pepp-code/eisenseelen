@@ -7,7 +7,7 @@
 struct FEIHeroValues;
 
 /**
- * The hero's movement: dash and speed chain on top of the engine's character movement. All of it runs inside the
+ * The hero's movement: sprint and dodge on top of the engine's character movement. All of it runs inside the
  * predicted move, so a client feels it at once and the server still decides.
  */
 UCLASS()
@@ -18,34 +18,33 @@ class EISENSEELEN_API UEIHeroMovementComponent : public UCharacterMovementCompon
 public:
 	void ApplyValues(const FEIHeroValues& Values);
 
-	void RequestDash() { bWantsToDash = true; }
-	bool IsDashReady() const { return DashCooldownRemaining <= 0.0f; }
-	float GetDashCooldownRemaining() const { return DashCooldownRemaining; }
-	float GetDashCooldownSeconds() const { return DashCooldownSeconds; }
+	void SetWantsToSprint(bool bWants) { bWantsToSprint = bWants; }
+	void RequestDodge() { bWantsToDodge = true; }
+	bool IsDodgeReady() const { return DodgeCooldownRemaining <= 0.0f; }
+	float GetDodgeCooldownRemaining() const { return DodgeCooldownRemaining; }
+	float GetDodgeCooldownSeconds() const { return DodgeCooldownSeconds; }
 
+	virtual float GetMaxSpeed() const override;
+	virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 	virtual void CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration) override;
 
-protected:
-	virtual void ProcessLanded(const FHitResult& Hit, float RemainingTime, int32 Iterations) override;
-
 private:
 	friend class FEIHeroSavedMove;
 
-	void PerformDash();
+	void PerformDodge();
 	void SteerTowardsInput(float DeltaTime);
 
-	float DashSpeedBonusCm = 0.0f;
-	float DashHopCm = 0.0f;
-	float DashCooldownSeconds = 0.0f;
-	float SpeedChainWindowSeconds = 0.0f;
-	float MaxSpeedCm = 0.0f;
+	float SprintSpeedCm = 0.0f;
+	float DodgeSpeedCm = 0.0f;
+	float DodgeHopCm = 0.0f;
+	float DodgeCooldownSeconds = 0.0f;
 	float AirTurnDegreesPerSecond = 0.0f;
 
 	// The predicted state. FEIHeroSavedMove saves it, so a replayed move starts from the same values.
-	bool bWantsToDash = false;
-	float DashCooldownRemaining = 0.0f;
-	float SpeedChainWindowRemaining = 0.0f;
+	bool bWantsToSprint = false;
+	bool bWantsToDodge = false;
+	float DodgeCooldownRemaining = 0.0f;
 };

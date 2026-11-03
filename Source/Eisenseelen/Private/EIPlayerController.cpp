@@ -53,7 +53,8 @@ void AEIPlayerController::SetupInputComponent()
 	MoveAction = MakeAction(this, EInputActionValueType::Axis2D);
 	LookAction = MakeAction(this, EInputActionValueType::Axis2D);
 	JumpAction = MakeAction(this, EInputActionValueType::Boolean);
-	DashAction = MakeAction(this, EInputActionValueType::Boolean);
+	SprintAction = MakeAction(this, EInputActionValueType::Boolean);
+	DodgeAction = MakeAction(this, EInputActionValueType::Boolean);
 	PrimaryAction = MakeAction(this, EInputActionValueType::Boolean);
 	BattleCryAction = MakeAction(this, EInputActionValueType::Boolean);
 	HordeAction = MakeAction(this, EInputActionValueType::Boolean);
@@ -68,9 +69,10 @@ void AEIPlayerController::SetupInputComponent()
 	MapMoveKey(Mapping, MoveAction, EKeys::A, false, true);
 	Mapping->MapKey(LookAction, EKeys::Mouse2D);
 	Mapping->MapKey(JumpAction, EKeys::SpaceBar);
-	Mapping->MapKey(DashAction, EKeys::LeftShift);
+	Mapping->MapKey(SprintAction, EKeys::LeftShift);
+	Mapping->MapKey(DodgeAction, EKeys::V);
 	Mapping->MapKey(PrimaryAction, EKeys::LeftMouseButton);
-	Mapping->MapKey(BattleCryAction, EKeys::V);
+	Mapping->MapKey(BattleCryAction, EKeys::E);
 	Mapping->MapKey(HordeAction, EKeys::H);
 	Mapping->MapKey(RestartAction, EKeys::R);
 	Mapping->MapKey(SpellAction, EKeys::Q);
@@ -81,7 +83,9 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(LookAction, ETriggerEvent::Triggered, this, &AEIPlayerController::HandleLook);
 	Input->BindAction(JumpAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleJumpStarted);
 	Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandleJumpEnded);
-	Input->BindAction(DashAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleDash);
+	Input->BindAction(SprintAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSprintStarted);
+	Input->BindAction(SprintAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandleSprintEnded);
+	Input->BindAction(DodgeAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleDodge);
 	Input->BindAction(PrimaryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandlePrimaryPressed);
 	Input->BindAction(PrimaryAction, ETriggerEvent::Completed, this, &AEIPlayerController::HandlePrimaryReleased);
 	Input->BindAction(BattleCryAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleBattleCry);
@@ -140,11 +144,27 @@ void AEIPlayerController::HandleJumpEnded()
 	}
 }
 
-void AEIPlayerController::HandleDash()
+void AEIPlayerController::HandleSprintStarted()
 {
 	if (const AEIHeroCharacter* Hero = GetLivingHero())
 	{
-		Hero->GetHeroMovement()->RequestDash();
+		Hero->GetHeroMovement()->SetWantsToSprint(true);
+	}
+}
+
+void AEIPlayerController::HandleSprintEnded()
+{
+	if (const AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
+	{
+		Hero->GetHeroMovement()->SetWantsToSprint(false);
+	}
+}
+
+void AEIPlayerController::HandleDodge()
+{
+	if (const AEIHeroCharacter* Hero = GetLivingHero())
+	{
+		Hero->GetHeroMovement()->RequestDodge();
 	}
 }
 
