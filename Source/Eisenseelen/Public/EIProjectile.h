@@ -69,6 +69,7 @@ public:
 	AEIExplosionFX();
 
 	void Setup(float InRadiusCm);
+	void Setup(float InRadiusCm, const FLinearColor& Color);
 
 	virtual void Tick(float DeltaSeconds) override;
 

@@ -4,7 +4,9 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EICasterComponent.h"
+#include "EIEnemy.h"
 #include "EIHeroCharacter.h"
+#include "EIRuneComponent.h"
 #include "EIVisuals.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/OverlapResult.h"
@@ -147,6 +149,13 @@ void AEIProjectile::Burst(const FVector& Location)
 		FCollisionQueryParams WallQuery(SCENE_QUERY_STAT(EIBurstWall), false, Target);
 		if (!GetWorld()->LineTraceTestByObjectType(Location, Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), WallQuery))
 		{
+			// Only a real fireball carries the element, not the small bolts of the staff.
+			const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(Caster);
+			AEIEnemy* Enemy = Cast<AEIEnemy>(Target);
+			if (bBig && Hero != nullptr && Enemy != nullptr)
+			{
+				Hero->GetRunes()->HitWithElement(Enemy, EEIElement::Fire);
+			}
 			UGameplayStatics::ApplyDamage(Target, Damage, CasterController, Caster, nullptr);
 		}
 	}
@@ -185,8 +194,14 @@ AEIExplosionFX::AEIExplosionFX()
 
 void AEIExplosionFX::Setup(float InRadiusCm)
 {
+	Setup(InRadiusCm, FireColor);
+}
+
+void AEIExplosionFX::Setup(float InRadiusCm, const FLinearColor& Color)
+{
 	RadiusCm = InRadiusCm;
-	Material = EIVisuals::SetGlow(Ball, FireColor, BurstGlow);
+	Material = EIVisuals::SetGlow(Ball, Color, BurstGlow);
+	Light->SetLightColor(Color);
 	Light->SetAttenuationRadius(RadiusCm * 3.0f);
 	Light->SetIntensity(RadiusCm * BurstLightPerRadius);
 	Ball->SetWorldScale3D(FVector(RadiusCm * 0.2f / SphereMeshRadiusCm));

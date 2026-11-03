@@ -11,6 +11,7 @@ class UEICasterComponent;
 class UEIHealthComponent;
 class UEIHeroMovementComponent;
 class UEIOmenComponent;
+class UEIRuneComponent;
 class AEISkyBarge;
 class UEISwordComponent;
 class UEIViewModelComponent;
@@ -57,6 +58,7 @@ public:
 	UEISwordComponent* GetSword() const { return Sword; }
 	UEICasterComponent* GetCaster() const { return Caster; }
 	UEIOmenComponent* GetOmens() const { return Omens; }
+	UEIRuneComponent* GetRunes() const { return Runes; }
 
 	/** Called on the server and the owner when the set of omens changed. */
 	void OnOmensChanged();
@@ -78,6 +80,7 @@ public:
 	void BoardBarge(AEISkyBarge* Barge);
 	bool IsAboard() const { return bAboard; }
 	void PressSpell();
+	void PressRuneSpell();
 	const FEIPoseLibrary& GetPoses() const { return Poses; }
 
 	/** Null on everyone but the owner, and until the owner knows it is local. */
@@ -142,6 +145,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIOmenComponent> Omens;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEIRuneComponent> Runes;
 
 	UPROPERTY(ReplicatedUsing = OnRep_HeroClass)
 	EEIHeroClass HeroClass = EEIHeroClass::Bladewarden;

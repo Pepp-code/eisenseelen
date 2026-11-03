@@ -103,8 +103,38 @@ def scenario():
     shot()
     yield AFTER_SHOT_SECONDS
 
-    # The horde reaches the hero.
+    # The runes: the frost around the hero, then the field and the wall where the hero looks.
+    yield from tap("E")
+    yield 0.15
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("T")
+    yield 0.1
+    yield from tap("E")
+    yield 0.6
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("T")
+    yield 0.1
+    yield from tap("E")
+    yield 0.6
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("T")
+
+    # The kinds of enemies, all in one group.
     yield from tap("C")
+    stand_at((-1500, 0, 92))
+    player().preview_invulnerable()
+    yield 0.5
+    player().preview_spawn_group("Kriegshaufen")
+    yield 0.4
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("R")
+    yield SETTLE_SECONDS
+
+    # The horde reaches the hero.
     stand_at((0, 0, 92))
     yield from tap("H")
     yield 6.0

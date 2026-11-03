@@ -22,6 +22,14 @@ enum class EEIEnemyKind : uint8
 
 constexpr int32 EIEnemyKindCount = 4;
 
+/** What a spell is made of. Two elements on one target can react. */
+enum class EEIElement : uint8
+{
+	Fire,
+	Ice,
+	Lightning
+};
+
 /** The name of a kind in the data files. */
 EISENSEELEN_API const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind);
 
@@ -97,6 +105,15 @@ public:
 	const FEIEnemyValues& GetValues() const { return Values; }
 	void ApplyValues(const FEIEnemyValues& NewValues);
 
+	/** Server only. What a spell does on top of its damage. */
+	void ApplySlow(float Share, float Seconds);
+	void ApplyBurn(float PerSecond, float Seconds);
+	bool IsSlowed() const { return bSlowed; }
+	bool IsBurning() const { return bBurning; }
+
+	/** Server only. Leaves the element on the enemy for a while. True if it reacts with fire on ice or ice on fire. */
+	bool MarkElement(EEIElement Element, float WindowSeconds);
+
 	/** Server only. More life and more damage, for enemies that come later in a run. */
 	void ApplyStrength(float Factor);
 
@@ -147,6 +164,7 @@ private:
 	void ThrowBone();
 	float ReduceByShield(float Amount, const AActor* DamageCauser);
 	void ShowHeldPart();
+	void UpdateStatus(float DeltaSeconds);
 	bool StandsOnPaths() const;
 	void StopWalking();
 	void Strike();
@@ -181,9 +199,21 @@ private:
 	UPROPERTY(Replicated)
 	EEIEnemyKind Kind = EEIEnemyKind::Runner;
 
+	UPROPERTY(Replicated)
+	bool bSlowed = false;
+
+	UPROPERTY(Replicated)
+	bool bBurning = false;
+
 	FEIEnemyValues Values;
 	FLinearColor BaseColor = FLinearColor::Gray;
 	bool bNextHitBreaksShield = false;
+	float SlowRemaining = 0.0f;
+	float BurnRemaining = 0.0f;
+	float BurnPerSecond = 0.0f;
+	float BurnTickRemaining = 0.0f;
+	EEIElement ElementMark = EEIElement::Fire;
+	float ElementMarkRemaining = 0.0f;
 	bool bGuard = false;
 	bool bHasHome = false;
 	FVector Home = FVector::ZeroVector;

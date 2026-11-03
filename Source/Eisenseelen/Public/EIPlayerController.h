@@ -19,6 +19,9 @@ public:
 	/** The class a new hero of this player starts as. It survives a restart. */
 	EEIHeroClass GetSelectedClass() const { return SelectedClass; }
 
+	/** The rune a new hero of this player has equipped. It survives a restart too. */
+	int32 GetSelectedRune() const { return SelectedRune; }
+
 	/** For preview pictures: presses or releases a key through the real controls. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewKey(FName KeyName, bool bPressed);
@@ -34,6 +37,10 @@ public:
 	/** For preview pictures: the active altar breaks as soon as a hero stands in its zone. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewBreakAltar();
+
+	/** For preview pictures: a group of that name appears some way in front of the hero. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewSpawnGroup(const FString& Name);
 
 	/** For preview pictures: all guards of chests fall at once. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
@@ -61,13 +68,18 @@ private:
 	void HandleHorde();
 	void HandleRestart();
 	void HandleSpell();
+	void HandleRuneSpell();
 	void HandleClass();
+	void HandleNextRune();
 
 	UFUNCTION(Server, Reliable)
 	void ServerInteract();
 
 	UFUNCTION(Server, Reliable)
 	void ServerToggleClass();
+
+	UFUNCTION(Server, Reliable)
+	void ServerNextRune();
 
 	UFUNCTION(Server, Reliable)
 	void ServerToggleHorde();
@@ -114,7 +126,14 @@ private:
 	TObjectPtr<UInputAction> SpellAction;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> RuneSpellAction;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> ClassAction;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> NextRuneAction;
+
 	EEIHeroClass SelectedClass = EEIHeroClass::Bladewarden;
+	int32 SelectedRune = 0;
 };

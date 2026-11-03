@@ -1,0 +1,276 @@
+#include "EIRuneComponent.h"
+
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
+#include "EIDataFile.h"
+#include "EIHeroCharacter.h"
+#include "EIOmenComponent.h"
+#include "EIProjectile.h"
+#include "EIRuneField.h"
+#include "EIViewModelComponent.h"
+#include "EIVisuals.h"
+#include "Engine/OverlapResult.h"
+#include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
+
+namespace
+{
+	constexpr float CentimetersPerMeter = 100.0f;
+	constexpr double ServerClockTolerance = 0.1;
+	constexpr float FloorSearchAboveCm = 200.0f;
+	constexpr float FloorSearchBelowCm = 5000.0f;
+	constexpr float PlaceToleranceCm = 300.0f;
+	constexpr float StaffCastSeconds = 0.6f;
+	const FLinearColor SteamColor(0.9f, 0.95f, 1.0f);
+
+	bool ReadRune(const FJsonObject& Line, FEIRune& Out, FString& OutError)
+	{
+		FString Form;
+		FString Element;
+		if (!Line.TryGetStringField(TEXT("name"), Out.Name) || !Line.TryGetStringField(TEXT("zauber"), Out.SpellName))
+		{
+			OutError = TEXT("Einer Rune fehlt der Name oder der Zauber.");
+			return false;
+		}
+		if (!Line.TryGetStringField(TEXT("form"), Form) || (Form != TEXT("kreis") && Form != TEXT("wand")))
+		{
+			OutError = FString::Printf(TEXT("%s braucht als form kreis oder wand."), *Out.Name);
+			return false;
+		}
+		Out.bWall = Form == TEXT("wand");
+		if (!Line.TryGetStringField(TEXT("element"), Element) || (Element != TEXT("feuer") && Element != TEXT("eis") && Element != TEXT("blitz")))
+		{
+			OutError = FString::Printf(TEXT("%s braucht als element feuer, eis oder blitz."), *Out.Name);
+			return false;
+		}
+		Out.Element = Element == TEXT("feuer") ? EEIElement::Fire : (Element == TEXT("eis") ? EEIElement::Ice : EEIElement::Lightning);
+		return FEIDataFile::ReadNumber(Line, TEXT("schaden"), 0.0, 100000.0, Out.Damage, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("abklingzeit_s"), 0.0, 600.0, Out.CooldownSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("groesse_m"), 0.1, 200.0, Out.SizeMeters, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("reichweite_m"), 0.0, 500.0, Out.RangeMeters, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("dauer_s"), 0.0, 600.0, Out.DurationSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("takt_s"), 0.05, 60.0, Out.TickSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("verlangsamen_0_bis_1"), 0.0, 1.0, Out.SlowShare, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("brennen_pro_s"), 0.0, 100000.0, Out.BurnPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("zustand_s"), 0.0, 600.0, Out.StatusSeconds, OutError);
+	}
+
+	bool ReadTable(const FJsonObject& Root, FEIRuneTable& Out, FString& OutError)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Lines = nullptr;
+		if (!Root.TryGetArrayField(TEXT("runen"), Lines))
+		{
+			OutError = TEXT("Die Liste runen fehlt.");
+			return false;
+		}
+		if (!FEIDataFile::ReadNumber(Root, TEXT("reaktion_fenster_s"), 0.0, 60.0, Out.ReactionWindowSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("dampfexplosion_schaden"), 0.0, 100000.0, Out.SteamDamage, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("dampfexplosion_radius_m"), 0.1, 200.0, Out.SteamRadiusMeters, OutError))
+		{
+			return false;
+		}
+		for (const TSharedPtr<FJsonValue>& Line : *Lines)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			FEIRune Rune;
+			if (!Line->TryGetObject(Object) || !ReadRune(**Object, Rune, OutError))
+			{
+				return false;
+			}
+			Out.Runes.Add(Rune);
+		}
+		return true;
+	}
+}
+
+bool FEIRuneTable::LoadFromString(const FString& Json, FEIRuneTable& OutTable, FString& OutError)
+{
+	const TSharedPtr<FJsonObject> Root = FEIDataFile::Parse(Json, OutError);
+	FEIRuneTable Loaded;
+	if (!Root.IsValid() || !ReadTable(*Root, Loaded, OutError))
+	{
+		return false;
+	}
+	OutTable = Loaded;
+	return true;
+}
+
+bool FEIRuneTable::LoadFromProjectFile(FEIRuneTable& OutTable, FString& OutError)
+{
+	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("runen.json"), OutError);
+	FEIRuneTable Loaded;
+	if (!Root.IsValid() || !ReadTable(*Root, Loaded, OutError))
+	{
+		return false;
+	}
+	OutTable = Loaded;
+	return true;
+}
+
+UEIRuneComponent::UEIRuneComponent()
+{
+	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+}
+
+void UEIRuneComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UEIRuneComponent, RuneIndex);
+}
+
+void UEIRuneComponent::LoadValues()
+{
+	FString Error;
+	if (!FEIRuneTable::LoadFromProjectFile(Table, Error))
+	{
+		FEIDataFile::ReportError(TEXT("runen.json"), Error);
+	}
+}
+
+AEIHeroCharacter* UEIRuneComponent::GetHero() const
+{
+	return CastChecked<AEIHeroCharacter>(GetOwner());
+}
+
+const FEIRune* UEIRuneComponent::GetRune() const
+{
+	return Table.Runes.IsValidIndex(RuneIndex) ? &Table.Runes[RuneIndex] : nullptr;
+}
+
+void UEIRuneComponent::SetRune(int32 Index)
+{
+	RuneIndex = Index;
+	OnRep_RuneIndex();
+}
+
+void UEIRuneComponent::OnRep_RuneIndex()
+{
+	ReadyAt = 0.0;
+}
+
+float UEIRuneComponent::GetCooldownSeconds() const
+{
+	const FEIRune* Rune = GetRune();
+	return Rune != nullptr ? Rune->CooldownSeconds * GetHero()->GetClassValues().SpellCooldownFactor : 0.0f;
+}
+
+float UEIRuneComponent::GetCooldownFraction() const
+{
+	const float Left = static_cast<float>(ReadyAt - GetWorld()->GetTimeSeconds());
+	return FMath::Clamp(Left / FMath::Max(GetCooldownSeconds(), KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+}
+
+void UEIRuneComponent::FindPlace(const FEIRune& Rune, FVector& OutLocation, float& OutYaw) const
+{
+	const AEIHeroCharacter* Hero = GetHero();
+	OutYaw = static_cast<float>(Hero->GetViewRotation().Yaw);
+	FVector Wanted = Hero->GetActorLocation();
+	if (Rune.RangeMeters > 0.0f)
+	{
+		const FVector Eye = Hero->GetPawnViewLocation();
+		const FVector End = Eye + Hero->GetViewRotation().Vector() * Rune.RangeMeters * CentimetersPerMeter;
+		FHitResult Hit;
+		Wanted = GetWorld()->LineTraceSingleByObjectType(Hit, Eye, End, FCollisionObjectQueryParams(ECC_WorldStatic)) ? Hit.ImpactPoint : End;
+	}
+	FHitResult Floor;
+	const FVector From = Wanted + FVector(0.0f, 0.0f, FloorSearchAboveCm);
+	const FVector To = Wanted - FVector(0.0f, 0.0f, FloorSearchBelowCm);
+	OutLocation = GetWorld()->LineTraceSingleByObjectType(Floor, From, To, FCollisionObjectQueryParams(ECC_WorldStatic)) ? Floor.ImpactPoint : Wanted;
+}
+
+void UEIRuneComponent::CastRune()
+{
+	const FEIRune* Rune = GetRune();
+	if (Rune == nullptr || GetWorld()->GetTimeSeconds() < ReadyAt)
+	{
+		return;
+	}
+	ReadyAt = GetWorld()->GetTimeSeconds() + GetCooldownSeconds();
+	AEIHeroCharacter* Hero = GetHero();
+	EIVisuals::PlaySound2D(this, TEXT("Feuerball"));
+	if (Hero->GetViewModel() != nullptr && Hero->GetHeroClass() == EEIHeroClass::Arcanist)
+	{
+		Hero->GetViewModel()->PlayPose(TEXT("stab_feuerball"), StaffCastSeconds);
+	}
+	FVector Location;
+	float Yaw = 0.0f;
+	FindPlace(*Rune, Location, Yaw);
+	if (GetOwner()->HasAuthority())
+	{
+		SpawnField(*Rune, Location, Yaw);
+	}
+	else
+	{
+		ServerCast(Location, Yaw);
+	}
+}
+
+void UEIRuneComponent::ServerCast_Implementation(FVector_NetQuantize Location, float Yaw)
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	const AEIHeroCharacter* Hero = GetHero();
+	const FEIRune* Rune = GetRune();
+	if (Rune == nullptr || Hero->IsDead() || Now + ServerClockTolerance < ReadyAt)
+	{
+		return;
+	}
+	ReadyAt = Now + GetCooldownSeconds();
+
+	// A guest cannot cast farther than the spell reaches.
+	const FVector Offset = FVector(Location) - Hero->GetActorLocation();
+	const double Allowed = Rune->RangeMeters * CentimetersPerMeter + PlaceToleranceCm;
+	const FVector Place = Offset.Size2D() <= Allowed ? FVector(Location) : Hero->GetActorLocation() + Offset.GetSafeNormal2D() * Allowed;
+	SpawnField(*Rune, Place, Yaw);
+}
+
+void UEIRuneComponent::SpawnField(const FEIRune& Rune, const FVector& Location, float Yaw)
+{
+	AEIHeroCharacter* Hero = GetHero();
+	const FTransform Spawn(FRotator(0.0f, Yaw, 0.0f), Location);
+	AEIRuneField* Field = GetWorld()->SpawnActorDeferred<AEIRuneField>(AEIRuneField::StaticClass(), Spawn, Hero, Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Field != nullptr)
+	{
+		const float Factor = Rune.Element == EEIElement::Fire ? Hero->GetOmens()->GetFactor(EEIOmenEffect::FireDamage) : 1.0f;
+		Field->Configure(Rune, Rune.Damage * Factor);
+		Field->FinishSpawning(Spawn);
+	}
+}
+
+void UEIRuneComponent::HitWithElement(AEIEnemy* Enemy, EEIElement Element)
+{
+	if (!Enemy->MarkElement(Element, Table.ReactionWindowSeconds))
+	{
+		return;
+	}
+	// The steam explosion.
+	AEIHeroCharacter* Hero = GetHero();
+	const FVector Location = Enemy->GetActorLocation();
+	const float RadiusCm = Table.SteamRadiusMeters * CentimetersPerMeter;
+	TArray<FOverlapResult> Overlaps;
+	GetWorld()->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, FCollisionObjectQueryParams(ECC_Pawn), FCollisionShape::MakeSphere(RadiusCm));
+	TSet<AActor*> Done;
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Target = Overlap.GetActor();
+		if (Target == nullptr || Done.Contains(Target) || Target->IsA<AEIHeroCharacter>() || !Target->CanBeDamaged())
+		{
+			continue;
+		}
+		Done.Add(Target);
+		UGameplayStatics::ApplyDamage(Target, Table.SteamDamage, Hero->GetController(), Hero, nullptr);
+	}
+	MulticastSteam(Location);
+}
+
+void UEIRuneComponent::MulticastSteam_Implementation(FVector_NetQuantize Location)
+{
+	EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), Location);
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
+	{
+		FX->Setup(Table.SteamRadiusMeters * CentimetersPerMeter, SteamColor);
+	}
+}

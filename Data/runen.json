@@ -1,0 +1,52 @@
+{
+	"reaktion_fenster_s": 2,
+	"dampfexplosion_schaden": 80,
+	"dampfexplosion_radius_m": 6,
+	"runen": [
+		{
+			"name": "Frostrune",
+			"zauber": "Frostnova",
+			"form": "kreis",
+			"element": "eis",
+			"schaden": 25,
+			"abklingzeit_s": 10,
+			"groesse_m": 7,
+			"reichweite_m": 0,
+			"dauer_s": 0,
+			"takt_s": 1,
+			"verlangsamen_0_bis_1": 0.5,
+			"brennen_pro_s": 0,
+			"zustand_s": 3
+		},
+		{
+			"name": "Sturmrune",
+			"zauber": "Sturmfeld",
+			"form": "kreis",
+			"element": "blitz",
+			"schaden": 12,
+			"abklingzeit_s": 14,
+			"groesse_m": 6,
+			"reichweite_m": 25,
+			"dauer_s": 6,
+			"takt_s": 0.5,
+			"verlangsamen_0_bis_1": 0,
+			"brennen_pro_s": 0,
+			"zustand_s": 0
+		},
+		{
+			"name": "Flammenrune",
+			"zauber": "Flammenwand",
+			"form": "wand",
+			"element": "feuer",
+			"schaden": 10,
+			"abklingzeit_s": 14,
+			"groesse_m": 12,
+			"reichweite_m": 8,
+			"dauer_s": 6,
+			"takt_s": 0.5,
+			"verlangsamen_0_bis_1": 0,
+			"brennen_pro_s": 8,
+			"zustand_s": 3
+		}
+	]
+}

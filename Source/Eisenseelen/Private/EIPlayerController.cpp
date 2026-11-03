@@ -2,6 +2,9 @@
 
 #include "EIEnemy.h"
 #include "EIGameMode.h"
+#include "EIGameState.h"
+#include "EIHordeDirector.h"
+#include "EIRuneComponent.h"
 #include "Engine/DamageEvents.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -70,6 +73,25 @@ void AEIPlayerController::PreviewBreakAltar()
 	}
 }
 
+void AEIPlayerController::PreviewSpawnGroup(const FString& Name)
+{
+	constexpr float AheadCm = 1200.0f;
+	constexpr float RadiusCm = 300.0f;
+	AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>();
+	const APawn* Hero = GetPawn();
+	if (GameMode == nullptr || Hero == nullptr)
+	{
+		return;
+	}
+	for (const FEIEnemyGroup& Group : GameMode->GetRun()->GetGroups().Groups)
+	{
+		if (Group.Name == Name)
+		{
+			GameMode->GetHorde()->SpawnGroup(Group, 1.0f, Hero->GetActorLocation() + Hero->GetActorForwardVector() * AheadCm, RadiusCm);
+		}
+	}
+}
+
 void AEIPlayerController::PreviewDefeatGuards()
 {
 	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
@@ -100,7 +122,9 @@ void AEIPlayerController::SetupInputComponent()
 	HordeAction = MakeAction(this, EInputActionValueType::Boolean);
 	RestartAction = MakeAction(this, EInputActionValueType::Boolean);
 	SpellAction = MakeAction(this, EInputActionValueType::Boolean);
+	RuneSpellAction = MakeAction(this, EInputActionValueType::Boolean);
 	ClassAction = MakeAction(this, EInputActionValueType::Boolean);
+	NextRuneAction = MakeAction(this, EInputActionValueType::Boolean);
 
 	Mapping = NewObject<UInputMappingContext>(this);
 	MapMoveKey(Mapping, MoveAction, EKeys::W, true, false);
@@ -117,7 +141,9 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(HordeAction, EKeys::H);
 	Mapping->MapKey(RestartAction, EKeys::R);
 	Mapping->MapKey(SpellAction, EKeys::Q);
+	Mapping->MapKey(RuneSpellAction, EKeys::E);
 	Mapping->MapKey(ClassAction, EKeys::C);
+	Mapping->MapKey(NextRuneAction, EKeys::T);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AEIPlayerController::HandleMove);
@@ -135,7 +161,9 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(HordeAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleHorde);
 	Input->BindAction(RestartAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleRestart);
 	Input->BindAction(SpellAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSpell);
+	Input->BindAction(RuneSpellAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleRuneSpell);
 	Input->BindAction(ClassAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleClass);
+	Input->BindAction(NextRuneAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleNextRune);
 
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 	Subsystem->AddMappingContext(Mapping, 0);
@@ -293,9 +321,40 @@ void AEIPlayerController::HandleSpell()
 	}
 }
 
+void AEIPlayerController::HandleRuneSpell()
+{
+	if (AEIHeroCharacter* Hero = GetLivingHero())
+	{
+		Hero->PressRuneSpell();
+	}
+}
+
 void AEIPlayerController::HandleClass()
 {
 	ServerToggleClass();
+}
+
+void AEIPlayerController::HandleNextRune()
+{
+	ServerNextRune();
+}
+
+void AEIPlayerController::ServerNextRune_Implementation()
+{
+	// A rune is part of what a hero flies out with, so during a run it stays.
+	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	const EEIRunPhase Phase = State != nullptr ? State->GetRunPhase() : EEIRunPhase::None;
+	AEIHeroCharacter* Hero = GetLivingHero();
+	if (Hero == nullptr || (Phase != EEIRunPhase::None && Phase != EEIRunPhase::OnBarge))
+	{
+		return;
+	}
+	const int32 Count = Hero->GetRunes()->GetTable().Runes.Num();
+	if (Count > 0)
+	{
+		SelectedRune = (SelectedRune + 1) % Count;
+		Hero->GetRunes()->SetRune(SelectedRune);
+	}
 }
 
 void AEIPlayerController::ServerToggleClass_Implementation()

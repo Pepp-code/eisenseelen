@@ -32,6 +32,10 @@ namespace
 	const FVector ShieldSize(0.12f, 0.95f, 1.5f);
 	const FVector HeldBonePlace(30.0f, 30.0f, 50.0f);
 	const FVector HeldBoneSize(0.1f, 0.1f, 0.6f);
+	const FLinearColor SlowedColor(0.35f, 0.65f, 1.0f);
+	const FLinearColor BurningColor(1.0f, 0.4f, 0.08f);
+	constexpr float BurningGlow = 1.5f;
+	constexpr float BurnTickSeconds = 0.5f;
 	constexpr float ThrowFromForwardCm = 60.0f;
 	constexpr float ThrownBoneLifeSeconds = 3.0f;
 	constexpr float ThrownBoneRadiusCm = 12.0f;
@@ -230,6 +234,63 @@ void AEIEnemy::ApplyStrength(float Factor)
 	Health->Reset(Values.Life * Factor);
 }
 
+void AEIEnemy::ApplySlow(float Share, float Seconds)
+{
+	SlowRemaining = Seconds;
+	bSlowed = true;
+	GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter * (1.0f - Share);
+}
+
+void AEIEnemy::ApplyBurn(float PerSecond, float Seconds)
+{
+	if (!bBurning)
+	{
+		BurnTickRemaining = BurnTickSeconds;
+	}
+	BurnPerSecond = PerSecond;
+	BurnRemaining = Seconds;
+	bBurning = true;
+}
+
+bool AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds)
+{
+	const bool bReacts = ElementMarkRemaining > 0.0f
+		&& ((Element == EEIElement::Fire && ElementMark == EEIElement::Ice) || (Element == EEIElement::Ice && ElementMark == EEIElement::Fire));
+	if (bReacts)
+	{
+		ElementMarkRemaining = 0.0f;
+		return true;
+	}
+	ElementMark = Element;
+	ElementMarkRemaining = WindowSeconds;
+	return false;
+}
+
+void AEIEnemy::UpdateStatus(float DeltaSeconds)
+{
+	ElementMarkRemaining = FMath::Max(0.0f, ElementMarkRemaining - DeltaSeconds);
+	if (bSlowed)
+	{
+		SlowRemaining -= DeltaSeconds;
+		if (SlowRemaining <= 0.0f)
+		{
+			bSlowed = false;
+			GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter;
+		}
+	}
+	if (bBurning)
+	{
+		BurnRemaining -= DeltaSeconds;
+		BurnTickRemaining -= DeltaSeconds;
+		if (BurnTickRemaining <= 0.0f)
+		{
+			BurnTickRemaining += BurnTickSeconds;
+			Health->ApplyDamage(BurnPerSecond * BurnTickSeconds);
+		}
+		bBurning = BurnRemaining > 0.0f;
+	}
+}
+
 void AEIEnemy::StandWatch(const FVector& NewHome)
 {
 	Home = NewHome;
@@ -316,6 +377,8 @@ void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(AEIEnemy, bTelegraphing);
 	DOREPLIFETIME(AEIEnemy, bStaggering);
 	DOREPLIFETIME(AEIEnemy, Kind);
+	DOREPLIFETIME(AEIEnemy, bSlowed);
+	DOREPLIFETIME(AEIEnemy, bBurning);
 }
 
 bool AEIEnemy::IsDead() const
@@ -351,6 +414,11 @@ AActor* AEIEnemy::FindNearestHero() const
 
 void AEIEnemy::TickServer(float DeltaSeconds)
 {
+	UpdateStatus(DeltaSeconds);
+	if (IsDead())
+	{
+		return;
+	}
 	StateTime += DeltaSeconds;
 	AActor* Target = FindNearestHero();
 	switch (State)
@@ -676,9 +744,10 @@ void AEIEnemy::UpdateLook(float DeltaSeconds)
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);
 	const float Hurt = HurtFlashRemaining / HurtFlashSeconds;
 	StaggerBlend = FMath::FInterpConstantTo(StaggerBlend, bStaggering ? 1.0f : 0.0f, DeltaSeconds, StaggerBlendPerSecond);
-	const FLinearColor Calm = FMath::Lerp(FMath::Lerp(BaseColor, WarningColor, TelegraphBlend), StaggerColor, StaggerBlend);
+	const FLinearColor StatusColor = bBurning ? BurningColor : (bSlowed ? SlowedColor : BaseColor);
+	const FLinearColor Calm = FMath::Lerp(FMath::Lerp(StatusColor, WarningColor, TelegraphBlend), StaggerColor, StaggerBlend);
 	const FLinearColor Color = FMath::Lerp(Calm, HurtColor, Hurt);
-	const float Glow = FMath::Max(TelegraphBlend * WarningGlow, Hurt * HurtGlow);
+	const float Glow = FMath::Max3(TelegraphBlend * WarningGlow, Hurt * HurtGlow, bBurning ? BurningGlow : 0.0f);
 	for (UMaterialInstanceDynamic* Material : { BodyMaterial.Get(), HeadMaterial.Get() })
 	{
 		Material->SetVectorParameterValue(TEXT("Farbe"), Color);

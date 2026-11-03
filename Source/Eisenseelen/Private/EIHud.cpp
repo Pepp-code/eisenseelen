@@ -10,6 +10,7 @@
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIOmenComponent.h"
+#include "EIRuneComponent.h"
 #include "EISkyBarge.h"
 #include "EISwordComponent.h"
 #include "Engine/Canvas.h"
@@ -24,6 +25,7 @@ namespace
 	const FLinearColor LifeColor(0.75f, 0.12f, 0.1f);
 	const FLinearColor DodgeColor(0.3f, 0.7f, 1.0f);
 	const FLinearColor RecoveringColor(0.3f, 0.8f, 0.35f);
+	const FLinearColor RuneColor(0.55f, 0.75f, 1.0f);
 	const FLinearColor ChargeColor(1.0f, 0.7f, 0.2f);
 	const FLinearColor SpellColor(1.0f, 0.42f, 0.1f);
 	const FLinearColor ManaColor(0.2f, 0.4f, 1.0f);
@@ -76,7 +78,10 @@ void AEIHud::DrawHUD()
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	const bool bHasRun = State != nullptr && State->GetRunPhase() != EEIRunPhase::None;
 	const TCHAR* DodgeKey = Hero != nullptr && Hero->GetValues().IsDodgeOn() ? TEXT("V ausweichen   ") : TEXT("");
-	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   %sQ Feuerball   F benutzen   C Klasse   %sR Neustart"), DodgeKey, bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
+	const FEIRune* Rune = Hero != nullptr ? Hero->GetRunes()->GetRune() : nullptr;
+	const FString RuneKey = Rune != nullptr ? FString::Printf(TEXT("E %s   "), *Rune->SpellName) : FString();
+	const TCHAR* NextRuneKey = !bHasRun || State->GetRunPhase() == EEIRunPhase::OnBarge ? TEXT("T Rune   ") : TEXT("");
+	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   %sQ Feuerball   %sF benutzen   C Klasse   %s%sR Neustart"), DodgeKey, *RuneKey, NextRuneKey, bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -94,7 +99,7 @@ void AEIHud::DrawHUD()
 	const TCHAR* ClassKeys = bArcanist ? TEXT("Linke Maus Schuss   Rechte Maus halten: Feuerball") : TEXT("Linke Maus Hieb (halten: schwerer Hieb)   Rechte Maus halten: blocken, kurz vor dem Treffer: Parade");
 	// On the run map most enemies stand far away in their camps, so that number would say nothing.
 	const FString EnemyNote = bHasRun ? FString() : FString::Printf(TEXT("   %sGegner %d"), HordeNote, Enemies);
-	DrawLine(FString::Printf(TEXT("%s   %s%s"), ClassName, ClassKeys, *EnemyNote), Margin, Margin + 24.0f, TextColor);
+	DrawLine(FString::Printf(TEXT("%s   %s   %s%s"), ClassName, Rune != nullptr ? *Rune->Name : TEXT("Keine Rune"), ClassKeys, *EnemyNote), Margin, Margin + 24.0f, TextColor);
 
 	if (Hero->GetHurtFlash() > 0.0f)
 	{
@@ -143,6 +148,12 @@ void AEIHud::DrawHUD()
 	const float SpellY = LifeY - 56.0f;
 	DrawBar(SpellX, SpellY, BarWidth / 2.0f, BarHeight, 1.0f - Caster->GetSpellCooldownFraction(), SpellColor);
 	DrawLine(TEXT("Q Feuerball"), SpellX, SpellY - 24.0f, TextColor);
+	if (Rune != nullptr)
+	{
+		const float RuneX = SpellX + BarWidth / 2.0f + Margin;
+		DrawBar(RuneX, SpellY, BarWidth / 2.0f, BarHeight, 1.0f - Hero->GetRunes()->GetCooldownFraction(), RuneColor);
+		DrawLine(FString::Printf(TEXT("E %s"), *Rune->SpellName), RuneX, SpellY - 24.0f, TextColor);
+	}
 
 	if (Caster->GetMaxMana() > 0.0f)
 	{
@@ -264,7 +275,7 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	switch (Phase)
 	{
 	case EEIRunPhase::OnBarge:
-		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse."), Margin, LineY, TextColor);
+		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse, mit T die Rune."), Margin, LineY, TextColor);
 		DrawActiveAltar();
 		break;
 

@@ -15,6 +15,8 @@
 #include "EISwordComponent.h"
 #include "EIProjectile.h"
 #include "EIRunDirector.h"
+#include "EIRuneComponent.h"
+#include "EIRuneField.h"
 #include "EISkyBarge.h"
 #include "EITrainingDummy.h"
 #include "EngineUtils.h"
@@ -779,6 +781,136 @@ private:
 	double StepAt = 0.0;
 };
 
+/**
+ * The guest equips a rune and casts its spell: the server has the last word on the cooldown, and everyone sees the spell.
+ */
+class FEITwoPlayerRuneCommand : public IAutomationLatentCommand
+{
+public:
+	explicit FEITwoPlayerRuneCommand(FAutomationTestBase* InTest) : Test(InTest), StartedAt(FPlatformTime::Seconds()) {}
+
+	virtual bool Update() override
+	{
+		if (FPlatformTime::Seconds() - StartedAt > TimeoutSeconds)
+		{
+			Test->AddError(FString::Printf(TEXT("The two-player rune test timed out in step %d"), Step));
+			return true;
+		}
+		const FTwoPlayerSession Session = FTwoPlayerSession::Find();
+		if (!Session.IsReady() && Step == 0)
+		{
+			return false;
+		}
+		if (Session.ClientHero == nullptr || Session.ServerCopyOfClientHero == nullptr)
+		{
+			Test->AddError(TEXT("The guest disappeared from the session"));
+			return true;
+		}
+
+		const double Now = Session.ClientWorld->GetTimeSeconds();
+		const auto EnterStep = [this, Now](int32 NewStep)
+		{
+			Step = NewStep;
+			StepAt = Now;
+		};
+		const auto CountFields = [](UWorld* World)
+		{
+			int32 Count = 0;
+			for (TActorIterator<AEIRuneField> It(World); It; ++It)
+			{
+				++Count;
+			}
+			return Count;
+		};
+		UWorld* ServerWorld = Session.ServerCopyOfClientHero->GetWorld();
+		switch (Step)
+		{
+		case 0:
+		{
+			Session.ServerCopyOfClientHero->SetCanBeDamaged(false);
+			Session.ClientPlayer->SetControlRotation(FRotator(-20.0f, 0.0f, 0.0f));
+			const FVector Spot = Session.ServerCopyOfClientHero->GetActorLocation() + FVector(420.0f, 0.0f, 0.0f);
+			if (AEIEnemy* Enemy = ServerWorld->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Spot, FRotator(0.0f, 180.0f, 0.0f)))
+			{
+				Enemy->GetHealth()->Reset(100000.0f);
+				Target = Enemy;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::T, IE_Pressed);
+			EnterStep(1);
+			return false;
+		}
+		case 1:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::T, IE_Released);
+			EnterStep(2);
+			return false;
+		case 2:
+			if (Now - StepAt < 0.3)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("The server takes the guest's rune"), Session.ServerCopyOfClientHero->GetRunes()->GetRuneIndex(), 1);
+			Test->TestEqual(TEXT("The guest knows the rune"), Session.ClientHero->GetRunes()->GetRuneIndex(), 1);
+			EISendTestKey(Session.ClientPlayer, EKeys::E, IE_Pressed);
+			EnterStep(3);
+			return false;
+		case 3:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::E, IE_Released);
+			Test->TestTrue(TEXT("The guest sees the cooldown at once"), Session.ClientHero->GetRunes()->GetCooldownFraction() > 0.0f);
+			EnterStep(4);
+			return false;
+		case 4:
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("The server spawns the spell"), CountFields(ServerWorld), 1);
+			Test->TestEqual(TEXT("The guest sees the spell"), CountFields(Session.ClientWorld), 1);
+			Test->TestTrue(TEXT("The server counts the cooldown too"), Session.ServerCopyOfClientHero->GetRunes()->GetCooldownFraction() > 0.0f);
+			Test->TestTrue(TEXT("The spell of the guest hurts on the server"), Target.IsValid() && Target->GetHealth()->GetHealth() < 100000.0f);
+			EISendTestKey(Session.ClientPlayer, EKeys::E, IE_Pressed);
+			EnterStep(5);
+			return false;
+		case 5:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::E, IE_Released);
+			EnterStep(6);
+			return false;
+		case 6:
+			if (Now - StepAt < 0.3)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("During the cooldown no second spell comes"), CountFields(ServerWorld), 1);
+			return true;
+		default:
+			return true;
+		}
+	}
+
+private:
+	FAutomationTestBase* Test;
+	double StartedAt;
+	int32 Step = 0;
+	double StepAt = 0.0;
+	TWeakObjectPtr<AEIEnemy> Target;
+};
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEITwoPlayerRuneTest,
+	"Eisenseelen.Net.GuestRune",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEITwoPlayerDodgeTest,
 	"Eisenseelen.Net.GuestDodge",
@@ -850,6 +982,15 @@ bool FEITwoPlayerRunTest::RunTest(const FString& Parameters)
 	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(TEXT("/Game/Maps/L_ErsterLauf"))));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
 	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerRunCommand(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	return true;
+}
+
+bool FEITwoPlayerRuneTest::RunTest(const FString& Parameters)
+{
+	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(ArenaMap)));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
+	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerRuneCommand(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	return true;
 }

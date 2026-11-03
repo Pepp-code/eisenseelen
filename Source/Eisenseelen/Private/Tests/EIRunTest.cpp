@@ -14,6 +14,7 @@
 #include "EIHordeDirector.h"
 #include "EIOmenComponent.h"
 #include "EIRunDirector.h"
+#include "EIRuneComponent.h"
 #include "EISkyBarge.h"
 #include "EITestScript.h"
 #include "Engine/DamageEvents.h"
@@ -146,6 +147,14 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		Context.Test->TestTrue(TEXT("The hero stands on the deck"), Context.Movement->IsMovingOnGround());
 	}));
 
+	// On the barge the rune can still change.
+	AddTap(Steps, EKeys::T);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("On the barge T equips the next rune"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
+	}));
+
 	// Running off the deck begins the run, and the fall is a flight.
 	Steps.Add(Press(EKeys::W));
 	Steps.Add(WaitForPhase(TEXT("the hero leaves the barge"), 6.0, EEIRunPhase::RitualDone));
@@ -186,6 +195,14 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		FEIRunValues Short = GetGameMode(Context)->GetRun()->GetValues();
 		Short.BeaconHoldSeconds = ShortHoldSeconds;
 		GetGameMode(Context)->GetRun()->ApplyValues(Short);
+	}));
+
+	// During the run the rune stays.
+	AddTap(Steps, EKeys::T);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("During a run T changes nothing"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
 	}));
 
 	// The use key does nothing far from a beacon.
@@ -282,6 +299,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 			Context.Test->TestFalse(TEXT("The fires are out"), Beacon->IsLit());
 		}
 		Context.Test->TestEqual(TEXT("All enemies are gone"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
+		Context.Test->TestEqual(TEXT("The next run starts with the same rune"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

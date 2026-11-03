@@ -9,6 +9,7 @@
 #include "EIHeroMovementComponent.h"
 #include "EIOmenComponent.h"
 #include "EIPlayerController.h"
+#include "EIRuneComponent.h"
 #include "EISkyBarge.h"
 #include "EISwordComponent.h"
 #include "EIViewModelComponent.h"
@@ -75,6 +76,7 @@ AEIHeroCharacter::AEIHeroCharacter(const FObjectInitializer& ObjectInitializer)
 	Sword = CreateDefaultSubobject<UEISwordComponent>(TEXT("Sword"));
 	Caster = CreateDefaultSubobject<UEICasterComponent>(TEXT("Caster"));
 	Omens = CreateDefaultSubobject<UEIOmenComponent>(TEXT("Omens"));
+	Runes = CreateDefaultSubobject<UEIRuneComponent>(TEXT("Runes"));
 }
 
 void AEIHeroCharacter::BeginPlay()
@@ -95,6 +97,7 @@ void AEIHeroCharacter::BeginPlay()
 	Sword->LoadValues();
 	Caster->LoadValues();
 	Omens->LoadValues();
+	Runes->LoadValues();
 	LoadClassValues();
 	Caster->RefillMana();
 	if (HasAuthority())
@@ -116,6 +119,7 @@ void AEIHeroCharacter::PossessedBy(AController* NewController)
 	if (const AEIPlayerController* Player = Cast<AEIPlayerController>(NewController))
 	{
 		SetHeroClass(Player->GetSelectedClass());
+		Runes->SetRune(Player->GetSelectedRune());
 	}
 }
 
@@ -197,6 +201,11 @@ void AEIHeroCharacter::ReleaseSecondary()
 void AEIHeroCharacter::PressSpell()
 {
 	Caster->CastFireball();
+}
+
+void AEIHeroCharacter::PressRuneSpell()
+{
+	Runes->CastRune();
 }
 
 bool AEIHeroCharacter::IsDead() const
