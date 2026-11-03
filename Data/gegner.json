@@ -77,7 +77,14 @@
 		"drehtempo_grad_pro_s": 180,
 		"schild_schaden_faktor_0_bis_1": 1,
 		"schild_winkel_grad": 120,
-		"wurf_tempo_m_pro_s": 0
+		"wurf_tempo_m_pro_s": 0,
+		"ansturm_tempo_m_pro_s": 14,
+		"ansturm_strecke_m": 16,
+		"ansturm_ab_abstand_m": 6,
+		"ansturm_bis_abstand_m": 15,
+		"ansturm_ankuendigung_s": 1.1,
+		"ansturm_schaden": 40,
+		"ansturm_pause_s": 7
 	},
 	"horde": {
 		"gleichzeitig_max": 20,

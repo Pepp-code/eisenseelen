@@ -55,6 +55,7 @@ private:
 
 	float Damage = 0.0f;
 	float TickSeconds = 0.5f;
+	float FreezeSeconds = 0.0f;
 	float SlowShare = 0.0f;
 	float BurnPerSecond = 0.0f;
 	float StatusSeconds = 0.0f;

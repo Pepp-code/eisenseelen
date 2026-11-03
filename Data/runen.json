@@ -2,6 +2,14 @@
 	"reaktion_fenster_s": 2,
 	"dampfexplosion_schaden": 80,
 	"dampfexplosion_radius_m": 6,
+	"dampfwolke_s": 3,
+	"splitterbruch_schaden": 100,
+	"splitterbruch_radius_m": 5,
+	"funkenflug_schaden": 30,
+	"funkenflug_radius_m": 8,
+	"funkenflug_ziele": 4,
+	"funkenflug_brennen_pro_s": 10,
+	"funkenflug_brennen_s": 3,
 	"runen": [
 		{
 			"name": "Frostrune",
@@ -14,6 +22,7 @@
 			"reichweite_m": 0,
 			"dauer_s": 0,
 			"takt_s": 1,
+			"gefrieren_s": 1.5,
 			"verlangsamen_0_bis_1": 0.5,
 			"brennen_pro_s": 0,
 			"zustand_s": 3
@@ -29,6 +38,7 @@
 			"reichweite_m": 25,
 			"dauer_s": 6,
 			"takt_s": 0.5,
+			"gefrieren_s": 0,
 			"verlangsamen_0_bis_1": 0,
 			"brennen_pro_s": 0,
 			"zustand_s": 0
@@ -44,6 +54,7 @@
 			"reichweite_m": 8,
 			"dauer_s": 6,
 			"takt_s": 0.5,
+			"gefrieren_s": 0,
 			"verlangsamen_0_bis_1": 0,
 			"brennen_pro_s": 8,
 			"zustand_s": 3

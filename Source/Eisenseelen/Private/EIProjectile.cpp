@@ -34,6 +34,7 @@ namespace
 	constexpr float BurstSeconds = 0.28f;
 	constexpr float BurstGlow = 5.0f;
 	constexpr float BurstLightPerRadius = 200.0f;
+	constexpr float CloudFadeSeconds = 0.8f;
 }
 
 AEIProjectile::AEIProjectile()
@@ -207,12 +208,31 @@ void AEIExplosionFX::Setup(float InRadiusCm, const FLinearColor& Color)
 	Ball->SetWorldScale3D(FVector(RadiusCm * 0.2f / SphereMeshRadiusCm));
 }
 
+void AEIExplosionFX::SetupCloud(float InRadiusCm, const FLinearColor& Color, float Seconds, float Strength)
+{
+	RadiusCm = InRadiusCm;
+	LifeSeconds = Seconds;
+	SetLifeSpan(Seconds);
+	Material = EIVisuals::SetGlow(Ball, Color, Strength);
+	Light->SetIntensity(0.0f);
+	Ball->SetWorldScale3D(FVector(RadiusCm * 0.2f / SphereMeshRadiusCm));
+}
+
 void AEIExplosionFX::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
 	Age += DeltaSeconds;
 	const float T = FMath::Clamp(Age / BurstSeconds, 0.0f, 1.0f);
+	if (LifeSeconds > 0.0f)
+	{
+		Ball->SetWorldScale3D(FVector(RadiusCm * FMath::Lerp(0.2f, 1.0f, 1.0f - FMath::Square(1.0f - T)) / SphereMeshRadiusCm));
+		if (Material != nullptr)
+		{
+			Material->SetScalarParameterValue(TEXT("Deckkraft"), FMath::Clamp((LifeSeconds - Age) / CloudFadeSeconds, 0.0f, 1.0f));
+		}
+		return;
+	}
 	// Fast at first and slowing down, so it reads as a blast and not as a growing ball.
 	const float Growth = 1.0f - FMath::Square(1.0f - T);
 	Ball->SetWorldScale3D(FVector(RadiusCm * FMath::Lerp(0.2f, 1.0f, Growth) / SphereMeshRadiusCm));

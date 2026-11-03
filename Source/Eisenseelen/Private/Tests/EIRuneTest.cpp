@@ -6,6 +6,7 @@
 #include "EIEnemy.h"
 #include "EIHealthComponent.h"
 #include "EIRuneComponent.h"
+#include "EISwordComponent.h"
 #include "EIRuneField.h"
 #include "EITestScript.h"
 #include "EngineUtils.h"
@@ -69,16 +70,20 @@ bool FEIRuneTableTest::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("There are three runes"), Table.Runes.Num(), 3);
 
-	const FString Valid = TEXT("{\"reaktion_fenster_s\": 2, \"dampfexplosion_schaden\": 50, \"dampfexplosion_radius_m\": 4, \"runen\": [")
+	const FString Valid = TEXT("{\"reaktion_fenster_s\": 2, \"dampfexplosion_schaden\": 50, \"dampfexplosion_radius_m\": 4, \"dampfwolke_s\": 2, \"splitterbruch_schaden\": 90, \"splitterbruch_radius_m\": 3, ")
+		TEXT("\"funkenflug_schaden\": 20, \"funkenflug_radius_m\": 5, \"funkenflug_ziele\": 2, \"funkenflug_brennen_pro_s\": 4, \"funkenflug_brennen_s\": 1, \"runen\": [")
 		TEXT("{\"name\": \"Proberune\", \"zauber\": \"Probe\", \"form\": \"wand\", \"element\": \"feuer\", \"schaden\": 5, \"abklingzeit_s\": 3, \"groesse_m\": 9,")
-		TEXT("\"reichweite_m\": 8, \"dauer_s\": 4, \"takt_s\": 0.5, \"verlangsamen_0_bis_1\": 0.25, \"brennen_pro_s\": 6, \"zustand_s\": 2}]}");
+		TEXT("\"reichweite_m\": 8, \"dauer_s\": 4, \"takt_s\": 0.5, \"gefrieren_s\": 1, \"verlangsamen_0_bis_1\": 0.25, \"brennen_pro_s\": 6, \"zustand_s\": 2}]}");
 	FEIRuneTable Small;
 	TestTrue(TEXT("A complete line loads"), FEIRuneTable::LoadFromString(Valid, Small, Error));
 	TestEqual(TEXT("The name counts"), Small.Runes[0].Name, FString(TEXT("Proberune")));
 	TestTrue(TEXT("The form counts"), Small.Runes[0].bWall);
 	TestEqual(TEXT("The element counts"), Small.Runes[0].Element, EEIElement::Fire);
 	TestEqual(TEXT("The size counts"), Small.Runes[0].SizeMeters, 9.0f);
+	TestEqual(TEXT("The freeze counts"), Small.Runes[0].FreezeSeconds, 1.0f);
 	TestEqual(TEXT("The reaction counts"), Small.SteamDamage, 50.0f);
+	TestEqual(TEXT("The shatter counts"), Small.ShatterDamage, 90.0f);
+	TestEqual(TEXT("The sparks count"), Small.SparkDamage, 20.0f);
 
 	FEIRuneTable Untouched;
 	TestFalse(TEXT("An unknown form is refused"), FEIRuneTable::LoadFromString(Valid.Replace(TEXT("\"wand\""), TEXT("\"stern\"")), Untouched, Error));
@@ -126,6 +131,7 @@ bool FEIRuneSpellsTest::RunTest(const FString& Parameters)
 		const FEIRune& Rune = CurrentRune(Context);
 		Context.Test->TestNearlyEqual(TEXT("The spell on E hits"), Lost(), Rune.Damage, 0.01f);
 		Context.Test->TestTrue(TEXT("It slows"), State->Target->IsSlowed());
+		Context.Test->TestTrue(TEXT("It freezes"), State->Target->IsFrozen());
 		const float SlowSpeed = TargetSpeedMetersPerSecond * 100.0f * (1.0f - Rune.SlowShare);
 		Context.Test->TestNearlyEqual(TEXT("A slowed enemy walks slower"), State->Target->GetCharacterMovement()->MaxWalkSpeed, SlowSpeed, 0.01f);
 		Context.Test->TestTrue(TEXT("Now it has to cool down"), Context.Hero->GetRunes()->GetCooldownFraction() > 0.0f);
@@ -242,6 +248,115 @@ bool FEIRuneSpellsTest::RunTest(const FString& Parameters)
 	{
 		Context.Test->TestEqual(TEXT("A new hero keeps the rune"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
 	}));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIReactionsTest,
+	"Eisenseelen.Play.Reactions",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIReactionsTest::RunTest(const FString& Parameters)
+{
+	struct FState
+	{
+		TWeakObjectPtr<AEIEnemy> Target;
+		TWeakObjectPtr<AEIEnemy> Neighbour;
+		float TargetLife = 0.0f;
+		float NeighbourLife = 0.0f;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+	const auto Remember = [State]()
+	{
+		State->TargetLife = State->Target->GetHealth()->GetHealth();
+		State->NeighbourLife = State->Neighbour->GetHealth()->GetHealth();
+	};
+	const auto TargetLost = [State]() { return State->TargetLife - State->Target->GetHealth()->GetHealth(); };
+	const auto NeighbourLost = [State]() { return State->NeighbourLife - State->Neighbour->GetHealth()->GetHealth(); };
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		Teleport(Context, OpenFloor, 0.0f);
+	}));
+	Steps.Add(Wait(0.2));
+
+	// Lightning and fire: sparks jump over and set the neighbours on fire.
+	Steps.Add(Do([State, Remember, TargetLost, NeighbourLost](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Target = SpawnTarget(Context);
+		AEIEnemy* Neighbour = SpawnTarget(Context);
+		Target->SetActorLocation(Context.Hero->GetActorLocation() + FVector(200.0f, 0.0f, 0.0f));
+		Neighbour->SetActorLocation(Context.Hero->GetActorLocation() + FVector(200.0f, 200.0f, 0.0f));
+		State->Target = Target;
+		State->Neighbour = Neighbour;
+		Remember();
+		UEIRuneComponent* Runes = Context.Hero->GetRunes();
+		const FEIRuneTable& Table = Runes->GetTable();
+		Runes->HitWithElement(Target, EEIElement::Lightning);
+		Context.Test->TestEqual(TEXT("Lightning alone sets off nothing"), TargetLost(), 0.0f);
+		Runes->HitWithElement(Target, EEIElement::Fire);
+		Context.Test->TestEqual(TEXT("Sparks hurt the target"), TargetLost(), Table.SparkDamage);
+		Context.Test->TestEqual(TEXT("Sparks jump over"), NeighbourLost(), Table.SparkDamage);
+		Context.Test->TestTrue(TEXT("Sparks set the target on fire"), Target->IsBurning());
+		Context.Test->TestTrue(TEXT("Sparks set the neighbour on fire"), Neighbour->IsBurning());
+
+		// Lightning on the frozen: it breaks, and the splinters reach the neighbour.
+		Remember();
+		Target->Freeze(5.0f);
+		Context.Test->TestTrue(TEXT("It is frozen"), Target->IsFrozen());
+		Runes->HitWithElement(Target, EEIElement::Lightning);
+		Context.Test->TestEqual(TEXT("Lightning breaks the frozen"), TargetLost(), Table.ShatterDamage);
+		Context.Test->TestEqual(TEXT("The splinters hit the neighbour"), NeighbourLost(), Table.ShatterDamage);
+		Context.Test->TestFalse(TEXT("Whoever broke is no longer frozen"), Target->IsFrozen());
+		Remember();
+	}));
+	Steps.Add(WaitUntil(TEXT("the fire goes out"), 5.0, [State](const FEIPlayContext& Context) { return !State->Target->IsBurning(); }));
+
+	// The way of the blade: E freezes, the heavy hit breaks.
+	Steps.Add(Do([Remember](const FEIPlayContext& Context)
+	{
+		Remember();
+		Context.Test->TestEqual(TEXT("The frost rune is equipped"), CurrentRune(Context).Name, FString(TEXT("Frostrune")));
+	}));
+	AddTap(Steps, EKeys::E);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([State, Remember](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("The frost freezes the target"), State->Target->IsFrozen());
+		Remember();
+	}));
+	Steps.Add(Press(EKeys::LeftMouseButton));
+	Steps.Add(Wait(0.7));
+	Steps.Add(Release(EKeys::LeftMouseButton));
+	Steps.Add(WaitUntil(TEXT("the heavy swing is over"), 3.0, [](const FEIPlayContext& Context) { return !Context.Hero->GetSword()->IsSwinging(); }));
+	Steps.Add(Do([State, TargetLost, NeighbourLost](const FEIPlayContext& Context)
+	{
+		const float Expected = Context.Hero->GetSword()->GetValues().Heavy.Damage + Context.Hero->GetRunes()->GetTable().ShatterDamage;
+		Context.Test->AddInfo(FString::Printf(TEXT("A heavy hit on the frozen at 200 cm: %.0f damage, expected %.0f"), TargetLost(), Expected));
+		Context.Test->TestNearlyEqual(TEXT("A heavy hit breaks the frozen"), TargetLost(), Expected, 0.01f);
+		Context.Test->TestFalse(TEXT("It is thawed now"), State->Target->IsFrozen());
+		State->Target->Destroy();
+		State->Neighbour->Destroy();
+	}));
+	Steps.Add(Wait(0.1));
+
+	// Whoever is frozen does not strike, and the frost melts by itself.
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Runner = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(130.0f, 0.0f, 0.0f), FRotator(0.0f, 180.0f, 0.0f));
+		Runner->GetHealth()->Reset(100000.0f);
+		Runner->Freeze(1.0f);
+		State->Target = Runner;
+	}));
+	Steps.Add(Wait(0.7));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("It is still frozen"), State->Target->IsFrozen());
+		Context.Test->TestFalse(TEXT("Whoever is frozen does not strike"), State->Target->IsTelegraphing());
+	}));
+	Steps.Add(WaitUntil(TEXT("it thaws and winds up"), 2.0, [State](const FEIPlayContext& Context) { return !State->Target->IsFrozen() && State->Target->IsTelegraphing(); }));
 	return RunInArena(this, MoveTemp(Steps));
 }
 

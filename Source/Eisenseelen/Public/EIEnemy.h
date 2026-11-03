@@ -30,6 +30,14 @@ enum class EEIElement : uint8
 	Lightning
 };
 
+/** What two elements on one target set off. */
+enum class EEIReaction : uint8
+{
+	None,
+	Steam,
+	Sparks
+};
+
 /** The name of a kind in the data files. */
 EISENSEELEN_API const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind);
 
@@ -54,6 +62,13 @@ struct EISENSEELEN_API FEIEnemyValues
 	float ShieldDamageFactor = 1.0f;
 	float ShieldAngleDegrees = 120.0f;
 	float ThrowSpeedMetersPerSecond = 0.0f;
+	float ChargeSpeedMetersPerSecond = 0.0f;
+	float ChargeDistanceMeters = 0.0f;
+	float ChargeFromMeters = 0.0f;
+	float ChargeToMeters = 0.0f;
+	float ChargeWindupSeconds = 0.0f;
+	float ChargeDamage = 0.0f;
+	float ChargePauseSeconds = 0.0f;
 
 	static bool LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutValues, FString& OutError);
 };
@@ -111,8 +126,16 @@ public:
 	bool IsSlowed() const { return bSlowed; }
 	bool IsBurning() const { return bBurning; }
 
-	/** Server only. Leaves the element on the enemy for a while. True if it reacts with fire on ice or ice on fire. */
-	bool MarkElement(EEIElement Element, float WindowSeconds);
+	/** Server only. Stops it on the spot for a while. Whoever hits it hard then, breaks it. */
+	void Freeze(float Seconds);
+	void Unfreeze();
+	bool IsFrozen() const { return bFrozen; }
+
+	/** Whether the path of its charge lies on the ground right now. */
+	bool IsChargeMarked() const { return bChargeMarked; }
+
+	/** Server only. Leaves the element on the enemy for a while, or sets off what it does with the one already there. */
+	EEIReaction MarkElement(EEIElement Element, float WindowSeconds);
 
 	/** Server only. More life and more damage, for enemies that come later in a run. */
 	void ApplyStrength(float Factor);
@@ -132,7 +155,10 @@ private:
 		Recover,
 		Stagger,
 		Watch,
-		GoHome
+		GoHome,
+		Frozen,
+		ChargeWindup,
+		Charging
 	};
 
 	UFUNCTION()
@@ -143,6 +169,9 @@ private:
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastShieldBlocked();
+
+	UFUNCTION()
+	void OnRep_ChargeMarked();
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHurt();
@@ -165,6 +194,10 @@ private:
 	float ReduceByShield(float Amount, const AActor* DamageCauser);
 	void ShowHeldPart();
 	void UpdateStatus(float DeltaSeconds);
+	bool CanStartCharge(const AActor* Target) const;
+	void StartChargeWindup(const AActor* Target);
+	void UpdateCharge(float DeltaSeconds);
+	void EndCharge();
 	bool StandsOnPaths() const;
 	void StopWalking();
 	void Strike();
@@ -177,6 +210,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Head;
+
+	/** The path of a charge on the ground. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> ChargeMark;
 
 	/** The shield of a shield bearer, the bone of a thrower. */
 	UPROPERTY(VisibleAnywhere)
@@ -206,6 +243,12 @@ private:
 	UPROPERTY(Replicated)
 	bool bBurning = false;
 
+	UPROPERTY(Replicated)
+	bool bFrozen = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ChargeMarked)
+	bool bChargeMarked = false;
+
 	FEIEnemyValues Values;
 	FLinearColor BaseColor = FLinearColor::Gray;
 	bool bNextHitBreaksShield = false;
@@ -215,6 +258,11 @@ private:
 	float BurnTickRemaining = 0.0f;
 	EEIElement ElementMark = EEIElement::Fire;
 	float ElementMarkRemaining = 0.0f;
+	float FrozenSeconds = 0.0f;
+	double NextChargeAt = 0.0;
+	FVector ChargeDirection = FVector::ForwardVector;
+	float ChargeTravelledCm = 0.0f;
+	TArray<TWeakObjectPtr<AActor>> ChargeHit;
 	bool bGuard = false;
 	bool bHasHome = false;
 	FVector Home = FVector::ZeroVector;

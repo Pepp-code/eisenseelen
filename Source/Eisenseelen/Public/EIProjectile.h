@@ -71,6 +71,9 @@ public:
 	void Setup(float InRadiusCm);
 	void Setup(float InRadiusCm, const FLinearColor& Color);
 
+	/** Grows just as fast, but stays for a while and only then fades. */
+	void SetupCloud(float InRadiusCm, const FLinearColor& Color, float Seconds, float Strength);
+
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
@@ -85,4 +88,5 @@ private:
 
 	float RadiusCm = 150.0f;
 	float Age = 0.0f;
+	float LifeSeconds = 0.0f;
 };

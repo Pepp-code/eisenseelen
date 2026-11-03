@@ -6,6 +6,7 @@
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIOmenComponent.h"
+#include "EIRuneComponent.h"
 #include "EIPoses.h"
 #include "EIViewModelComponent.h"
 #include "EIVisuals.h"
@@ -455,6 +456,10 @@ void UEISwordComponent::HitActor(AActor* Target, const FVector& Location)
 	if (Enemy != nullptr)
 	{
 		Enemy->BreakShieldWithNextHit();
+		if (Enemy->IsFrozen())
+		{
+			Hero->GetRunes()->Shatter(Enemy);
+		}
 	}
 	UGameplayStatics::ApplyDamage(Target, Damage, Hero->GetController(), Hero, nullptr);
 	if (Enemy != nullptr)

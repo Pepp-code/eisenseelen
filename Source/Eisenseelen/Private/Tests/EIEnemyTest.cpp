@@ -143,6 +143,30 @@ bool FEIEnemyKindsTest::RunTest(const FString& Parameters)
 		Colossus->StaggerFromHeavyHit(1.0f);
 		Context.Test->TestFalse(TEXT("A heavy hit does not stagger the colossus"), Colossus->IsStaggering());
 		Colossus->Destroy();
+		Context.Hero->SetCanBeDamaged(true);
+	}));
+	Steps.Add(Wait(0.1));
+
+	// From a distance the colossus marks its path, and then it charges along it.
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		State->Enemy = SpawnKindAhead(Context, EEIEnemyKind::Colossus, 1000.0f);
+		State->Life = Context.Hero->GetHealth()->GetHealth();
+	}));
+	Steps.Add(WaitUntil(TEXT("the colossus marks its path"), 1.0, [State](const FEIPlayContext& Context) { return State->Enemy->IsChargeMarked(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("While it marks its path, nothing has happened yet"), Context.Hero->GetHealth()->GetHealth(), State->Life);
+	}));
+	Steps.Add(WaitUntil(TEXT("the charge hits the hero"), 4.0, [State](const FEIPlayContext& Context) { return Context.Hero->GetHealth()->GetHealth() < State->Life; }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const float Lost = State->Life - Context.Hero->GetHealth()->GetHealth();
+		Context.Test->AddInfo(FString::Printf(TEXT("The charge from 1000 cm takes %.0f life"), Lost));
+		Context.Test->TestEqual(TEXT("The charge does its damage"), Lost, State->Enemy->GetValues().ChargeDamage);
+		Context.Test->TestFalse(TEXT("The mark is gone in the charge"), State->Enemy->IsChargeMarked());
+		Context.Hero->SetCanBeDamaged(false);
+		State->Enemy->Destroy();
 	}));
 	return RunInArena(this, MoveTemp(Steps));
 }

@@ -26,6 +26,7 @@ struct EISENSEELEN_API FEIRune
 	/** 0 means one single burst. */
 	float DurationSeconds = 0.0f;
 	float TickSeconds = 0.5f;
+	float FreezeSeconds = 0.0f;
 	float SlowShare = 0.0f;
 	float BurnPerSecond = 0.0f;
 	float StatusSeconds = 0.0f;
@@ -37,6 +38,14 @@ struct EISENSEELEN_API FEIRuneTable
 	float ReactionWindowSeconds = 2.0f;
 	float SteamDamage = 80.0f;
 	float SteamRadiusMeters = 6.0f;
+	float SteamCloudSeconds = 3.0f;
+	float ShatterDamage = 100.0f;
+	float ShatterRadiusMeters = 5.0f;
+	float SparkDamage = 30.0f;
+	float SparkRadiusMeters = 8.0f;
+	float SparkTargets = 4.0f;
+	float SparkBurnPerSecond = 10.0f;
+	float SparkBurnSeconds = 3.0f;
 
 	/** OutTable only changes when the whole text is valid. */
 	static bool LoadFromString(const FString& Json, FEIRuneTable& OutTable, FString& OutError);
@@ -74,8 +83,11 @@ public:
 	float GetCooldownSeconds() const;
 	float GetCooldownFraction() const;
 
-	/** Server only. Marks the enemy with the element, and with fire on ice or ice on fire the steam explodes. */
+	/** Server only. Marks the enemy with the element, and with a fitting element already on it a reaction breaks loose. */
 	void HitWithElement(AEIEnemy* Enemy, EEIElement Element);
+
+	/** Server only. A frozen enemy breaks, and the splinters hit those around it. */
+	void Shatter(AEIEnemy* Enemy);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -86,12 +98,18 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastSteam(FVector_NetQuantize Location);
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastBurst(FVector_NetQuantize Location, float RadiusCm, FLinearColor Color);
+
 	UFUNCTION()
 	void OnRep_RuneIndex();
 
 	AEIHeroCharacter* GetHero() const;
 	void FindPlace(const FEIRune& Rune, FVector& OutLocation, float& OutYaw) const;
 	void SpawnField(const FEIRune& Rune, const FVector& Location, float Yaw);
+	void HurtAround(const FVector& Location, float RadiusCm, float Damage);
+	void SteamExplosion(const AEIEnemy* Enemy);
+	void SparksFly(AEIEnemy* Enemy);
 
 	FEIRuneTable Table;
 

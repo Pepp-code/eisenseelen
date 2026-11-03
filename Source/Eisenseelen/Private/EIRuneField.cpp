@@ -63,6 +63,7 @@ void AEIRuneField::Configure(const FEIRune& Rune, float InDamage)
 	Color = Rune.Element == EEIElement::Fire ? FireColor : (Rune.Element == EEIElement::Ice ? IceColor : LightningColor);
 	Damage = InDamage;
 	TickSeconds = Rune.TickSeconds;
+	FreezeSeconds = Rune.FreezeSeconds;
 	SlowShare = Rune.SlowShare;
 	BurnPerSecond = Rune.BurnPerSecond;
 	StatusSeconds = Rune.StatusSeconds;
@@ -152,6 +153,10 @@ void AEIRuneField::Pulse()
 		UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Hero, nullptr);
 		if (Enemy != nullptr)
 		{
+			if (FreezeSeconds > 0.0f)
+			{
+				Enemy->Freeze(FreezeSeconds);
+			}
 			if (SlowShare > 0.0f)
 			{
 				Enemy->ApplySlow(SlowShare, StatusSeconds);

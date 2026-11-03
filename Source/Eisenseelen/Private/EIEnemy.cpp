@@ -33,6 +33,15 @@ namespace
 	const FVector HeldBonePlace(30.0f, 30.0f, 50.0f);
 	const FVector HeldBoneSize(0.1f, 0.1f, 0.6f);
 	const FLinearColor SlowedColor(0.35f, 0.65f, 1.0f);
+	const FLinearColor FrozenColor(0.7f, 0.9f, 1.0f);
+	constexpr float FrozenGlow = 2.0f;
+	const FLinearColor ChargeMarkColor(1.0f, 0.1f, 0.03f);
+	constexpr float ChargeMarkStrength = 0.8f;
+	constexpr float ChargeMarkWidthCm = 260.0f;
+	constexpr float ChargeMarkAboveFloorCm = 8.0f;
+	constexpr float ChargeBlockedAfterSeconds = 0.4f;
+	constexpr float ChargeBlockedBelowCm = 150.0f;
+	const FVector ChargeKnockback(700.0f, 0.0f, 350.0f);
 	const FLinearColor BurningColor(1.0f, 0.4f, 0.08f);
 	constexpr float BurningGlow = 1.5f;
 	constexpr float BurnTickSeconds = 0.5f;
@@ -145,6 +154,18 @@ bool FEIEnemyValues::LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutV
 	{
 		return false;
 	}
+	// Only a kind with a charge has these numbers.
+	if ((*Section)->HasField(TEXT("ansturm_tempo_m_pro_s"))
+		&& (!FEIDataFile::ReadNumber(**Section, TEXT("ansturm_tempo_m_pro_s"), 0.0, 100.0, Loaded.ChargeSpeedMetersPerSecond, OutError)
+			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_strecke_m"), 0.0, 200.0, Loaded.ChargeDistanceMeters, OutError)
+			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_ab_abstand_m"), 0.0, 200.0, Loaded.ChargeFromMeters, OutError)
+			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_bis_abstand_m"), 0.0, 200.0, Loaded.ChargeToMeters, OutError)
+			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_ankuendigung_s"), 0.0, 20.0, Loaded.ChargeWindupSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_schaden"), 0.0, 100000.0, Loaded.ChargeDamage, OutError)
+			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_pause_s"), 0.0, 600.0, Loaded.ChargePauseSeconds, OutError)))
+	{
+		return false;
+	}
 	OutValues = Loaded;
 	return true;
 }
@@ -188,6 +209,13 @@ AEIEnemy::AEIEnemy()
 	Held->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Held->SetVisibility(false);
 
+	ChargeMark = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ChargeMark"));
+	ChargeMark->SetupAttachment(GetCapsuleComponent());
+	ChargeMark->SetStaticMesh(Cube.Object);
+	ChargeMark->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ChargeMark->SetCastShadow(false);
+	ChargeMark->SetVisibility(false);
+
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
 }
 
@@ -221,6 +249,15 @@ void AEIEnemy::BeginPlay()
 	HeadMaterial = EIVisuals::SetColor(Head, BaseColor);
 	ShowHeldPart();
 	SetActorScale3D(FVector(Values.Scale));
+	if (Values.ChargeSpeedMetersPerSecond > 0.0f)
+	{
+		// The sizes count within the enemy, so they are divided by its own size.
+		const float Length = Values.ChargeDistanceMeters * CentimetersPerMeter / Values.Scale;
+		const float HalfHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+		ChargeMark->SetRelativeLocation(FVector(Length / 2.0f, 0.0f, ChargeMarkAboveFloorCm / Values.Scale - HalfHeight));
+		ChargeMark->SetRelativeScale3D(FVector(Length, ChargeMarkWidthCm / Values.Scale, 1.0f) / 100.0f);
+		EIVisuals::SetGlow(ChargeMark, ChargeMarkColor, ChargeMarkStrength);
+	}
 	if (!HasAuthority())
 	{
 		return;
@@ -280,18 +317,119 @@ void AEIEnemy::ApplyBurn(float PerSecond, float Seconds)
 	bBurning = true;
 }
 
-bool AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds)
+EEIReaction AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds)
 {
-	const bool bReacts = ElementMarkRemaining > 0.0f
-		&& ((Element == EEIElement::Fire && ElementMark == EEIElement::Ice) || (Element == EEIElement::Ice && ElementMark == EEIElement::Fire));
-	if (bReacts)
+	EEIReaction Reaction = EEIReaction::None;
+	if (ElementMarkRemaining > 0.0f)
+	{
+		const auto Between = [Element, this](EEIElement A, EEIElement B) { return (Element == A && ElementMark == B) || (Element == B && ElementMark == A); };
+		Reaction = Between(EEIElement::Fire, EEIElement::Ice) ? EEIReaction::Steam : (Between(EEIElement::Fire, EEIElement::Lightning) ? EEIReaction::Sparks : EEIReaction::None);
+	}
+	if (Reaction != EEIReaction::None)
 	{
 		ElementMarkRemaining = 0.0f;
-		return true;
+		return Reaction;
 	}
 	ElementMark = Element;
 	ElementMarkRemaining = WindowSeconds;
-	return false;
+	return EEIReaction::None;
+}
+
+void AEIEnemy::Freeze(float Seconds)
+{
+	if (IsDead())
+	{
+		return;
+	}
+	if (State == EState::Charging)
+	{
+		EndCharge();
+	}
+	StopWalking();
+	State = EState::Frozen;
+	StateTime = 0.0f;
+	FrozenSeconds = Seconds;
+	bFrozen = true;
+	bStaggering = false;
+	bChargeMarked = false;
+	OnRep_ChargeMarked();
+	bTelegraphing = false;
+	OnRep_Telegraphing();
+}
+
+void AEIEnemy::Unfreeze()
+{
+	if (bFrozen)
+	{
+		bFrozen = false;
+		State = EState::Chase;
+		StateTime = 0.0f;
+	}
+}
+
+bool AEIEnemy::CanStartCharge(const AActor* Target) const
+{
+	if (Values.ChargeSpeedMetersPerSecond <= 0.0f || GetWorld()->GetTimeSeconds() < NextChargeAt)
+	{
+		return false;
+	}
+	const double Distance = FVector::Dist2D(Target->GetActorLocation(), GetActorLocation());
+	if (Distance < Values.ChargeFromMeters * CentimetersPerMeter || Distance > Values.ChargeToMeters * CentimetersPerMeter)
+	{
+		return false;
+	}
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(EIEnemyCharge), false, this);
+	return !GetWorld()->LineTraceTestByObjectType(GetPawnViewLocation(), Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), Query);
+}
+
+void AEIEnemy::StartChargeWindup(const AActor* Target)
+{
+	StopWalking();
+	ChargeDirection = (Target->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	SetActorRotation(ChargeDirection.Rotation());
+	State = EState::ChargeWindup;
+	StateTime = 0.0f;
+	bChargeMarked = true;
+	OnRep_ChargeMarked();
+	bTelegraphing = true;
+	OnRep_Telegraphing();
+}
+
+void AEIEnemy::UpdateCharge(float DeltaSeconds)
+{
+	AddMovementInput(ChargeDirection);
+	ChargeTravelledCm += static_cast<float>(GetVelocity().Size2D()) * DeltaSeconds;
+	const double HitZone = Values.HitZoneMeters * CentimetersPerMeter;
+	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsDead() && !ChargeHit.Contains(*It) && FVector::Dist(It->GetActorLocation(), GetActorLocation()) <= HitZone)
+		{
+			ChargeHit.Add(*It);
+			UGameplayStatics::ApplyDamage(*It, Values.ChargeDamage, GetController(), this, nullptr);
+			if (It->CanBeDamaged())
+			{
+				It->LaunchCharacter(ChargeDirection * ChargeKnockback.X + FVector(0.0f, 0.0f, ChargeKnockback.Z), true, true);
+			}
+		}
+	}
+	const bool bBlocked = StateTime > ChargeBlockedAfterSeconds && GetVelocity().Size2D() < ChargeBlockedBelowCm;
+	if (bBlocked || ChargeTravelledCm >= Values.ChargeDistanceMeters * CentimetersPerMeter)
+	{
+		EndCharge();
+	}
+}
+
+void AEIEnemy::EndCharge()
+{
+	GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter;
+	NextChargeAt = GetWorld()->GetTimeSeconds() + Values.ChargePauseSeconds;
+	State = EState::Recover;
+	StateTime = 0.0f;
+}
+
+void AEIEnemy::OnRep_ChargeMarked()
+{
+	ChargeMark->SetVisibility(bChargeMarked);
 }
 
 void AEIEnemy::UpdateStatus(float DeltaSeconds)
@@ -408,6 +546,8 @@ void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(AEIEnemy, Kind);
 	DOREPLIFETIME(AEIEnemy, bSlowed);
 	DOREPLIFETIME(AEIEnemy, bBurning);
+	DOREPLIFETIME(AEIEnemy, bFrozen);
+	DOREPLIFETIME(AEIEnemy, bChargeMarked);
 }
 
 bool AEIEnemy::IsDead() const
@@ -464,6 +604,11 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 			StateTime = 0.0f;
 			return;
 		}
+		if (CanStartCharge(Target))
+		{
+			StartChargeWindup(Target);
+			return;
+		}
 		if (CanAttack(Target))
 		{
 			StopWalking();
@@ -511,6 +656,33 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		}
 		return;
 
+	case EState::Frozen:
+		if (StateTime >= FrozenSeconds)
+		{
+			Unfreeze();
+		}
+		return;
+
+	case EState::ChargeWindup:
+		if (StateTime >= Values.ChargeWindupSeconds)
+		{
+			bChargeMarked = false;
+			OnRep_ChargeMarked();
+			bTelegraphing = false;
+			OnRep_Telegraphing();
+			MulticastStrike();
+			State = EState::Charging;
+			StateTime = 0.0f;
+			ChargeTravelledCm = 0.0f;
+			ChargeHit.Reset();
+			GetCharacterMovement()->MaxWalkSpeed = Values.ChargeSpeedMetersPerSecond * CentimetersPerMeter;
+		}
+		return;
+
+	case EState::Charging:
+		UpdateCharge(DeltaSeconds);
+		return;
+
 	case EState::Watch:
 		if (NoticesHero(DeltaSeconds))
 		{
@@ -538,10 +710,16 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 
 void AEIEnemy::Stagger(float Seconds)
 {
-	if (!HasAuthority() || IsDead())
+	if (!HasAuthority() || IsDead() || bFrozen)
 	{
 		return;
 	}
+	if (State == EState::Charging)
+	{
+		EndCharge();
+	}
+	bChargeMarked = false;
+	OnRep_ChargeMarked();
 	StopWalking();
 	State = EState::Stagger;
 	StateTime = 0.0f;
@@ -665,7 +843,7 @@ float AEIEnemy::ReduceByShield(float Amount, const AActor* DamageCauser)
 {
 	const bool bBroken = bNextHitBreaksShield;
 	bNextHitBreaksShield = false;
-	if (Values.ShieldDamageFactor >= 1.0f || bBroken || bStaggering || DamageCauser == nullptr || Amount <= 0.0f)
+	if (Values.ShieldDamageFactor >= 1.0f || bBroken || bStaggering || bFrozen || DamageCauser == nullptr || Amount <= 0.0f)
 	{
 		return Amount;
 	}
@@ -782,10 +960,10 @@ void AEIEnemy::UpdateLook(float DeltaSeconds)
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);
 	const float Hurt = HurtFlashRemaining / HurtFlashSeconds;
 	StaggerBlend = FMath::FInterpConstantTo(StaggerBlend, bStaggering ? 1.0f : 0.0f, DeltaSeconds, StaggerBlendPerSecond);
-	const FLinearColor StatusColor = bBurning ? BurningColor : (bSlowed ? SlowedColor : BaseColor);
+	const FLinearColor StatusColor = bFrozen ? FrozenColor : (bBurning ? BurningColor : (bSlowed ? SlowedColor : BaseColor));
 	const FLinearColor Calm = FMath::Lerp(FMath::Lerp(StatusColor, WarningColor, TelegraphBlend), StaggerColor, StaggerBlend);
 	const FLinearColor Color = FMath::Lerp(Calm, HurtColor, Hurt);
-	const float Glow = FMath::Max3(TelegraphBlend * WarningGlow, Hurt * HurtGlow, bBurning ? BurningGlow : 0.0f);
+	const float Glow = FMath::Max3(TelegraphBlend * WarningGlow, Hurt * HurtGlow, bFrozen ? FrozenGlow : (bBurning ? BurningGlow : 0.0f));
 	for (UMaterialInstanceDynamic* Material : { BodyMaterial.Get(), HeadMaterial.Get() })
 	{
 		Material->SetVectorParameterValue(TEXT("Farbe"), Color);
@@ -810,7 +988,8 @@ void AEIEnemy::UpdatePose(float DeltaSeconds)
 	const float Stagger = StaggerBlend * (StaggerTiltDegrees + FMath::Sin(GetWorld()->GetTimeSeconds() * StaggerWobbleSpeed) * StaggerWobbleDegrees);
 	// Positive leans back.
 	const float Lean = Stagger + TelegraphBlend * WindupLeanDegrees + RecoilBlend * RecoilLeanDegrees - WalkBlend * WalkLeanDegrees - StrikeBlend * StrikeLeanDegrees;
-	const float Waddle = Step * WalkWaddleDegrees * WalkBlend + FMath::Sin(IdlePhase) * IdleSwayDegrees * (1.0f - WalkBlend);
+	// Whoever is frozen does not even sway.
+	const float Waddle = bFrozen ? 0.0f : Step * WalkWaddleDegrees * WalkBlend + FMath::Sin(IdlePhase) * IdleSwayDegrees * (1.0f - WalkBlend);
 	const float Forward = StrikeBlend * StrikeForwardCm;
 
 	Body->SetRelativeRotation(FRotator(Lean, 0.0f, Waddle));

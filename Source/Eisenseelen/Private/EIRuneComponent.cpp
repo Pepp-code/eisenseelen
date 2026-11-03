@@ -11,6 +11,7 @@
 #include "EIVisuals.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
@@ -23,6 +24,11 @@ namespace
 	constexpr float PlaceToleranceCm = 300.0f;
 	constexpr float StaffCastSeconds = 0.6f;
 	const FLinearColor SteamColor(0.9f, 0.95f, 1.0f);
+	constexpr float SteamCloudStrength = 0.35f;
+	constexpr float SteamCloudShare = 0.85f;
+	const FLinearColor ShatterColor(0.55f, 0.85f, 1.0f);
+	const FLinearColor SparkColor(1.0f, 0.75f, 0.25f);
+	constexpr float SparkBurstRadiusCm = 130.0f;
 
 	bool ReadRune(const FJsonObject& Line, FEIRune& Out, FString& OutError)
 	{
@@ -51,6 +57,7 @@ namespace
 			&& FEIDataFile::ReadNumber(Line, TEXT("reichweite_m"), 0.0, 500.0, Out.RangeMeters, OutError)
 			&& FEIDataFile::ReadNumber(Line, TEXT("dauer_s"), 0.0, 600.0, Out.DurationSeconds, OutError)
 			&& FEIDataFile::ReadNumber(Line, TEXT("takt_s"), 0.05, 60.0, Out.TickSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("gefrieren_s"), 0.0, 60.0, Out.FreezeSeconds, OutError)
 			&& FEIDataFile::ReadNumber(Line, TEXT("verlangsamen_0_bis_1"), 0.0, 1.0, Out.SlowShare, OutError)
 			&& FEIDataFile::ReadNumber(Line, TEXT("brennen_pro_s"), 0.0, 100000.0, Out.BurnPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Line, TEXT("zustand_s"), 0.0, 600.0, Out.StatusSeconds, OutError);
@@ -66,7 +73,15 @@ namespace
 		}
 		if (!FEIDataFile::ReadNumber(Root, TEXT("reaktion_fenster_s"), 0.0, 60.0, Out.ReactionWindowSeconds, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("dampfexplosion_schaden"), 0.0, 100000.0, Out.SteamDamage, OutError)
-			|| !FEIDataFile::ReadNumber(Root, TEXT("dampfexplosion_radius_m"), 0.1, 200.0, Out.SteamRadiusMeters, OutError))
+			|| !FEIDataFile::ReadNumber(Root, TEXT("dampfexplosion_radius_m"), 0.1, 200.0, Out.SteamRadiusMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("dampfwolke_s"), 0.1, 60.0, Out.SteamCloudSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("splitterbruch_schaden"), 0.0, 100000.0, Out.ShatterDamage, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("splitterbruch_radius_m"), 0.1, 200.0, Out.ShatterRadiusMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_schaden"), 0.0, 100000.0, Out.SparkDamage, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_radius_m"), 0.1, 200.0, Out.SparkRadiusMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_ziele"), 0.0, 100.0, Out.SparkTargets, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_brennen_pro_s"), 0.0, 100000.0, Out.SparkBurnPerSecond, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_brennen_s"), 0.0, 60.0, Out.SparkBurnSeconds, OutError))
 		{
 			return false;
 		}
@@ -240,14 +255,27 @@ void UEIRuneComponent::SpawnField(const FEIRune& Rune, const FVector& Location, 
 
 void UEIRuneComponent::HitWithElement(AEIEnemy* Enemy, EEIElement Element)
 {
-	if (!Enemy->MarkElement(Element, Table.ReactionWindowSeconds))
+	if (Element == EEIElement::Lightning && Enemy->IsFrozen())
 	{
+		Shatter(Enemy);
 		return;
 	}
-	// The steam explosion.
+	switch (Enemy->MarkElement(Element, Table.ReactionWindowSeconds))
+	{
+	case EEIReaction::Steam:
+		SteamExplosion(Enemy);
+		break;
+	case EEIReaction::Sparks:
+		SparksFly(Enemy);
+		break;
+	default:
+		break;
+	}
+}
+
+void UEIRuneComponent::HurtAround(const FVector& Location, float RadiusCm, float Damage)
+{
 	AEIHeroCharacter* Hero = GetHero();
-	const FVector Location = Enemy->GetActorLocation();
-	const float RadiusCm = Table.SteamRadiusMeters * CentimetersPerMeter;
 	TArray<FOverlapResult> Overlaps;
 	GetWorld()->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, FCollisionObjectQueryParams(ECC_Pawn), FCollisionShape::MakeSphere(RadiusCm));
 	TSet<AActor*> Done;
@@ -259,9 +287,60 @@ void UEIRuneComponent::HitWithElement(AEIEnemy* Enemy, EEIElement Element)
 			continue;
 		}
 		Done.Add(Target);
-		UGameplayStatics::ApplyDamage(Target, Table.SteamDamage, Hero->GetController(), Hero, nullptr);
+		UGameplayStatics::ApplyDamage(Target, Damage, Hero->GetController(), Hero, nullptr);
 	}
+}
+
+void UEIRuneComponent::SteamExplosion(const AEIEnemy* Enemy)
+{
+	const FVector Location = Enemy->GetActorLocation();
+	HurtAround(Location, Table.SteamRadiusMeters * CentimetersPerMeter, Table.SteamDamage);
 	MulticastSteam(Location);
+}
+
+void UEIRuneComponent::Shatter(AEIEnemy* Enemy)
+{
+	const FVector Location = Enemy->GetActorLocation();
+	const float RadiusCm = Table.ShatterRadiusMeters * CentimetersPerMeter;
+	Enemy->Unfreeze();
+	HurtAround(Location, RadiusCm, Table.ShatterDamage);
+	MulticastBurst(Location, RadiusCm, ShatterColor);
+}
+
+void UEIRuneComponent::SparksFly(AEIEnemy* Enemy)
+{
+	AEIHeroCharacter* Hero = GetHero();
+	const FVector From = Enemy->GetActorLocation();
+	const double Reach = Table.SparkRadiusMeters * CentimetersPerMeter;
+	TArray<AEIEnemy*> Nearby;
+	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsDead() && FVector::Dist(It->GetActorLocation(), From) <= Reach)
+		{
+			Nearby.Add(*It);
+		}
+	}
+	Nearby.Sort([&From](const AEIEnemy& A, const AEIEnemy& B) { return FVector::DistSquared(A.GetActorLocation(), From) < FVector::DistSquared(B.GetActorLocation(), From); });
+	// The enemy itself comes first, because it is the nearest, and it counts on top of the others.
+	const int32 Targets = FMath::Min(Nearby.Num(), FMath::RoundToInt(Table.SparkTargets) + 1);
+	for (int32 Index = 0; Index < Targets; ++Index)
+	{
+		AEIEnemy* Target = Nearby[Index];
+		MulticastBurst(Target->GetActorLocation(), SparkBurstRadiusCm, SparkColor);
+		Target->ApplyBurn(Table.SparkBurnPerSecond, Table.SparkBurnSeconds);
+		UGameplayStatics::ApplyDamage(Target, Table.SparkDamage, Hero->GetController(), Hero, nullptr);
+	}
+}
+
+void UEIRuneComponent::MulticastBurst_Implementation(FVector_NetQuantize Location, float RadiusCm, FLinearColor Color)
+{
+	EIVisuals::PlaySoundAt(this, TEXT("ExplosionKlein"), Location);
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
+	{
+		FX->Setup(RadiusCm, Color);
+	}
 }
 
 void UEIRuneComponent::MulticastSteam_Implementation(FVector_NetQuantize Location)
@@ -272,5 +351,10 @@ void UEIRuneComponent::MulticastSteam_Implementation(FVector_NetQuantize Locatio
 	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
 	{
 		FX->Setup(Table.SteamRadiusMeters * CentimetersPerMeter, SteamColor);
+	}
+	// The cloud that stays hides what is behind it.
+	if (AEIExplosionFX* Cloud = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
+	{
+		Cloud->SetupCloud(Table.SteamRadiusMeters * CentimetersPerMeter * SteamCloudShare, SteamColor, Table.SteamCloudSeconds, SteamCloudStrength);
 	}
 }
