@@ -12,6 +12,7 @@ class UStaticMeshComponent;
 struct EISENSEELEN_API FEIEnemyValues
 {
 	float Life = 40.0f;
+	float Threat = 1.0f;
 	float SpeedMetersPerSecond = 4.5f;
 	float Damage = 10.0f;
 	float AttackFromMeters = 1.7f;

@@ -76,8 +76,9 @@ void AEIHud::DrawHUD()
 	const bool bHorde = State != nullptr && State->IsHordeActive();
 	const bool bArcanist = Hero->GetHeroClass() == EEIHeroClass::Arcanist;
 	const TCHAR* ClassName = bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht");
+	const TCHAR* HordeNote = bHasRun ? TEXT("") : (bHorde ? TEXT("Horde an   ") : TEXT("Horde aus   "));
 	const TCHAR* ClassKeys = bArcanist ? TEXT("Linke Maus Schuss   Rechte Maus halten: Feuerball") : TEXT("Linke Maus Hieb (halten: schwerer Hieb)   Rechte Maus halten: blocken, kurz vor dem Treffer: Parade");
-	DrawLine(FString::Printf(TEXT("%s   %s   Horde %s   Gegner %d"), ClassName, ClassKeys, bHorde ? TEXT("an") : TEXT("aus"), Enemies), Margin, Margin + 24.0f, TextColor);
+	DrawLine(FString::Printf(TEXT("%s   %s   %sGegner %d"), ClassName, ClassKeys, HordeNote, Enemies), Margin, Margin + 24.0f, TextColor);
 
 	if (Hero->GetHurtFlash() > 0.0f)
 	{
@@ -157,7 +158,19 @@ void AEIHud::DrawWorldMark(const FVector& Location, const FString& Label, const 
 void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 {
 	const int32 Seconds = FMath::Max(0, FMath::FloorToInt(State->GetRunSeconds()));
-	const FString Clock = FString::Printf(TEXT("%d:%02d"), Seconds / 60, Seconds % 60);
+	FString Clock = FString::Printf(TEXT("%d:%02d"), Seconds / 60, Seconds % 60);
+	if (State->IsBloodMoon())
+	{
+		Clock += TEXT("   Blutmond");
+	}
+	else if (State->GetCorruptionStage() > 0)
+	{
+		Clock += FString::Printf(TEXT("   Verderbnis %d"), State->GetCorruptionStage());
+	}
+	if (State->GetCorruptionNote() > 0.0f)
+	{
+		DrawLine(State->IsBloodMoon() ? TEXT("Der Blutmond steigt auf") : TEXT("Die Verderbnis w\u00E4chst"), Canvas->SizeX / 2.0f - 140.0f, 110.0f, WarningTextColor, 1.5f);
+	}
 	const float LineY = Margin + 48.0f;
 	const float CenterX = Canvas->SizeX / 2.0f;
 	const float PromptY = Canvas->SizeY / 2.0f + 100.0f;

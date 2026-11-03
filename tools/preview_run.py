@@ -76,6 +76,16 @@ def scenario():
     player().preview_key("W", False)
     yield 6.0
 
+    # The sky on the way to the blood moon, and back for the rest of the pictures.
+    stand_looking_at((0, 0), (4000, 0, 900))
+    for stage in (3, 6):
+        player().preview_corruption(stage)
+        yield 5.0
+        shot()
+        yield AFTER_SHOT_SECONDS
+    player().preview_corruption(0)
+    yield 6.0
+
     # A beacon from afar and from close by.
     beacon = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIBeacon)[0].get_actor_location()
     fire = (beacon.x, beacon.y, 950)

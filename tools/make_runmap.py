@@ -146,6 +146,8 @@ def main():
 
     sun = spawn(actors, unreal.DirectionalLight, location=(0, 0, 1000), rotation=(0, -50, 30), label="Sonne")
     sun.light_component.set_editor_property("atmosphere_sun_light", True)
+    # The corruption changes the light during a run.
+    sun.light_component.set_mobility(unreal.ComponentMobility.MOVABLE)
     spawn(actors, unreal.SkyAtmosphere, label="Himmel")
     sky_light = spawn(actors, unreal.SkyLight, location=(0, 0, 1000), label="Himmelslicht")
     sky_light.light_component.set_editor_property("real_time_capture", True)

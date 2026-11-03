@@ -56,6 +56,22 @@ namespace
 		return WaitUntil(What, MaxSeconds, [Phase](const FEIPlayContext& Context) { return GetState(Context)->GetRunPhase() == Phase; });
 	}
 
+	/** No enemies at all, for a test that looks at something else. */
+	void SwitchOffDirector(const FEIPlayContext& Context)
+	{
+		UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
+		FEIHordeValues Values = Horde->GetValues();
+		Values.Director.FullThreat = 0.0f;
+		Horde->ApplyValues(Values);
+	}
+
+	float ExpectedBudget(const FEIPlayContext& Context, float PhaseShare)
+	{
+		const FEIDirectorValues& Director = GetGameMode(Context)->GetHorde()->GetValues().Director;
+		const float Corruption = 1.0f + GetGameMode(Context)->GetRun()->GetValues().CorruptionThreatPerStage * GetState(Context)->GetCorruptionStage();
+		return FMath::Min(Director.FullThreat * Director.PlayerShare[0] * PhaseShare * Corruption, Director.PeakThreat);
+	}
+
 	/** Stands next to the beacon, far enough from the fire to look at it. */
 	void StandAtBeacon(const FEIPlayContext& Context, const AEIBeacon* Beacon, float DistanceCm)
 	{
@@ -85,6 +101,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	// The run starts high up on the barge, and the clock waits for the jump.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
+		SwitchOffDirector(Context);
 		Context.Test->TestEqual(TEXT("The run starts on the barge"), GetState(Context)->GetRunPhase(), EEIRunPhase::OnBarge);
 		Context.Test->TestTrue(TEXT("The barge flies high"), Context.Hero->GetActorLocation().Z > GetBarge(Context)->GetDeckHeight());
 		Context.Test->TestTrue(TEXT("The hero stands on the deck"), Context.Movement->IsMovingOnGround());
@@ -139,7 +156,6 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("There are two beacons on the map"), Beacons.Num(), 2);
 		Context.Test->TestTrue(TEXT("The beacon burns"), Beacons[0]->IsLit());
 		Context.Test->TestFalse(TEXT("The other one does not"), Beacons[1]->IsLit());
-		Context.Test->TestTrue(TEXT("The last wave starts"), GetGameMode(Context)->GetHorde()->IsHordeActive());
 	}));
 
 	// Leaving the zone stops the wait for the barge.
@@ -221,6 +237,139 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIRunDirectorTest,
+	"Eisenseelen.Play.Run.Director",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIRunDirectorTest::RunTest(const FString& Parameters)
+{
+	constexpr float InViewDot = 0.35f;
+	struct FState
+	{
+		TSet<const AEIEnemy*> Seen;
+		int32 Checked = 0;
+		TWeakObjectPtr<AEIEnemy> LeftBehind;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+
+	// Every enemy is checked at the moment it appears: far enough away and out of sight.
+	const auto CheckNewEnemies = [State](const FEIPlayContext& Context)
+	{
+		const float MinDistance = GetGameMode(Context)->GetHorde()->GetValues().MinDistanceMeters * CentimetersPerMeter;
+		const FVector Eye = Context.Hero->GetPawnViewLocation();
+		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
+		{
+			if (State->Seen.Contains(*It))
+			{
+				continue;
+			}
+			State->Seen.Add(*It);
+			++State->Checked;
+			Context.Test->TestTrue(TEXT("An enemy appears at a distance"), FVector::Dist2D(It->GetActorLocation(), Context.Hero->GetActorLocation()) >= MinDistance * 0.9f);
+			const bool bInViewCone = FVector::DotProduct(Context.Hero->GetViewRotation().Vector(), (It->GetActorLocation() - Eye).GetSafeNormal()) >= InViewDot * 1.1f;
+			FCollisionQueryParams Query(SCENE_QUERY_STAT(EITestSight), false, Context.Hero);
+			const bool bWallBetween = Context.World->LineTraceTestByObjectType(Eye, It->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), Query);
+			Context.Test->TestTrue(TEXT("An enemy appears out of sight"), !bInViewCone || bWallBetween);
+		}
+	};
+	const auto TooMuchThreat = [](const FEIPlayContext& Context)
+	{
+		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
+		return Horde->CountThreat() > Horde->GetThreatBudget() + 1.0f;
+	};
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		Context.Test->TestFalse(TEXT("On the barge nothing comes yet"), GetGameMode(Context)->GetHorde()->IsHordeActive());
+		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
+	}));
+
+	// The quiet phase: a share of the budget, and it fills up.
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Exploring));
+	Steps.Add(WaitUntil(TEXT("the enemies of the quiet phase are there"), 20.0, [CheckNewEnemies, TooMuchThreat](const FEIPlayContext& Context)
+	{
+		CheckNewEnemies(Context);
+		Context.Test->TestFalse(TEXT("The budget holds"), TooMuchThreat(Context));
+		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
+		return Horde->CountThreat() >= Horde->GetThreatBudget();
+	}));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
+		const float Expected = ExpectedBudget(Context, Horde->GetValues().Director.ExploringShare);
+		Context.Test->AddInfo(FString::Printf(TEXT("Quiet phase: budget %.1f, threat %.0f, %d enemies checked at 1500 cm from the middle"), Horde->GetThreatBudget(), Horde->CountThreat(), State->Checked));
+		Context.Test->TestNearlyEqual(TEXT("The quiet phase has its share of the budget"), Horde->GetThreatBudget(), Expected, 0.01f);
+
+		// Far away from everyone: such an enemy makes way for one nearby.
+		State->LeftBehind = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(9000.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+		Context.Test->TestTrue(TEXT("An enemy can be far away"), State->LeftBehind.IsValid());
+	}));
+	Steps.Add(WaitUntil(TEXT("the enemy left behind is gone"), 3.0, [State](const FEIPlayContext& Context) { return !State->LeftBehind.IsValid(); }));
+
+	// The corruption rises with the clock and makes more of everything.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		FEIRunValues Fast = GetGameMode(Context)->GetRun()->GetValues();
+		Fast.CorruptionEverySeconds = GetState(Context)->GetRunSeconds() / 2.5f;
+		GetGameMode(Context)->GetRun()->ApplyValues(Fast);
+	}));
+	Steps.Add(WaitUntil(TEXT("the corruption rises"), 2.0, [](const FEIPlayContext& Context) { return GetState(Context)->GetCorruptionStage() >= 2; }));
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
+		const float Expected = ExpectedBudget(Context, Horde->GetValues().Director.ExploringShare);
+		Context.Test->AddInfo(FString::Printf(TEXT("Corruption %d: budget %.1f"), GetState(Context)->GetCorruptionStage(), Horde->GetThreatBudget()));
+		Context.Test->TestNearlyEqual(TEXT("The corruption raises the budget"), Horde->GetThreatBudget(), Expected, 0.01f);
+		Context.Test->TestFalse(TEXT("This is no blood moon yet"), GetState(Context)->IsBloodMoon());
+
+		FEIRunValues Fast = GetGameMode(Context)->GetRun()->GetValues();
+		Fast.CorruptionEverySeconds = 0.1f;
+		GetGameMode(Context)->GetRun()->ApplyValues(Fast);
+	}));
+
+	// At the end comes the blood moon: no quiet phase any more, and the stage stops there.
+	Steps.Add(WaitUntil(TEXT("the blood moon rises"), 2.0, [](const FEIPlayContext& Context) { return GetState(Context)->IsBloodMoon(); }));
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
+		const float MaxStage = GetGameMode(Context)->GetRun()->GetValues().CorruptionMaxStage;
+		Context.Test->AddInfo(FString::Printf(TEXT("Blood moon: budget %.1f"), Horde->GetThreatBudget()));
+		Context.Test->TestEqual(TEXT("The stage stops at the blood moon"), GetState(Context)->GetCorruptionStage(), FMath::RoundToInt(MaxStage));
+		Context.Test->TestNearlyEqual(TEXT("The blood moon knows no quiet phase"), Horde->GetThreatBudget(), ExpectedBudget(Context, Horde->GetValues().Director.BeaconShare), 0.01f);
+		Context.Test->TestTrue(TEXT("The budget stops at its peak"), Horde->GetThreatBudget() <= Horde->GetValues().Director.PeakThreat);
+	}));
+
+	// R takes it all back, and the next run has no corruption yet.
+	AddTap(Steps, EKeys::R);
+	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::OnBarge));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("A fresh run has no corruption"), GetState(Context)->GetCorruptionStage(), 0);
+		Context.Test->TestFalse(TEXT("A fresh run has no blood moon"), GetState(Context)->IsBloodMoon());
+		Context.Test->TestFalse(TEXT("On the barge nothing comes again"), GetGameMode(Context)->GetHorde()->IsHordeActive());
+		Context.Hero->SetCanBeDamaged(false);
+		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
+	}));
+
+	// At the beacon the last wave comes with the full budget.
+	Steps.Add(WaitForPhase(TEXT("the run begins again"), 2.0, EEIRunPhase::Exploring));
+	AddTap(Steps, EKeys::F);
+	Steps.Add(WaitForPhase(TEXT("the beacon burns"), 1.0, EEIRunPhase::BeaconLit));
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
+		Context.Test->AddInfo(FString::Printf(TEXT("At the beacon: budget %.1f"), Horde->GetThreatBudget()));
+		Context.Test->TestNearlyEqual(TEXT("The beacon brings the full budget"), Horde->GetThreatBudget(), ExpectedBudget(Context, Horde->GetValues().Director.BeaconShare), 0.01f);
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEIPathfindingTest,
 	"Eisenseelen.Play.Run.Pathfinding",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -246,6 +395,7 @@ bool FEIPathfindingTest::RunTest(const FString& Parameters)
 	}));
 	Steps.Add(Do([HeroSpot, EnemySpot, StartedAt](const FEIPlayContext& Context)
 	{
+		SwitchOffDirector(Context);
 		Context.Hero->SetCanBeDamaged(false);
 		Teleport(Context, HeroSpot, 270.0f);
 		FHitResult Wall;

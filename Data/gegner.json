@@ -1,6 +1,7 @@
 {
 	"knochenlaeufer": {
 		"leben": 40,
+		"bedrohung": 1,
 		"tempo_m_pro_s": 4.5,
 		"schaden": 10,
 		"angriff_ab_abstand_m": 1.7,
@@ -13,6 +14,17 @@
 		"gleichzeitig_max": 20,
 		"neue_pro_s": 3,
 		"abstand_min_m": 25,
-		"abstand_max_m": 40
+		"abstand_max_m": 40,
+		"zu_weit_weg_m": 80
+	},
+	"direktor": {
+		"bedrohung_voll": 44,
+		"anteil_1_spieler": 0.45,
+		"anteil_2_spieler": 0.7,
+		"anteil_3_spieler": 0.85,
+		"anteil_4_spieler": 1.0,
+		"anteil_erkundung": 0.35,
+		"anteil_leuchtfeuer": 1.0,
+		"bedrohung_spitze": 30
 	}
 }

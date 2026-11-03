@@ -7,6 +7,7 @@
 class AEIBeacon;
 class AEIHeroCharacter;
 class AEISkyBarge;
+enum class EEIRunPhase : uint8;
 
 /** The numbers of a run from Data/lauf.json. */
 struct EISENSEELEN_API FEIRunValues
@@ -16,6 +17,9 @@ struct EISENSEELEN_API FEIRunValues
 	float BeaconZoneMeters = 15.0f;
 	float BargeDistanceMeters = 12.0f;
 	float BargeDepartMetersPerSecond = 6.0f;
+	float CorruptionEverySeconds = 120.0f;
+	float CorruptionMaxStage = 6.0f;
+	float CorruptionThreatPerStage = 0.12f;
 
 	static bool LoadFromProjectFile(FEIRunValues& OutValues, FString& OutError);
 };
@@ -44,6 +48,9 @@ public:
 
 	AEISkyBarge* GetBarge() const { return Barge; }
 
+	/** The clock raises it by itself. Directly only for preview pictures. */
+	void SetCorruptionStage(int32 Stage);
+
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
@@ -51,6 +58,8 @@ private:
 	void HoldBeacon(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingHeroes);
 	void SetHorde(bool bActive);
+	void UpdateCorruption();
+	void UpdateThreatBudget(EEIRunPhase Phase, int32 HeroCount);
 
 	UPROPERTY(Transient)
 	TObjectPtr<AEISkyBarge> Barge;

@@ -27,6 +27,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewInvulnerable();
 
+	/** For preview pictures: jumps to a stage of the corruption. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewCorruption(int32 Stage);
+
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);
 

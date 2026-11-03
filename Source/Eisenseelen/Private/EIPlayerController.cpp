@@ -51,6 +51,14 @@ void AEIPlayerController::PreviewInvulnerable()
 	}
 }
 
+void AEIPlayerController::PreviewCorruption(int32 Stage)
+{
+	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
+	{
+		GameMode->GetRun()->SetCorruptionStage(Stage);
+	}
+}
+
 void AEIPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();

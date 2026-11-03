@@ -61,6 +61,7 @@ bool FEIEnemyValues::LoadFromProjectFile(FEIEnemyValues& OutValues, FString& Out
 	}
 	FEIEnemyValues Loaded;
 	if (!FEIDataFile::ReadNumber(**Runner, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
+		|| !FEIDataFile::ReadNumber(**Runner, TEXT("bedrohung"), 0.0, 1000.0, Loaded.Threat, OutError)
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("tempo_m_pro_s"), 0.1, 30.0, Loaded.SpeedMetersPerSecond, OutError)
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("schaden"), 0.0, 10000.0, Loaded.Damage, OutError)
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("angriff_ab_abstand_m"), 0.5, 20.0, Loaded.AttackFromMeters, OutError)

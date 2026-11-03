@@ -24,6 +24,8 @@ class EISENSEELEN_API AEIGameState : public AGameStateBase
 	GENERATED_BODY()
 
 public:
+	AEIGameState();
+
 	bool IsHordeActive() const { return bHordeActive; }
 	void SetHordeActive(bool bActive) { bHordeActive = bActive; }
 
@@ -31,6 +33,11 @@ public:
 	float GetRunSeconds() const;
 	float GetBeaconHoldLeft() const { return BeaconHoldLeft; }
 	bool IsBeaconHeld() const { return bBeaconHeld; }
+	int32 GetCorruptionStage() const { return CorruptionStage; }
+	bool IsBloodMoon() const { return bBloodMoon; }
+
+	/** Seconds of the note left after the corruption rose. For the HUD. */
+	float GetCorruptionNote() const { return CorruptionNoteRemaining; }
 
 	/** Server only. */
 	void SetRunPhase(EEIRunPhase NewPhase) { RunPhase = NewPhase; }
@@ -39,9 +46,17 @@ public:
 	void StopRunClock();
 	void SetBeaconHold(float SecondsLeft, bool bHeld);
 
+	/** Share is how far along the way to the worst the sky should be, from 0 to 1. */
+	void SetCorruption(int32 Stage, float Share, bool bIsBloodMoon);
+
+	virtual void Tick(float DeltaSeconds) override;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
+	UFUNCTION()
+	void OnRep_CorruptionStage(int32 PreviousStage);
+
 	UPROPERTY(Replicated)
 	bool bHordeActive = false;
 
@@ -60,4 +75,16 @@ private:
 
 	UPROPERTY(Replicated)
 	bool bBeaconHeld = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_CorruptionStage)
+	int32 CorruptionStage = 0;
+
+	UPROPERTY(Replicated)
+	float CorruptionShare = 0.0f;
+
+	UPROPERTY(Replicated)
+	bool bBloodMoon = false;
+
+	float CorruptionLook = 0.0f;
+	float CorruptionNoteRemaining = 0.0f;
 };

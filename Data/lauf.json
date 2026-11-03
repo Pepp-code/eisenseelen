@@ -3,5 +3,8 @@
 	"leuchtfeuer_reichweite_m": 4,
 	"leuchtfeuer_zone_m": 15,
 	"barke_abstand_m": 12,
-	"barke_abflug_tempo_m_pro_s": 6
+	"barke_abflug_tempo_m_pro_s": 6,
+	"verderbnis_alle_s": 120,
+	"verderbnis_stufen": 6,
+	"verderbnis_bedrohung_je_stufe": 0.12
 }
