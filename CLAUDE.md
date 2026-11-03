@@ -75,4 +75,4 @@ Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war
 
 **Nicht geprüft:** Töne kann der Agent nicht hören, und die Klingenspur erscheint in keinem Standbild.
 
-**Stil (entschieden am 3. November 2026):** Leere Rüstungen, beide Klassen flach aus einfarbigen Flächen ohne Umrisslinien. Die Vorlage ist `SourceAssets/Konzepte/Stilvorlage_beide_Helden.jpg`. Die Bilder in den Unterordnern dort sind frühere Entwürfe. Alle zeigen die Richtung und sind kein Bauplan.
+**Stil (entschieden am 3. November 2026):** Leere Rüstungen, beide Klassen flach aus einfarbigen Flächen ohne Umrisslinien. Die Vorlagen des Entwicklers liegen in `SourceAssets/Konzepte/Klingenwacht` und `SourceAssets/Konzepte/Arkanist`. Sie zeigen die Richtung und sind kein Bauplan.
