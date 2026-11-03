@@ -20,6 +20,13 @@
 			"ziele_max": 5,
 			"abzug_je_ziel_0_bis_1": 0.15
 		},
+		"blocken": {
+			"schaden_abzug_0_bis_1": 0.6,
+			"winkel_grad": 120,
+			"parade_fenster_s": 0.2,
+			"parade_schaden_abzug_0_bis_1": 1.0,
+			"taumeln_s": 1.0
+		},
 		"aufladen_s": 0.6,
 		"ketten_fenster_s": 0.5,
 		"treff_stopp_s": 0.05,

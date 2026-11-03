@@ -150,17 +150,17 @@ void AEIPlayerController::HandleJumpEnded()
 
 void AEIPlayerController::HandleSprintStarted()
 {
-	if (const AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetLivingHero())
 	{
-		Hero->GetHeroMovement()->SetWantsToSprint(true);
+		Hero->SetSprintKey(true);
 	}
 }
 
 void AEIPlayerController::HandleSprintEnded()
 {
-	if (const AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
+	if (AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
 	{
-		Hero->GetHeroMovement()->SetWantsToSprint(false);
+		Hero->SetSprintKey(false);
 	}
 }
 

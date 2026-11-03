@@ -28,10 +28,21 @@ struct FEISwingValues
 	float TargetFalloff = 0.15f;
 };
 
+/** The numbers of the block from Data/waffen.json. */
+struct FEIBlockValues
+{
+	float DamageReduction = 0.6f;
+	float AngleDegrees = 120.0f;
+	float ParryWindowSeconds = 0.2f;
+	float ParryDamageReduction = 1.0f;
+	float StaggerSeconds = 1.0f;
+};
+
 struct EISENSEELEN_API FEISwordValues
 {
 	FEISwingValues Light;
 	FEISwingValues Heavy;
+	FEIBlockValues Block;
 	float ChargeSeconds = 0.6f;
 	float ChainWindowSeconds = 0.5f;
 	float HitStopSeconds = 0.05f;
@@ -44,7 +55,9 @@ struct EISENSEELEN_API FEISwordValues
 
 /**
  * The sword. A press and release is a light swing in a chain of three, a long hold is a heavy swing. The owner sees
- * the swing at once. Hits only count on the server, along the blade's path and not through walls.
+ * the swing at once. Hits only count on the server, along the blade's path and not through walls. Holding the second
+ * key raises a block against hits from the front, whose first moment is a parry that staggers the attacker. An attack
+ * goes first, the block comes back after it.
  */
 UCLASS()
 class EISENSEELEN_API UEISwordComponent : public UActorComponent
@@ -60,7 +73,16 @@ public:
 	/** Owner only: the key went down or up. */
 	void PressPrimary();
 	void ReleasePrimary();
+	void PressBlock();
+	void ReleaseBlock();
 	void Deactivate();
+
+	/** Server only: what a block leaves of a hit from this causer. Without a fitting block that is all of it. */
+	float BlockDamage(float Damage, AActor* Causer);
+
+	/** Seconds of the note left after the block caught a hit, and whether that was a parry. For the HUD. */
+	float GetBlockFlash() const { return BlockFlashRemaining; }
+	bool WasParry() const { return bFlashIsParry; }
 
 	bool IsSwinging() const { return bSwinging; }
 	EEISwingKind GetSwingKind() const { return SwingKind; }
@@ -76,6 +98,9 @@ private:
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHitFeedback(FVector_NetQuantize Location, bool bHeavy);
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastBlockFeedback(bool bParry);
+
 	AEIHeroCharacter* GetHero() const;
 	void StartOwnerSwing(EEISwingKind Kind);
 	void BeginSwing(EEISwingKind Kind);
@@ -83,11 +108,16 @@ private:
 	EEISwingKind NextLightSwing();
 	void SweepBlade(float FromT, float ToT);
 	void HitActor(AActor* Target, const FVector& Location);
+	void UpdateBlockAsOwner(float DeltaTime);
 
 	FEISwordValues Values;
 
 	bool bHolding = false;
 	double HoldStartedAt = 0.0;
+	bool bBlockKeyHeld = false;
+	float BlockLift = 0.0f;
+	float BlockFlashRemaining = 0.0f;
+	bool bFlashIsParry = false;
 	bool bHasQueuedSwing = false;
 	EEISwingKind QueuedSwing = EEISwingKind::Light1;
 	bool bServerHasQueuedSwing = false;

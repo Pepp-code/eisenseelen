@@ -63,6 +63,7 @@ public:
 	void ReleasePrimary();
 	void PressSecondary();
 	void ReleaseSecondary();
+	void SetSprintKey(bool bHeld) { bSprintKeyHeld = bHeld; }
 	void PressSpell();
 	const FEIPoseLibrary& GetPoses() const { return Poses; }
 
@@ -146,4 +147,5 @@ private:
 	float HurtFlashRemaining = 0.0f;
 	double BufferedJumpUntil = -1.0;
 	bool bJumpOnGround = false;
+	bool bSprintKeyHeld = false;
 };

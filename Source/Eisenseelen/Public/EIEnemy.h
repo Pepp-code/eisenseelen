@@ -24,7 +24,8 @@ struct EISENSEELEN_API FEIEnemyValues
 
 /**
  * The bone runner, a grey capsule for now. It runs at the nearest hero, winds up visibly and audibly, and only then
- * strikes, so a hero who moves away in time takes no damage. All of its decisions happen on the server.
+ * strikes, so a hero who moves away in time takes no damage. A parry staggers it, which interrupts everything it does.
+ * All of its decisions happen on the server.
  */
 UCLASS()
 class EISENSEELEN_API AEIEnemy : public ACharacter
@@ -35,6 +36,12 @@ public:
 	AEIEnemy();
 
 	bool IsTelegraphing() const { return bTelegraphing; }
+	bool IsStaggering() const { return bStaggering; }
+
+	/** Server only. Callable for preview pictures. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void Stagger(float Seconds);
+
 	bool IsDead() const;
 	UEIHealthComponent* GetHealth() const { return Health; }
 	const FEIEnemyValues& GetValues() const { return Values; }
@@ -51,7 +58,8 @@ private:
 	{
 		Chase,
 		Windup,
-		Recover
+		Recover,
+		Stagger
 	};
 
 	UFUNCTION()
@@ -91,14 +99,19 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_Telegraphing)
 	bool bTelegraphing = false;
 
+	UPROPERTY(Replicated)
+	bool bStaggering = false;
+
 	FEIEnemyValues Values;
 	EState State = EState::Chase;
 	float StateTime = 0.0f;
+	float StaggerSeconds = 0.0f;
 	float StuckSeconds = 0.0f;
 	float SidestepRemaining = 0.0f;
 	float SidestepSign = 1.0f;
 	float HurtFlashRemaining = 0.0f;
 	float TelegraphBlend = 0.0f;
+	float StaggerBlend = 0.0f;
 };
 
 /** Bones flying apart when a runner dies. Purely for the eye, every machine spawns its own. */

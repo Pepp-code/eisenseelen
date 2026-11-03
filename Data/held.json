@@ -1,6 +1,7 @@
 {
 	"lauftempo_m_pro_s": 5.5,
 	"sprint_tempo_m_pro_s": 8.0,
+	"blocken_tempo_m_pro_s": 3.3,
 	"sprunghoehe_m": 1.0,
 	"schwerkraft_faktor": 1.6,
 	"luftkontrolle_0_bis_1": 0.55,

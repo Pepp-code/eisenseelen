@@ -144,6 +144,10 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	// Letting go of the second key too early fires nothing.
 	Steps.Add(Press(EKeys::RightMouseButton));
 	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestFalse(TEXT("The arcanist does not block"), Context.Movement->IsBlocking());
+	}));
 	Steps.Add(Release(EKeys::RightMouseButton));
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)

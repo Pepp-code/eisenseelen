@@ -7,8 +7,8 @@
 struct FEIHeroValues;
 
 /**
- * The hero's movement: sprint and dodge on top of the engine's character movement. All of it runs inside the
- * predicted move, so a client feels it at once and the server still decides.
+ * The hero's movement: sprint, dodge and the slower pace of a block on top of the engine's character movement. All of
+ * it runs inside the predicted move, so a client feels it at once and the server still decides.
  */
 UCLASS()
 class EISENSEELEN_API UEIHeroMovementComponent : public UCharacterMovementComponent
@@ -19,6 +19,12 @@ public:
 	void ApplyValues(const FEIHeroValues& Values);
 
 	void SetWantsToSprint(bool bWants) { bWantsToSprint = bWants; }
+	void SetWantsToBlock(bool bWants) { bWantsToBlock = bWants; }
+	bool IsBlocking() const { return bWantsToBlock; }
+
+	/** How long the block has been up. It only counts on the server, which decides about every hit. */
+	float GetBlockHeldSeconds() const { return BlockHeldSeconds; }
+
 	void RequestDodge() { bWantsToDodge = true; }
 	bool IsDodgeReady() const { return DodgeCooldownRemaining <= 0.0f; }
 	float GetDodgeCooldownRemaining() const { return DodgeCooldownRemaining; }
@@ -38,6 +44,7 @@ private:
 	void SteerTowardsInput(float DeltaTime);
 
 	float SprintSpeedCm = 0.0f;
+	float BlockSpeedCm = 0.0f;
 	float DodgeSpeedCm = 0.0f;
 	float DodgeHopCm = 0.0f;
 	float DodgeCooldownSeconds = 0.0f;
@@ -45,6 +52,9 @@ private:
 
 	// The predicted state. FEIHeroSavedMove saves it, so a replayed move starts from the same values.
 	bool bWantsToSprint = false;
+	bool bWantsToBlock = false;
 	bool bWantsToDodge = false;
 	float DodgeCooldownRemaining = 0.0f;
+
+	float BlockHeldSeconds = 0.0f;
 };

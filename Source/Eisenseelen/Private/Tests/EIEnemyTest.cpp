@@ -126,6 +126,136 @@ bool FEIEnemyAttackTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIBlockTest,
+	"Eisenseelen.Play.Enemy.Block",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIBlockTest::RunTest(const FString& Parameters)
+{
+	struct FState
+	{
+		float LifeBefore = 0.0f;
+		double TelegraphAt = 0.0;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+	constexpr float TestHit = 10.0f;
+	constexpr float LifeTolerance = 0.01f;
+	constexpr double RaiseBeforeStrikeSeconds = 0.15;
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, 0.0f); }));
+	Steps.Add(Wait(0.2));
+
+	// The second key raises the block, and the block slows the hero even with shift held.
+	Steps.Add(Press(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Test->TestTrue(TEXT("The second key blocks"), Context.Movement->IsBlocking()); }));
+	Steps.Add(Press(EKeys::W));
+	Steps.Add(Press(EKeys::LeftShift));
+	Steps.Add(Wait(0.5));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const float Speed = static_cast<float>(Context.Hero->GetVelocity().Size2D());
+		const float Expected = Context.Hero->GetValues().BlockSpeedMetersPerSecond * CentimetersPerMeter;
+		Context.Test->AddInfo(FString::Printf(TEXT("Blocking with W and shift: %.0f cm/s, expected %.0f"), Speed, Expected));
+		Context.Test->TestNearlyEqual(TEXT("The block slows the hero"), Speed, Expected, 20.0f);
+	}));
+	Steps.Add(Release(EKeys::LeftShift));
+	Steps.Add(Release(EKeys::W));
+	Steps.Add(Wait(0.3));
+
+	// An attack goes first, and the block comes back after it.
+	AddTap(Steps, EKeys::LeftMouseButton);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("The hero attacks out of the block"), Context.Hero->GetSword()->IsSwinging());
+		Context.Test->TestFalse(TEXT("There is no block during a swing"), Context.Movement->IsBlocking());
+	}));
+	Steps.Add(WaitUntil(TEXT("the swing ends"), 2.0, [](const FEIPlayContext& Context) { return !Context.Hero->GetSword()->IsSwinging(); }));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Test->TestTrue(TEXT("The block comes back"), Context.Movement->IsBlocking()); }));
+	Steps.Add(Wait(0.3));
+
+	// A hit from the front is reduced, without a parry after the first moment.
+	Steps.Add(Do([State, TestHit, LifeTolerance](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Enemy = SpawnEnemyAhead(Context, 800.0f);
+		UEIHealthComponent* Health = Context.Hero->GetHealth();
+		const float Before = Health->GetHealth();
+		Context.Hero->TakeDamage(TestHit, FDamageEvent(), nullptr, Enemy);
+		const float Expected = TestHit * (1.0f - Context.Hero->GetSword()->GetValues().Block.DamageReduction);
+		Context.Test->TestNearlyEqual(TEXT("A block reduces a hit from the front"), Before - Health->GetHealth(), Expected, LifeTolerance);
+		Context.Test->TestFalse(TEXT("A late block does not stagger"), Enemy->IsStaggering());
+		Context.Test->TestTrue(TEXT("The block shows"), Context.Hero->GetSword()->GetBlockFlash() > 0.0f && !Context.Hero->GetSword()->WasParry());
+		Context.Player->SetControlRotation(FRotator(0.0f, 180.0f, 0.0f));
+	}));
+
+	// A hit from behind goes through.
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([TestHit, LifeTolerance](const FEIPlayContext& Context)
+	{
+		UEIHealthComponent* Health = Context.Hero->GetHealth();
+		const float Before = Health->GetHealth();
+		Context.Hero->TakeDamage(TestHit, FDamageEvent(), nullptr, FindEnemy(Context));
+		Context.Test->TestNearlyEqual(TEXT("A hit from behind goes through the block"), Before - Health->GetHealth(), TestHit, LifeTolerance);
+		Context.Player->SetControlRotation(FRotator::ZeroRotator);
+	}));
+	Steps.Add(Release(EKeys::RightMouseButton));
+
+	// The real thing: a block raised just before the strike is a parry. It takes nothing and staggers the runner.
+	Steps.Add(WaitUntil(TEXT("the enemy winds up"), 5.0, [](const FEIPlayContext& Context) { return FindEnemy(Context)->IsTelegraphing(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		State->TelegraphAt = Context.Now;
+		State->LifeBefore = Context.Hero->GetHealth()->GetHealth();
+	}));
+	Steps.Add(WaitUntil(TEXT("the strike is near"), 2.0, [State, RaiseBeforeStrikeSeconds](const FEIPlayContext& Context)
+	{
+		return Context.Now - State->TelegraphAt >= FindEnemy(Context)->GetValues().WindupSeconds - RaiseBeforeStrikeSeconds;
+	}));
+	Steps.Add(Press(EKeys::RightMouseButton));
+	Steps.Add(WaitUntil(TEXT("the windup ends"), 2.0, [](const FEIPlayContext& Context) { return !FindEnemy(Context)->IsTelegraphing(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("A parry takes no damage"), Context.Hero->GetHealth()->GetHealth(), State->LifeBefore);
+		Context.Test->TestTrue(TEXT("A parry staggers the runner"), FindEnemy(Context)->IsStaggering());
+		Context.Test->TestTrue(TEXT("The parry shows"), Context.Hero->GetSword()->GetBlockFlash() > 0.0f && Context.Hero->GetSword()->WasParry());
+	}));
+
+	// The runner does nothing for a while, then goes on. The block held since then is no parry any more.
+	Steps.Add(Wait(0.2));
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Test->TestFalse(TEXT("A staggered runner does not wind up"), FindEnemy(Context)->IsTelegraphing()); }));
+	Steps.Add(WaitUntil(TEXT("the stagger ends"), 3.0, [](const FEIPlayContext& Context) { return !FindEnemy(Context)->IsStaggering(); }));
+	Steps.Add(WaitUntil(TEXT("the runner hits the block"), 5.0, [State](const FEIPlayContext& Context)
+	{
+		return Context.Hero->GetHealth()->GetHealth() < State->LifeBefore;
+	}));
+	Steps.Add(Do([State, LifeTolerance](const FEIPlayContext& Context)
+	{
+		const AEIEnemy* Enemy = FindEnemy(Context);
+		const float Expected = Enemy->GetValues().Damage * (1.0f - Context.Hero->GetSword()->GetValues().Block.DamageReduction);
+		Context.Test->TestNearlyEqual(TEXT("A long block reduces the real strike"), State->LifeBefore - Context.Hero->GetHealth()->GetHealth(), Expected, LifeTolerance);
+		Context.Test->TestFalse(TEXT("A long block staggers nobody"), Enemy->IsStaggering());
+	}));
+	Steps.Add(Release(EKeys::RightMouseButton));
+
+	// A reduced hit that takes all the life but for a rounding error kills.
+	Steps.Add(Wait(0.1));
+	Steps.Add(Press(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.4));
+	Steps.Add(Do([TestHit](const FEIPlayContext& Context)
+	{
+		const float Reduced = TestHit * (1.0f - Context.Hero->GetSword()->GetValues().Block.DamageReduction);
+		Context.Hero->GetHealth()->Reset(Reduced + 0.0001f);
+		Context.Hero->TakeDamage(TestHit, FDamageEvent(), nullptr, FindEnemy(Context));
+		Context.Test->TestTrue(TEXT("No hero survives on a rounding error"), Context.Hero->IsDead());
+	}));
+	Steps.Add(Release(EKeys::RightMouseButton));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEIHordeTest,
 	"Eisenseelen.Play.Enemy.Horde",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

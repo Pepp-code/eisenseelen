@@ -7,6 +7,7 @@ struct EISENSEELEN_API FEIHeroValues
 {
 	float RunSpeedMetersPerSecond = 5.5f;
 	float SprintSpeedMetersPerSecond = 8.0f;
+	float BlockSpeedMetersPerSecond = 3.3f;
 	float JumpHeightMeters = 1.0f;
 	float GravityFactor = 1.6f;
 	float AirControl = 0.55f;

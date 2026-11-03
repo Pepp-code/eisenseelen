@@ -16,7 +16,7 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 	{
 		return FEIHeroValues::LoadFromString(Json, OutValues, OutError);
 	};
-	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprint_tempo_m_pro_s\": 9, \"sprunghoehe_m\": 3, \"schwerkraft_faktor\": 2, \"luftkontrolle_0_bis_1\": 0.25, \"luft_lenkung_grad_pro_s\": 150, \"maus_faktor\": 2, ")
+	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprint_tempo_m_pro_s\": 9, \"blocken_tempo_m_pro_s\": 2, \"sprunghoehe_m\": 3, \"schwerkraft_faktor\": 2, \"luftkontrolle_0_bis_1\": 0.25, \"luft_lenkung_grad_pro_s\": 150, \"maus_faktor\": 2, ")
 		TEXT("\"ausweichen_tempo_m_pro_s\": 12, \"ausweichen_hopser_m_pro_s\": 2, \"ausweichen_abklingzeit_s\": 1.5, \"sprung_puffer_s\": 0.2, \"schlachtruf_abklingzeit_s\": 2}");
 
 	FEIHeroValues Values;
@@ -24,6 +24,7 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A complete file loads"), Parse(Valid, Values, Error));
 	TestEqual(TEXT("Run speed"), Values.RunSpeedMetersPerSecond, 7.0f);
 	TestEqual(TEXT("Sprint speed"), Values.SprintSpeedMetersPerSecond, 9.0f);
+	TestEqual(TEXT("Block speed"), Values.BlockSpeedMetersPerSecond, 2.0f);
 	TestEqual(TEXT("Jump height"), Values.JumpHeightMeters, 3.0f);
 	TestEqual(TEXT("Air control"), Values.AirControl, 0.25f);
 	TestEqual(TEXT("Air turn rate"), Values.AirTurnDegreesPerSecond, 150.0f);

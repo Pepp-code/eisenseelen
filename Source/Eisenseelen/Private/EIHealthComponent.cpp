@@ -2,6 +2,11 @@
 
 #include "Net/UnrealNetwork.h"
 
+namespace
+{
+	constexpr float NoLifeLeft = 0.001f;
+}
+
 UEIHealthComponent::UEIHealthComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -29,6 +34,11 @@ float UEIHealthComponent::ApplyDamage(float Amount)
 	}
 	const float Applied = FMath::Min(Amount, Health);
 	Health -= Applied;
+	// A reduced hit leaves rounding errors, and nobody should survive on a thousandth of a life point.
+	if (Health < NoLifeLeft)
+	{
+		Health = 0.0f;
+	}
 	if (IsDead())
 	{
 		OnDied.Broadcast();

@@ -50,6 +50,12 @@
 			{ "t": 1.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 }
 		]
 	},
+	"blocken": {
+		"schluessel": [
+			{ "t": 0.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 },
+			{ "t": 1.0, "vor": 50, "rechts": 36, "hoch": -20, "nick": 16, "gier": -76, "roll": 75 }
+		]
+	},
 	"stab_ruhe": {
 		"schluessel": [
 			{ "t": 0, "vor": 50, "rechts": 24, "hoch": -32, "nick": 50, "gier": -10, "roll": 0 }

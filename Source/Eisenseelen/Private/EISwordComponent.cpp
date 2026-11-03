@@ -2,7 +2,9 @@
 
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
+#include "EIEnemy.h"
 #include "EIHeroCharacter.h"
+#include "EIHeroMovementComponent.h"
 #include "EIPoses.h"
 #include "EIViewModelComponent.h"
 #include "EIVisuals.h"
@@ -15,6 +17,8 @@ namespace
 	constexpr float CentimetersPerMeter = 100.0f;
 	constexpr float DegreesPerSweepStep = 10.0f;
 	constexpr double MaxDamage = 10000.0;
+	constexpr float BlockLiftPerSecond = 10.0f;
+	constexpr float BlockFlashSeconds = 0.5f;
 
 	FName CurveName(EEISwingKind Kind)
 	{
@@ -44,6 +48,21 @@ namespace
 			&& FEIDataFile::ReadNumber(**Swing, TEXT("ziele_max"), 1.0, 50.0, Out.MaxTargets, OutError)
 			&& FEIDataFile::ReadNumber(**Swing, TEXT("abzug_je_ziel_0_bis_1"), 0.0, 1.0, Out.TargetFalloff, OutError);
 	}
+
+	bool ReadBlock(const FJsonObject& Sword, FEIBlockValues& Out, FString& OutError)
+	{
+		const TSharedPtr<FJsonObject>* Block = nullptr;
+		if (!Sword.TryGetObjectField(TEXT("blocken"), Block))
+		{
+			OutError = TEXT("Der Abschnitt blocken fehlt.");
+			return false;
+		}
+		return FEIDataFile::ReadNumber(**Block, TEXT("schaden_abzug_0_bis_1"), 0.0, 1.0, Out.DamageReduction, OutError)
+			&& FEIDataFile::ReadNumber(**Block, TEXT("winkel_grad"), 0.0, 360.0, Out.AngleDegrees, OutError)
+			&& FEIDataFile::ReadNumber(**Block, TEXT("parade_fenster_s"), 0.0, 5.0, Out.ParryWindowSeconds, OutError)
+			&& FEIDataFile::ReadNumber(**Block, TEXT("parade_schaden_abzug_0_bis_1"), 0.0, 1.0, Out.ParryDamageReduction, OutError)
+			&& FEIDataFile::ReadNumber(**Block, TEXT("taumeln_s"), 0.0, 30.0, Out.StaggerSeconds, OutError);
+	}
 }
 
 FEISwordValues::FEISwordValues()
@@ -72,6 +91,7 @@ bool FEISwordValues::LoadFromProjectFile(FEISwordValues& OutValues, FString& Out
 	FEISwordValues Loaded;
 	if (!ReadSwing(**Sword, TEXT("leichter_hieb"), Loaded.Light, OutError)
 		|| !ReadSwing(**Sword, TEXT("schwerer_hieb"), Loaded.Heavy, OutError)
+		|| !ReadBlock(**Sword, Loaded.Block, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("aufladen_s"), 0.1, 5.0, Loaded.ChargeSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("ketten_fenster_s"), 0.0, 5.0, Loaded.ChainWindowSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("treff_stopp_s"), 0.0, 0.5, Loaded.HitStopSeconds, OutError)
@@ -148,9 +168,86 @@ void UEISwordComponent::ReleasePrimary()
 	}
 }
 
+void UEISwordComponent::PressBlock()
+{
+	bBlockKeyHeld = true;
+}
+
+void UEISwordComponent::ReleaseBlock()
+{
+	bBlockKeyHeld = false;
+}
+
+float UEISwordComponent::BlockDamage(float Damage, AActor* Causer)
+{
+	const AEIHeroCharacter* Hero = GetHero();
+	const UEIHeroMovementComponent* Movement = Hero->GetHeroMovement();
+	if (Damage <= 0.0f || Causer == nullptr || bSwinging || !Movement->IsBlocking() || Hero->GetHeroClass() != EEIHeroClass::Bladewarden)
+	{
+		return Damage;
+	}
+	const FVector ToCauser = (Causer->GetActorLocation() - Hero->GetActorLocation()).GetSafeNormal2D();
+	const double MinDot = FMath::Cos(FMath::DegreesToRadians(Values.Block.AngleDegrees / 2.0f));
+	if (FVector::DotProduct(Hero->GetActorForwardVector().GetSafeNormal2D(), ToCauser) < MinDot)
+	{
+		return Damage;
+	}
+	const bool bParry = Movement->GetBlockHeldSeconds() <= Values.Block.ParryWindowSeconds;
+	if (AEIEnemy* Enemy = Cast<AEIEnemy>(Causer); Enemy != nullptr && bParry)
+	{
+		Enemy->Stagger(Values.Block.StaggerSeconds);
+	}
+	MulticastBlockFeedback(bParry);
+	return Damage * (1.0f - (bParry ? Values.Block.ParryDamageReduction : Values.Block.DamageReduction));
+}
+
+void UEISwordComponent::MulticastBlockFeedback_Implementation(bool bParry)
+{
+	const TCHAR* Sound = bParry ? TEXT("Parade") : TEXT("Blocken");
+	AEIHeroCharacter* Hero = GetHero();
+	if (!Hero->IsLocallyControlled())
+	{
+		EIVisuals::PlaySoundAt(this, Sound, Hero->GetActorLocation());
+		return;
+	}
+	EIVisuals::PlaySound2D(this, Sound);
+	Hero->AddCameraKick(bParry ? Values.HeavyCameraKickDegrees : Values.CameraKickDegrees);
+	BlockFlashRemaining = BlockFlashSeconds;
+	bFlashIsParry = bParry;
+}
+
+void UEISwordComponent::UpdateBlockAsOwner(float DeltaTime)
+{
+	AEIHeroCharacter* Hero = GetHero();
+	const bool bBlocking = bBlockKeyHeld && !bSwinging && !bHasQueuedSwing && !bHolding;
+	// Set every frame, because replaying a corrected move overwrites the wish with an older one.
+	Hero->GetHeroMovement()->SetWantsToBlock(bBlocking);
+
+	const float PreviousLift = BlockLift;
+	BlockLift = FMath::FInterpConstantTo(BlockLift, bBlocking ? 1.0f : 0.0f, DeltaTime, BlockLiftPerSecond);
+	if (Hero->GetViewModel() == nullptr)
+	{
+		return;
+	}
+	if (BlockLift > 0.0f)
+	{
+		Hero->GetViewModel()->HoldPose(TEXT("blocken"), BlockLift);
+	}
+	else if (PreviousLift > 0.0f)
+	{
+		Hero->GetViewModel()->ClearHold();
+	}
+}
+
 void UEISwordComponent::Deactivate()
 {
 	bHolding = false;
+	bBlockKeyHeld = false;
+	BlockLift = 0.0f;
+	if (GetHero()->IsLocallyControlled())
+	{
+		GetHero()->GetHeroMovement()->SetWantsToBlock(false);
+	}
 	bHasQueuedSwing = false;
 	bServerHasQueuedSwing = false;
 	bSwinging = false;
@@ -233,6 +330,11 @@ void UEISwordComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	AEIHeroCharacter* Hero = GetHero();
+	BlockFlashRemaining = FMath::Max(0.0f, BlockFlashRemaining - DeltaTime);
+	if (Hero->IsLocallyControlled())
+	{
+		UpdateBlockAsOwner(DeltaTime);
+	}
 	if (bHolding && Hero->GetViewModel() != nullptr)
 	{
 		// A short tap shows nothing. Only a real hold lifts the sword.

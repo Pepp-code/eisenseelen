@@ -22,11 +22,16 @@ namespace
 	const FLinearColor BoneColor(0.32f, 0.31f, 0.28f);
 	const FLinearColor WarningColor(1.0f, 0.12f, 0.04f);
 	const FLinearColor HurtColor(1.0f, 0.9f, 0.7f);
+	const FLinearColor StaggerColor(0.75f, 0.7f, 0.2f);
 	constexpr float WarningGlow = 3.0f;
 	constexpr float HurtFlashSeconds = 0.1f;
 	constexpr float HurtGlow = 2.5f;
 	constexpr float TelegraphBlendPerSecond = 8.0f;
 	constexpr float TelegraphStretch = 0.22f;
+	constexpr float StaggerBlendPerSecond = 10.0f;
+	constexpr float StaggerTiltDegrees = 28.0f;
+	constexpr float BodyHeight = -20.0f;
+	constexpr float HeadAboveBody = 86.0f;
 
 	constexpr float StuckBelowSpeedCm = 80.0f;
 	constexpr float StuckAfterSeconds = 0.6f;
@@ -87,14 +92,14 @@ AEIEnemy::AEIEnemy()
 	Body->SetupAttachment(GetCapsuleComponent());
 	Body->SetStaticMesh(Cylinder.Object);
 	Body->SetRelativeScale3D(FVector(0.5f, 0.5f, 1.3f));
-	Body->SetRelativeLocation(FVector(0.0f, 0.0f, -20.0f));
+	Body->SetRelativeLocation(FVector(0.0f, 0.0f, BodyHeight));
 	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	Head = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Head"));
 	Head->SetupAttachment(GetCapsuleComponent());
 	Head->SetStaticMesh(Sphere.Object);
 	Head->SetRelativeScale3D(FVector(0.42f));
-	Head->SetRelativeLocation(FVector(0.0f, 0.0f, 66.0f));
+	Head->SetRelativeLocation(FVector(0.0f, 0.0f, BodyHeight + HeadAboveBody));
 	Head->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
@@ -124,6 +129,7 @@ void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AEIEnemy, bTelegraphing);
+	DOREPLIFETIME(AEIEnemy, bStaggering);
 }
 
 bool AEIEnemy::IsDead() const
@@ -182,11 +188,12 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 	case EState::Windup:
 		if (StateTime >= Values.WindupSeconds)
 		{
-			Strike();
 			bTelegraphing = false;
 			OnRep_Telegraphing();
 			State = EState::Recover;
 			StateTime = 0.0f;
+			// Last, because a parry during the strike changes the state.
+			Strike();
 		}
 		return;
 
@@ -197,7 +204,30 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 			StateTime = 0.0f;
 		}
 		return;
+
+	case EState::Stagger:
+		if (StateTime >= StaggerSeconds)
+		{
+			bStaggering = false;
+			State = EState::Chase;
+			StateTime = 0.0f;
+		}
+		return;
 	}
+}
+
+void AEIEnemy::Stagger(float Seconds)
+{
+	if (!HasAuthority() || IsDead())
+	{
+		return;
+	}
+	State = EState::Stagger;
+	StateTime = 0.0f;
+	StaggerSeconds = Seconds;
+	bStaggering = true;
+	bTelegraphing = false;
+	OnRep_Telegraphing();
 }
 
 void AEIEnemy::Steer(const AActor* Target, float DeltaSeconds)
@@ -294,7 +324,9 @@ void AEIEnemy::UpdateLook(float DeltaSeconds)
 	TelegraphBlend = FMath::FInterpConstantTo(TelegraphBlend, bTelegraphing ? 1.0f : 0.0f, DeltaSeconds, TelegraphBlendPerSecond);
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);
 	const float Hurt = HurtFlashRemaining / HurtFlashSeconds;
-	const FLinearColor Color = FMath::Lerp(FMath::Lerp(BoneColor, WarningColor, TelegraphBlend), HurtColor, Hurt);
+	StaggerBlend = FMath::FInterpConstantTo(StaggerBlend, bStaggering ? 1.0f : 0.0f, DeltaSeconds, StaggerBlendPerSecond);
+	const FLinearColor Calm = FMath::Lerp(FMath::Lerp(BoneColor, WarningColor, TelegraphBlend), StaggerColor, StaggerBlend);
+	const FLinearColor Color = FMath::Lerp(Calm, HurtColor, Hurt);
 	const float Glow = FMath::Max(TelegraphBlend * WarningGlow, Hurt * HurtGlow);
 	for (UMaterialInstanceDynamic* Material : { BodyMaterial.Get(), HeadMaterial.Get() })
 	{
@@ -302,7 +334,11 @@ void AEIEnemy::UpdateLook(float DeltaSeconds)
 		Material->SetScalarParameterValue(TEXT("Leuchten"), Glow);
 	}
 	// It rears up while it winds up, readable even without the color.
-	Head->SetRelativeLocation(FVector(0.0f, 0.0f, 66.0f + TelegraphBlend * TelegraphStretch * 100.0f));
+	const float HeadLength = HeadAboveBody + TelegraphBlend * TelegraphStretch * 100.0f;
+	// A staggered runner leans back, body and head together.
+	const float Tilt = StaggerBlend * StaggerTiltDegrees;
+	Body->SetRelativeRotation(FRotator(Tilt, 0.0f, 0.0f));
+	Head->SetRelativeLocation(FVector(-FMath::Sin(FMath::DegreesToRadians(Tilt)) * HeadLength, 0.0f, BodyHeight + FMath::Cos(FMath::DegreesToRadians(Tilt)) * HeadLength));
 }
 
 AEIBoneDebris::AEIBoneDebris()

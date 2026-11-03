@@ -11,7 +11,7 @@ namespace
 	constexpr double MaxSteerAngleDegrees = 135.0;
 }
 
-/** Sends the sprint and dodge wishes to the server and restores the predicted state when a move is replayed. */
+/** Sends the sprint, block and dodge wishes to the server and restores the predicted state when a move is replayed. */
 class FEIHeroSavedMove : public FSavedMove_Character
 {
 public:
@@ -19,6 +19,7 @@ public:
 	{
 		FSavedMove_Character::Clear();
 		bSavedWantsToSprint = false;
+		bSavedWantsToBlock = false;
 		bSavedWantsToDodge = false;
 		SavedDodgeCooldownRemaining = 0.0f;
 	}
@@ -34,6 +35,10 @@ public:
 		{
 			Flags |= FLAG_Custom_1;
 		}
+		if (bSavedWantsToBlock)
+		{
+			Flags |= FLAG_Custom_2;
+		}
 		return Flags;
 	}
 
@@ -42,7 +47,8 @@ public:
 		// The timer ticks per move, so moves only combine while it does not run.
 		const FEIHeroSavedMove* New = static_cast<const FEIHeroSavedMove*>(NewMove.Get());
 		const bool bTimerIdle = SavedDodgeCooldownRemaining <= 0.0f && New->SavedDodgeCooldownRemaining <= 0.0f;
-		return bTimerIdle && bSavedWantsToSprint == New->bSavedWantsToSprint && FSavedMove_Character::CanCombineWith(NewMove, Character, MaxDelta);
+		return bTimerIdle && bSavedWantsToSprint == New->bSavedWantsToSprint && bSavedWantsToBlock == New->bSavedWantsToBlock
+			&& FSavedMove_Character::CanCombineWith(NewMove, Character, MaxDelta);
 	}
 
 	virtual void SetMoveFor(ACharacter* Character, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData) override
@@ -50,6 +56,7 @@ public:
 		FSavedMove_Character::SetMoveFor(Character, InDeltaTime, NewAccel, ClientData);
 		const UEIHeroMovementComponent* Movement = CastChecked<UEIHeroMovementComponent>(Character->GetCharacterMovement());
 		bSavedWantsToSprint = Movement->bWantsToSprint;
+		bSavedWantsToBlock = Movement->bWantsToBlock;
 		bSavedWantsToDodge = Movement->bWantsToDodge;
 		SavedDodgeCooldownRemaining = Movement->DodgeCooldownRemaining;
 	}
@@ -59,12 +66,14 @@ public:
 		FSavedMove_Character::PrepMoveFor(Character);
 		UEIHeroMovementComponent* Movement = CastChecked<UEIHeroMovementComponent>(Character->GetCharacterMovement());
 		Movement->bWantsToSprint = bSavedWantsToSprint;
+		Movement->bWantsToBlock = bSavedWantsToBlock;
 		Movement->bWantsToDodge = bSavedWantsToDodge;
 		Movement->DodgeCooldownRemaining = SavedDodgeCooldownRemaining;
 	}
 
 private:
 	bool bSavedWantsToSprint = false;
+	bool bSavedWantsToBlock = false;
 	bool bSavedWantsToDodge = false;
 	float SavedDodgeCooldownRemaining = 0.0f;
 };
@@ -95,6 +104,7 @@ void UEIHeroMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 	Super::UpdateFromCompressedFlags(Flags);
 	bWantsToDodge = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
 	bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
+	bWantsToBlock = (Flags & FSavedMove_Character::FLAG_Custom_2) != 0;
 }
 
 void UEIHeroMovementComponent::ApplyValues(const FEIHeroValues& Values)
@@ -106,6 +116,7 @@ void UEIHeroMovementComponent::ApplyValues(const FEIHeroValues& Values)
 	JumpZVelocity = FMath::Sqrt(2.0f * FMath::Abs(GetGravityZ()) * Values.JumpHeightMeters * CentimetersPerMeter);
 
 	SprintSpeedCm = Values.SprintSpeedMetersPerSecond * CentimetersPerMeter;
+	BlockSpeedCm = Values.BlockSpeedMetersPerSecond * CentimetersPerMeter;
 	DodgeSpeedCm = Values.DodgeSpeedMetersPerSecond * CentimetersPerMeter;
 	DodgeHopCm = Values.DodgeHopMetersPerSecond * CentimetersPerMeter;
 	DodgeCooldownSeconds = Values.DodgeCooldownSeconds;
@@ -117,6 +128,7 @@ void UEIHeroMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSec
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 
 	DodgeCooldownRemaining = FMath::Max(0.0f, DodgeCooldownRemaining - DeltaSeconds);
+	BlockHeldSeconds = bWantsToBlock ? BlockHeldSeconds + DeltaSeconds : 0.0f;
 	if (bWantsToDodge)
 	{
 		bWantsToDodge = false;
@@ -129,7 +141,15 @@ void UEIHeroMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSec
 
 float UEIHeroMovementComponent::GetMaxSpeed() const
 {
-	return bWantsToSprint && (IsMovingOnGround() || IsFalling()) ? SprintSpeedCm : Super::GetMaxSpeed();
+	if (!IsMovingOnGround() && !IsFalling())
+	{
+		return Super::GetMaxSpeed();
+	}
+	if (bWantsToBlock)
+	{
+		return BlockSpeedCm;
+	}
+	return bWantsToSprint ? SprintSpeedCm : Super::GetMaxSpeed();
 }
 
 void UEIHeroMovementComponent::PerformDodge()

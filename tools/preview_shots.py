@@ -82,6 +82,7 @@ def scenario():
         ("leicht_1", 0.65),
         ("schwer_laden", 1.0),
         ("schwer", 0.45),
+        ("blocken", 1.0),
     ]:
         pose(curve, position)
         yield SETTLE_SECONDS
@@ -111,6 +112,18 @@ def scenario():
     yield 1.5
     shot()
     yield AFTER_SHOT_SECONDS
+
+    # The block against the horde, and the runners staggering.
+    player().preview_key("RightMouseButton", True)
+    yield 1.5
+    shot()
+    yield AFTER_SHOT_SECONDS
+    for enemy in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIEnemy):
+        enemy.stagger(5.0)
+    yield 0.5
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_key("RightMouseButton", False)
 
     unreal.SystemLibrary.execute_console_command(world(), "Quit")
     yield 60.0

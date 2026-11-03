@@ -175,11 +175,16 @@ void AEIHeroCharacter::PressSecondary()
 	{
 		Caster->PressCharge();
 	}
+	else
+	{
+		Sword->PressBlock();
+	}
 }
 
 void AEIHeroCharacter::ReleaseSecondary()
 {
 	Caster->ReleaseCharge();
+	Sword->ReleaseBlock();
 }
 
 void AEIHeroCharacter::PressSpell()
@@ -226,6 +231,11 @@ void AEIHeroCharacter::Tick(float DeltaSeconds)
 		ViewModel->Build();
 		ApplyClassToView();
 	}
+	// Set every frame, because replaying a corrected move overwrites the wish with an older one.
+	if (IsLocallyControlled())
+	{
+		GetHeroMovement()->SetWantsToSprint(bSprintKeyHeld);
+	}
 	UpdateCameraKick(DeltaSeconds);
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);
 }
@@ -250,7 +260,8 @@ void AEIHeroCharacter::UpdateCameraKick(float DeltaSeconds)
 
 float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	const float Applied = Health->ApplyDamage(Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser));
+	const float Incoming = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	const float Applied = Health->ApplyDamage(Sword->BlockDamage(Incoming, DamageCauser));
 	if (Applied > 0.0f)
 	{
 		ClientHurt();

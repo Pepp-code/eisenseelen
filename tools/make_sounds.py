@@ -111,6 +111,18 @@ def hit_heavy():
     return mix((thump, 1.0), (crack, 0.9))
 
 
+def block():
+    clank = envelope(tone(0.25, lambda p: 520 - 120 * p, (1.0, 0.6, 0.35, 0.2)), 0.001, 0.09)
+    crack = envelope(lowpass(noise(0.08, 20), lambda p: 7000 - 3000 * p), 0.0005, 0.02)
+    return mix((clank, 0.8), (crack, 0.7))
+
+
+def parry():
+    ring = envelope(tone(0.5, lambda p: 1250 - 60 * p, (1.0, 0.5, 0.3)), 0.001, 0.2)
+    crack = envelope(lowpass(noise(0.06, 21), lambda p: 9000 - 3000 * p), 0.0005, 0.015)
+    return mix((ring, 0.7), (crack, 0.8))
+
+
 def dash():
     air = lowpass(noise(0.22, 5), lambda p: 900 + 2600 * (1.0 - p))
     return bell(air, 0.2)
@@ -211,6 +223,8 @@ SOUNDS = {
     "S_HiebSchwer": swing_heavy,
     "S_Treffer": hit,
     "S_TrefferSchwer": hit_heavy,
+    "S_Blocken": block,
+    "S_Parade": parry,
     "S_Dash": dash,
     "S_Sprungfeld": launch_pad,
     "S_Schlachtruf": battle_horn,

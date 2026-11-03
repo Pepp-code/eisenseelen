@@ -9,6 +9,7 @@ namespace
 	{
 		return FEIDataFile::ReadNumber(Root, TEXT("lauftempo_m_pro_s"), 1.0, 30.0, OutValues.RunSpeedMetersPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("sprint_tempo_m_pro_s"), 1.0, 30.0, OutValues.SprintSpeedMetersPerSecond, OutError)
+			&& FEIDataFile::ReadNumber(Root, TEXT("blocken_tempo_m_pro_s"), 0.1, 30.0, OutValues.BlockSpeedMetersPerSecond, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("sprunghoehe_m"), 0.2, 10.0, OutValues.JumpHeightMeters, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("schwerkraft_faktor"), 0.2, 5.0, OutValues.GravityFactor, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("luftkontrolle_0_bis_1"), 0.0, 1.0, OutValues.AirControl, OutError)

@@ -68,7 +68,7 @@ void AEIHud::DrawHUD()
 	const bool bHorde = State != nullptr && State->IsHordeActive();
 	const bool bArcanist = Hero->GetHeroClass() == EEIHeroClass::Arcanist;
 	const TCHAR* ClassName = bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht");
-	const TCHAR* ClassKeys = bArcanist ? TEXT("Linke Maus Schuss   Rechte Maus halten: Feuerball") : TEXT("Linke Maus Hieb (halten: schwerer Hieb)");
+	const TCHAR* ClassKeys = bArcanist ? TEXT("Linke Maus Schuss   Rechte Maus halten: Feuerball") : TEXT("Linke Maus Hieb (halten: schwerer Hieb)   Rechte Maus halten: blocken, kurz vor dem Treffer: Parade");
 	DrawLine(FString::Printf(TEXT("%s   %s   Horde %s   Gegner %d"), ClassName, ClassKeys, bHorde ? TEXT("an") : TEXT("aus"), Enemies), Margin, Margin + 24.0f, TextColor);
 
 	if (Hero->GetHurtFlash() > 0.0f)
@@ -85,6 +85,12 @@ void AEIHud::DrawHUD()
 	DrawThreats(Hero);
 
 	DrawRect(TextColor, Width / 2.0f - CrosshairSize / 2.0f, Height / 2.0f - CrosshairSize / 2.0f, CrosshairSize, CrosshairSize);
+
+	const UEISwordComponent* Sword = Hero->GetSword();
+	if (Sword->GetBlockFlash() > 0.0f)
+	{
+		DrawLine(Sword->WasParry() ? TEXT("Parade!") : TEXT("Geblockt"), Width / 2.0f - 50.0f, Height / 2.0f + 60.0f, TextColor, 1.5f);
+	}
 
 	const UEIHealthComponent* Health = Hero->GetHealth();
 	const float LifeY = Height - Margin - BarHeight;

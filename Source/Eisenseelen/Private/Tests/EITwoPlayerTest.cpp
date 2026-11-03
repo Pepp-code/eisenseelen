@@ -3,14 +3,17 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #include "EICasterComponent.h"
+#include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EISwordComponent.h"
 #include "EIProjectile.h"
 #include "EITrainingDummy.h"
 #include "EngineUtils.h"
 #include "EIPlayerController.h"
 #include "EITestKeys.h"
 #include "Editor.h"
+#include "Engine/DamageEvents.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
@@ -384,6 +387,108 @@ private:
 	double StepAt = 0.0;
 };
 
+/**
+ * The guest blocks: the server must know about the block from the guest's moves alone, and decides about the hit.
+ */
+class FEITwoPlayerBlockCommand : public IAutomationLatentCommand
+{
+public:
+	explicit FEITwoPlayerBlockCommand(FAutomationTestBase* InTest) : Test(InTest), StartedAt(FPlatformTime::Seconds()) {}
+
+	virtual bool Update() override
+	{
+		if (FPlatformTime::Seconds() - StartedAt > TimeoutSeconds)
+		{
+			Test->AddError(FString::Printf(TEXT("The two-player block test timed out in step %d"), Step));
+			return true;
+		}
+		const FTwoPlayerSession Session = FTwoPlayerSession::Find();
+		if (!Session.IsReady() && Step == 0)
+		{
+			return false;
+		}
+		if (Session.ClientHero == nullptr || Session.ServerCopyOfClientHero == nullptr)
+		{
+			Test->AddError(TEXT("The guest disappeared from the session"));
+			return true;
+		}
+
+		constexpr float TestHit = 10.0f;
+		const double Now = Session.ClientWorld->GetTimeSeconds();
+		const auto EnterStep = [this, Now](int32 NewStep)
+		{
+			Step = NewStep;
+			StepAt = Now;
+		};
+		AEIHeroCharacter* ServerHero = Session.ServerCopyOfClientHero;
+		// In front of the guest, as the place a hit comes from.
+		const FVector Ahead = ServerHero->GetActorLocation() + ServerHero->GetActorForwardVector() * 300.0f;
+		switch (Step)
+		{
+		case 0:
+			Session.ClientPlayer->SetControlRotation(FRotator::ZeroRotator);
+			EnterStep(1);
+			return false;
+		case 1:
+			if (Now - StepAt < 0.5)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::RightMouseButton, IE_Pressed);
+			EnterStep(2);
+			return false;
+		case 2:
+		{
+			if (Now - StepAt < 0.6)
+			{
+				return false;
+			}
+			Test->TestTrue(TEXT("The guest's block shows on the guest"), Session.ClientHero->GetHeroMovement()->IsBlocking());
+			Test->TestTrue(TEXT("The server knows about the guest's block"), ServerHero->GetHeroMovement()->IsBlocking());
+			AActor* Causer = ServerHero->GetWorld()->SpawnActor<AEITrainingDummy>(AEITrainingDummy::StaticClass(), Ahead, FRotator::ZeroRotator);
+			const float Before = ServerHero->GetHealth()->GetHealth();
+			ServerHero->TakeDamage(TestHit, FDamageEvent(), nullptr, Causer);
+			const float Expected = TestHit * (1.0f - ServerHero->GetSword()->GetValues().Block.DamageReduction);
+			Test->TestNearlyEqual(TEXT("The server reduces the hit"), Before - ServerHero->GetHealth()->GetHealth(), Expected, 0.01f);
+			Causer->Destroy();
+			EnterStep(3);
+			return false;
+		}
+		case 3:
+			if (Now - StepAt < 0.1)
+			{
+				return false;
+			}
+			Test->TestTrue(TEXT("The guest sees the block catch the hit"), Session.ClientHero->GetSword()->GetBlockFlash() > 0.0f);
+			EISendTestKey(Session.ClientPlayer, EKeys::RightMouseButton, IE_Released);
+			EnterStep(4);
+			return false;
+		case 4:
+		{
+			if (Now - StepAt < 0.3)
+			{
+				return false;
+			}
+			Test->TestFalse(TEXT("The server sees the block end"), ServerHero->GetHeroMovement()->IsBlocking());
+			AActor* Causer = ServerHero->GetWorld()->SpawnActor<AEITrainingDummy>(AEITrainingDummy::StaticClass(), Ahead, FRotator::ZeroRotator);
+			const float Before = ServerHero->GetHealth()->GetHealth();
+			ServerHero->TakeDamage(TestHit, FDamageEvent(), nullptr, Causer);
+			Test->TestNearlyEqual(TEXT("Without the block the whole hit counts"), Before - ServerHero->GetHealth()->GetHealth(), TestHit, 0.01f);
+			Causer->Destroy();
+			return true;
+		}
+		default:
+			return true;
+		}
+	}
+
+private:
+	FAutomationTestBase* Test;
+	double StartedAt;
+	int32 Step = 0;
+	double StepAt = 0.0;
+};
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEITwoPlayerDodgeTest,
 	"Eisenseelen.Net.GuestDodge",
@@ -427,6 +532,20 @@ bool FEITwoPlayerCombatTest::RunTest(const FString& Parameters)
 	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(ArenaMap)));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
 	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerCombatCommand(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEITwoPlayerBlockTest,
+	"Eisenseelen.Net.GuestBlock",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEITwoPlayerBlockTest::RunTest(const FString& Parameters)
+{
+	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(ArenaMap)));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
+	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerBlockCommand(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	return true;
 }
