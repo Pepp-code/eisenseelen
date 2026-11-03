@@ -7,6 +7,7 @@
 #include "EIDataFile.h"
 #include "EIHealthComponent.h"
 #include "EIHeroMovementComponent.h"
+#include "EIOmenComponent.h"
 #include "EIPlayerController.h"
 #include "EISkyBarge.h"
 #include "EISwordComponent.h"
@@ -73,6 +74,7 @@ AEIHeroCharacter::AEIHeroCharacter(const FObjectInitializer& ObjectInitializer)
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
 	Sword = CreateDefaultSubobject<UEISwordComponent>(TEXT("Sword"));
 	Caster = CreateDefaultSubobject<UEICasterComponent>(TEXT("Caster"));
+	Omens = CreateDefaultSubobject<UEIOmenComponent>(TEXT("Omens"));
 }
 
 void AEIHeroCharacter::BeginPlay()
@@ -92,6 +94,7 @@ void AEIHeroCharacter::BeginPlay()
 	}
 	Sword->LoadValues();
 	Caster->LoadValues();
+	Omens->LoadValues();
 	LoadClassValues();
 	Caster->RefillMana();
 	if (HasAuthority())
@@ -130,8 +133,9 @@ void AEIHeroCharacter::SetHeroClass(EEIHeroClass NewClass)
 	const float LifeShare = Health->GetHealth() / FMath::Max(Health->GetMaxHealth(), 1.0f);
 	HeroClass = NewClass;
 	LoadClassValues();
-	Health->Reset(ClassValues.Life);
-	Health->ApplyDamage(ClassValues.Life * (1.0f - LifeShare));
+	const float LifeWithOmens = ClassValues.Life + Omens->GetBonus(EEIOmenEffect::Life);
+	Health->Reset(LifeWithOmens);
+	Health->ApplyDamage(LifeWithOmens * (1.0f - LifeShare));
 	OnRep_HeroClass();
 }
 
@@ -275,7 +279,13 @@ float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 void AEIHeroCharacter::ApplyValues(const FEIHeroValues& NewValues)
 {
 	Values = NewValues;
-	GetHeroMovement()->ApplyValues(Values);
+	GetHeroMovement()->ApplyValues(Values, Omens->GetFactor(EEIOmenEffect::Speed));
+}
+
+void AEIHeroCharacter::OnOmensChanged()
+{
+	GetHeroMovement()->ApplyValues(Values, Omens->GetFactor(EEIOmenEffect::Speed));
+	Caster->SetManaFactor(Omens->GetFactor(EEIOmenEffect::ManaRegen));
 }
 
 UEIHeroMovementComponent* AEIHeroCharacter::GetHeroMovement() const

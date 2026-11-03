@@ -16,7 +16,8 @@ class EISENSEELEN_API UEIHeroMovementComponent : public UCharacterMovementCompon
 	GENERATED_BODY()
 
 public:
-	void ApplyValues(const FEIHeroValues& Values);
+	/** SpeedFactor raises running, sprinting and the pace of a block, and nothing else. */
+	void ApplyValues(const FEIHeroValues& Values, float SpeedFactor = 1.0f);
 
 	void SetWantsToSprint(bool bWants) { bWantsToSprint = bWants; }
 	void SetWantsToBlock(bool bWants) { bWantsToBlock = bWants; }

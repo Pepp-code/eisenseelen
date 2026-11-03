@@ -5,11 +5,13 @@
 #include "AIController.h"
 #include "EIAltar.h"
 #include "EIBeacon.h"
+#include "EIChest.h"
 #include "EIEnemy.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHordeDirector.h"
+#include "EIOmenComponent.h"
 #include "EIRunDirector.h"
 #include "EISkyBarge.h"
 #include "EITestScript.h"
@@ -391,6 +393,124 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
 		Context.Test->AddInfo(FString::Printf(TEXT("At the beacon: budget %.1f"), Horde->GetThreatBudget()));
 		Context.Test->TestNearlyEqual(TEXT("The beacon brings the full budget"), Horde->GetThreatBudget(), ExpectedBudget(Context, Horde->GetValues().Director.BeaconShare), 0.01f);
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIChestTest,
+	"Eisenseelen.Play.Run.Chests",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIChestTest::RunTest(const FString& Parameters)
+{
+	const auto ChestsInUse = [](const FEIPlayContext& Context)
+	{
+		TArray<AEIChest*> Chests;
+		for (TActorIterator<AEIChest> It(Context.World); It; ++It)
+		{
+			if (It->IsInUse())
+			{
+				Chests.Add(*It);
+			}
+		}
+		return Chests;
+	};
+	const auto StandAtChest = [](const FEIPlayContext& Context, const AEIChest* Chest)
+	{
+		const FVector Location = Chest->GetActorLocation();
+		Teleport(Context, FVector(Location.X + 200.0f, Location.Y, HeroHeight), 180.0f);
+	};
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([ChestsInUse](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		SwitchOffDirector(Context);
+
+		// The map has more chests than a run uses, and the others are gone.
+		int32 All = 0;
+		for (TActorIterator<AEIChest> It(Context.World); It; ++It)
+		{
+			++All;
+			Context.Test->TestEqual(TEXT("Only chests in use can be seen"), It->IsHidden(), !It->IsInUse());
+		}
+		const int32 InUse = ChestsInUse(Context).Num();
+		Context.Test->AddInfo(FString::Printf(TEXT("%d of %d chests in this run, reach 300 cm"), InUse, All));
+		Context.Test->TestEqual(TEXT("A run uses its number of chests"), InUse, FMath::RoundToInt(GetGameMode(Context)->GetRun()->GetValues().ChestsPerRun));
+		Context.Test->TestTrue(TEXT("The map has more chests than that"), All > InUse);
+		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
+	}));
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Exploring));
+
+	// Far from a chest nothing happens.
+	AddTap(Steps, EKeys::F);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([ChestsInUse, StandAtChest](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("Far from a chest the use key finds nothing"), Context.Hero->GetOmens()->CountAll(), 0);
+		StandAtChest(Context, ChestsInUse(Context)[0]);
+	}));
+	Steps.Add(Wait(0.1));
+
+	// At a chest the use key opens it and gives an omen, once.
+	AddTap(Steps, EKeys::F);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([ChestsInUse](const FEIPlayContext& Context)
+	{
+		const UEIOmenComponent* Omens = Context.Hero->GetOmens();
+		Context.Test->TestEqual(TEXT("A chest gives an omen"), Omens->CountAll(), 1);
+		Context.Test->TestTrue(TEXT("The chest is open now"), ChestsInUse(Context)[0]->IsOpenFor(Context.Hero));
+		Context.Test->TestTrue(TEXT("The hero is told"), Omens->GetFoundNote() > 0.0f);
+	}));
+	AddTap(Steps, EKeys::F);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([ChestsInUse, StandAtChest](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("An open chest gives nothing more"), Context.Hero->GetOmens()->CountAll(), 1);
+		StandAtChest(Context, ChestsInUse(Context)[1]);
+	}));
+	Steps.Add(Wait(0.1));
+
+	// All chests in a row: everything for this class comes once, and nothing for the other class.
+	for (int32 Chest = 1; Chest < 5; ++Chest)
+	{
+		AddTap(Steps, EKeys::F);
+		Steps.Add(Wait(0.05));
+		Steps.Add(Do([ChestsInUse, StandAtChest, Chest](const FEIPlayContext& Context)
+		{
+			Context.Test->TestEqual(TEXT("Every chest gives an omen"), Context.Hero->GetOmens()->CountAll(), Chest + 1);
+			StandAtChest(Context, ChestsInUse(Context)[Chest + 1]);
+		}));
+		Steps.Add(Wait(0.1));
+	}
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const UEIOmenComponent* Omens = Context.Hero->GetOmens();
+		const TArray<FEIOmen>& Table = Omens->GetTable().Omens;
+		for (int32 Index = 0; Index < Table.Num(); ++Index)
+		{
+			if (Table[Index].bForBladewarden)
+			{
+				Context.Test->TestTrue(TEXT("Everything for this class came"), Omens->CountOf(Index) >= 1);
+			}
+			else
+			{
+				Context.Test->TestEqual(TEXT("Nothing for the other class came"), Omens->CountOf(Index), 0);
+			}
+		}
+	}));
+
+	// R: the omens end with the run, and the chests are closed again.
+	AddTap(Steps, EKeys::R);
+	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::OnBarge));
+	Steps.Add(Do([ChestsInUse](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("The omens end with the run"), Context.Hero->GetOmens()->CountAll(), 0);
+		for (const AEIChest* Chest : ChestsInUse(Context))
+		{
+			Context.Test->TestFalse(TEXT("A fresh run has closed chests"), Chest->IsOpenFor(Context.Hero));
+		}
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

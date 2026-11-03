@@ -3,11 +3,13 @@
 #include "EIAltar.h"
 #include "EIBeacon.h"
 #include "EICasterComponent.h"
+#include "EIChest.h"
 #include "EIEnemy.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EIOmenComponent.h"
 #include "EISkyBarge.h"
 #include "EISwordComponent.h"
 #include "Engine/Canvas.h"
@@ -38,6 +40,11 @@ namespace
 	constexpr float ThreatEdgeShare = 0.42f;
 	const FLinearColor BeaconMarkColor(1.0f, 0.55f, 0.1f);
 	const FLinearColor AltarMarkColor(0.7f, 0.3f, 1.0f);
+	const FLinearColor TextShadowColor(0.0f, 0.0f, 0.0f, 0.75f);
+	constexpr float TextShadowOffset = 1.5f;
+	const FLinearColor ChestMarkColor(1.0f, 0.8f, 0.25f);
+	const FLinearColor OmenColor(1.0f, 0.85f, 0.45f);
+	constexpr float ChestMarkRangeCm = 4000.0f;
 	const FLinearColor BargeMarkColor(0.5f, 0.85f, 1.0f);
 	const FLinearColor WarningTextColor(1.0f, 0.25f, 0.15f);
 	constexpr float WorldMarkSize = 10.0f;
@@ -52,6 +59,8 @@ void AEIHud::DrawBar(float X, float Y, float Width, float Height, float Fraction
 
 void AEIHud::DrawLine(const FString& Text, float X, float Y, const FLinearColor& Color, float Scale)
 {
+	// A dark copy behind it keeps the text readable on a bright floor.
+	DrawText(Text, TextShadowColor, X + TextShadowOffset, Y + TextShadowOffset, GEngine->GetMediumFont(), Scale);
 	DrawText(Text, Color, X, Y, GEngine->GetMediumFont(), Scale);
 }
 
@@ -136,6 +145,7 @@ void AEIHud::DrawHUD()
 		}
 		DrawLine(FString::Printf(TEXT("Mana %.0f / %.0f"), Caster->GetMana(), Caster->GetMaxMana()), Margin, SpellY - 24.0f, TextColor);
 	}
+	DrawOmens(Hero, SpellY - 56.0f);
 
 	const float Charge = bArcanist ? Caster->GetChargeFraction() : Hero->GetSword()->GetChargeFraction();
 	if (Charge > 0.25f)
@@ -155,6 +165,27 @@ void AEIHud::DrawWorldMark(const FVector& Location, const FString& Label, const 
 	}
 	DrawRect(Color, OnScreen.X - WorldMarkSize / 2.0f, OnScreen.Y - WorldMarkSize / 2.0f, WorldMarkSize, WorldMarkSize);
 	DrawLine(Label, OnScreen.X + WorldMarkSize, OnScreen.Y - WorldMarkSize, TextColor);
+}
+
+void AEIHud::DrawOmens(const AEIHeroCharacter* Hero, float BottomY)
+{
+	const UEIOmenComponent* Omens = Hero->GetOmens();
+	const TArray<FEIOmen>& Table = Omens->GetTable().Omens;
+	float LineY = BottomY;
+	for (int32 Index = 0; Index < Table.Num(); ++Index)
+	{
+		const int32 Count = Omens->CountOf(Index);
+		if (Count > 0)
+		{
+			DrawLine(Count > 1 ? FString::Printf(TEXT("%s x%d"), *Table[Index].Name, Count) : Table[Index].Name, Margin, LineY, OmenColor);
+			LineY -= 22.0f;
+		}
+	}
+	if (Omens->GetFoundNote() > 0.0f && Table.IsValidIndex(Omens->GetLastFound()))
+	{
+		const FEIOmen& Found = Table[Omens->GetLastFound()];
+		DrawLine(FString::Printf(TEXT("%s: %s"), *Found.Name, *Found.Describe()), Canvas->SizeX / 2.0f - 200.0f, 150.0f, OmenColor, 1.5f);
+	}
 }
 
 void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
@@ -191,7 +222,27 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 		}
 	};
 
-	switch (State->GetRunPhase())
+	const EEIRunPhase Phase = State->GetRunPhase();
+	if (Phase != EEIRunPhase::OnBarge && Phase != EEIRunPhase::Escaped && Phase != EEIRunPhase::Failed)
+	{
+		for (TActorIterator<AEIChest> It(GetWorld()); It; ++It)
+		{
+			if (!It->IsInUse() || It->IsOpenFor(Hero) || FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) > ChestMarkRangeCm)
+			{
+				continue;
+			}
+			if (It->IsInReach(Hero))
+			{
+				DrawLine(TEXT("F: Truhe \u00F6ffnen"), CenterX - 95.0f, PromptY - 40.0f, TextColor, 1.5f);
+			}
+			else
+			{
+				DrawWorldMark(It->GetMarkLocation(), DistanceLabel(TEXT("Truhe"), It->GetActorLocation()), ChestMarkColor);
+			}
+		}
+	}
+
+	switch (Phase)
 	{
 	case EEIRunPhase::OnBarge:
 		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse."), Margin, LineY, TextColor);
@@ -253,7 +304,7 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 
 	case EEIRunPhase::Escaped:
 		DrawLine(TEXT("Entkommen!"), CenterX - 95.0f, Canvas->SizeY / 2.0f - 90.0f, TextColor, 2.0f);
-		DrawLine(FString::Printf(TEXT("Laufzeit %s. R startet neu."), *Clock), CenterX - 130.0f, Canvas->SizeY / 2.0f - 40.0f, TextColor, 1.5f);
+		DrawLine(FString::Printf(TEXT("Laufzeit %s, %d Omen. R startet neu."), *Clock, Hero->GetOmens()->CountAll()), CenterX - 190.0f, Canvas->SizeY / 2.0f - 40.0f, TextColor, 1.5f);
 		break;
 
 	default:

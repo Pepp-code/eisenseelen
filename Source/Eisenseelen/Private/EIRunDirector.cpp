@@ -3,11 +3,13 @@
 #include "Dom/JsonObject.h"
 #include "EIAltar.h"
 #include "EIBeacon.h"
+#include "EIChest.h"
 #include "EIDataFile.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
 #include "EIHordeDirector.h"
+#include "EIOmenComponent.h"
 #include "EISkyBarge.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -25,6 +27,8 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("lauf.json"), OutError);
 	FEIRunValues Loaded;
 	if (!Root.IsValid()
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhen_pro_lauf"), 0.0, 1000.0, Loaded.ChestsPerRun, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_reichweite_m"), 0.5, 100.0, Loaded.ChestReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("ritual_altare"), 0.0, 100.0, Loaded.RitualAltars, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_halten_s"), 0.1, 3600.0, Loaded.AltarHoldSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_zone_m"), 1.0, 100.0, Loaded.AltarZoneMeters, OutError)
@@ -79,6 +83,8 @@ void UEIRunDirector::ResetRun()
 	State->SetBeaconHold(0.0f, false);
 	SetCorruptionStage(0);
 
+	PrepareChests();
+
 	AltarOrder.Reset();
 	AltarsBroken = 0;
 	for (TActorIterator<AEIAltar> It(GetWorld()); It; ++It)
@@ -102,6 +108,34 @@ void UEIRunDirector::ResetRun()
 	}
 	Barge->ReturnToStart();
 	State->SetRunPhase(EEIRunPhase::OnBarge);
+}
+
+void UEIRunDirector::PrepareChests()
+{
+	TArray<AEIChest*> Chests;
+	for (TActorIterator<AEIChest> It(GetWorld()); It; ++It)
+	{
+		Chests.Insert(*It, FMath::RandRange(0, Chests.Num()));
+	}
+	const int32 InUse = FMath::RoundToInt(Values.ChestsPerRun);
+	for (int32 Index = 0; Index < Chests.Num(); ++Index)
+	{
+		Chests[Index]->PrepareForRun(Index < InUse);
+	}
+}
+
+bool UEIRunDirector::OpenChest(AEIHeroCharacter* Hero)
+{
+	for (TActorIterator<AEIChest> It(GetWorld()); It; ++It)
+	{
+		if (It->IsInUse() && It->IsInReach(Hero) && !It->IsOpenFor(Hero))
+		{
+			It->OpenFor(Hero);
+			Hero->GetOmens()->GrantRandomOmen();
+			return true;
+		}
+	}
+	return false;
 }
 
 AEIAltar* UEIRunDirector::GetActiveAltar() const
@@ -143,6 +177,11 @@ void UEIRunDirector::HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, fl
 void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 {
 	const EEIRunPhase Phase = GetWorld()->GetGameState<AEIGameState>()->GetRunPhase();
+	const bool bRunning = Phase != EEIRunPhase::None && Phase != EEIRunPhase::OnBarge && Phase != EEIRunPhase::Escaped && Phase != EEIRunPhase::Failed;
+	if (bRunning && OpenChest(Hero))
+	{
+		return;
+	}
 	if (Phase == EEIRunPhase::RitualDone)
 	{
 		for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)

@@ -14,6 +14,9 @@ public:
 	UEIHealthComponent();
 
 	void Reset(float NewMaxHealth);
+
+	/** Server only. More life at once, and more room for it. */
+	void AddMaxHealth(float Amount);
 	float GetHealth() const { return Health; }
 	float GetMaxHealth() const { return MaxHealth; }
 	bool IsDead() const { return Health <= 0.0f; }

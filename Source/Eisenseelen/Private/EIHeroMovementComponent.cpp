@@ -107,16 +107,16 @@ void UEIHeroMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 	bWantsToBlock = (Flags & FSavedMove_Character::FLAG_Custom_2) != 0;
 }
 
-void UEIHeroMovementComponent::ApplyValues(const FEIHeroValues& Values)
+void UEIHeroMovementComponent::ApplyValues(const FEIHeroValues& Values, float SpeedFactor)
 {
-	MaxWalkSpeed = Values.RunSpeedMetersPerSecond * CentimetersPerMeter;
+	MaxWalkSpeed = Values.RunSpeedMetersPerSecond * CentimetersPerMeter * SpeedFactor;
 	AirControl = Values.AirControl;
 	GravityScale = Values.GravityFactor;
 	// A jump of height h starts at v = sqrt(2 * g * h), so gravity changes the air time and not the height.
 	JumpZVelocity = FMath::Sqrt(2.0f * FMath::Abs(GetGravityZ()) * Values.JumpHeightMeters * CentimetersPerMeter);
 
-	SprintSpeedCm = Values.SprintSpeedMetersPerSecond * CentimetersPerMeter;
-	BlockSpeedCm = Values.BlockSpeedMetersPerSecond * CentimetersPerMeter;
+	SprintSpeedCm = Values.SprintSpeedMetersPerSecond * CentimetersPerMeter * SpeedFactor;
+	BlockSpeedCm = Values.BlockSpeedMetersPerSecond * CentimetersPerMeter * SpeedFactor;
 	DiveFromHeightCm = Values.DiveFromHeightMeters * CentimetersPerMeter;
 	DiveSpeedCm = Values.DiveSpeedMetersPerSecond * CentimetersPerMeter;
 	DiveFallSpeedCm = Values.DiveFallSpeedMetersPerSecond * CentimetersPerMeter;

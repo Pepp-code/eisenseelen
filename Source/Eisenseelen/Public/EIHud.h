@@ -23,4 +23,7 @@ private:
 	/** Where the run stands, what to do next and where that is. Nothing on a map without a run. */
 	void DrawRun(const class AEIHeroCharacter* Hero, const class AEIGameState* State);
 	void DrawWorldMark(const FVector& Location, const FString& Label, const FLinearColor& Color);
+
+	/** The omens found so far, in a column going up from this height, and the note about a new one. */
+	void DrawOmens(const class AEIHeroCharacter* Hero, float BottomY);
 };

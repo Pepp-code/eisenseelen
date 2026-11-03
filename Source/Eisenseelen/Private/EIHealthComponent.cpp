@@ -26,6 +26,15 @@ void UEIHealthComponent::Reset(float NewMaxHealth)
 	Health = NewMaxHealth;
 }
 
+void UEIHealthComponent::AddMaxHealth(float Amount)
+{
+	MaxHealth += Amount;
+	if (!IsDead())
+	{
+		Health += Amount;
+	}
+}
+
 float UEIHealthComponent::ApplyDamage(float Amount)
 {
 	if (IsDead() || Amount <= 0.0f)

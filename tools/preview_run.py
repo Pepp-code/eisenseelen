@@ -87,6 +87,25 @@ def scenario():
     player().preview_corruption(0)
     yield 6.0
 
+    # A chest: closed from a few metres away, right there with the prompt, and open with the omen.
+    chest = next(c for c in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIChest) if c.is_in_use())
+    spot = chest.get_actor_location()
+    front = chest.get_actor_forward_vector()
+    # From the side, because a chest at a place has its altar in front of it.
+    side = chest.get_actor_right_vector()
+    stand_looking_at((spot.x - 600 * side.x, spot.y - 600 * side.y), (spot.x, spot.y, 100))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    stand_looking_at((spot.x + 220 * front.x, spot.y + 220 * front.y), (spot.x, spot.y, 60))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("F")
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+
     # The ritual: the first altar from afar and from inside its zone, and all of them broken after that.
     altars = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar)
     first = True

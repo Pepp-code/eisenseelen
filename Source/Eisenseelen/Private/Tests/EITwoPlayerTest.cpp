@@ -4,11 +4,13 @@
 
 #include "EIBeacon.h"
 #include "EICasterComponent.h"
+#include "EIChest.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EIOmenComponent.h"
 #include "EISwordComponent.h"
 #include "EIProjectile.h"
 #include "EIRunDirector.h"
@@ -393,8 +395,8 @@ private:
 };
 
 /**
- * The guest plays a run alone, the host has fallen: the use key lights a beacon on the server, the guest sees how the
- * run goes on, and the barge takes the guest home.
+ * The guest plays a run alone, the host has fallen: the use key opens a chest and lights a beacon on the server, the
+ * guest sees how the run goes on, and the barge takes the guest home.
  */
 class FEITwoPlayerRunCommand : public IAutomationLatentCommand
 {
@@ -442,12 +444,21 @@ public:
 			{
 				if (It->Get()->IsLocalController())
 				{
-					It->Get()->GetPawn()->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+					APawn* HostPawn = It->Get()->GetPawn();
+					HostHero = HostPawn;
+					HostPawn->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 				}
 			}
 			Session.ServerCopyOfClientHero->SetCanBeDamaged(false);
-			TActorIterator<AEIBeacon> Beacon(ServerWorld);
-			Session.ServerCopyOfClientHero->TeleportTo(Beacon->GetActorLocation() + FVector(200.0f, 0.0f, 100.0f), FRotator::ZeroRotator);
+			for (TActorIterator<AEIChest> Chest(ServerWorld); Chest; ++Chest)
+			{
+				if (Chest->IsInUse())
+				{
+					Session.ServerCopyOfClientHero->TeleportTo(Chest->GetActorLocation() + FVector(200.0f, 0.0f, 100.0f), FRotator::ZeroRotator);
+					OpenedChest = *Chest;
+					break;
+				}
+			}
 			EnterStep(1);
 			return false;
 		}
@@ -474,6 +485,50 @@ public:
 			{
 				return false;
 			}
+			Test->TestTrue(TEXT("The chest is open for the guest on the server"), OpenedChest != nullptr && OpenedChest->IsOpenFor(Session.ServerCopyOfClientHero));
+			Test->TestEqual(TEXT("The server gives the guest an omen"), Session.ServerCopyOfClientHero->GetOmens()->CountAll(), 1);
+			Test->TestEqual(TEXT("The guest knows about the omen"), Session.ClientHero->GetOmens()->CountAll(), 1);
+			Test->TestTrue(TEXT("The guest is told"), Session.ClientHero->GetOmens()->GetFoundNote() > 0.0f);
+			Test->TestFalse(TEXT("The chest stays closed for the host"), OpenedChest != nullptr && OpenedChest->IsOpenFor(HostHero));
+
+			// The next omen is a faster one for sure, and both sides have to agree on what that means.
+			UEIOmenComponent* ServerOmens = Session.ServerCopyOfClientHero->GetOmens();
+			for (int32 Index = 0; Index < ServerOmens->GetTable().Omens.Num(); ++Index)
+			{
+				if (ServerOmens->GetTable().Omens[Index].Effect == EEIOmenEffect::Speed)
+				{
+					ServerOmens->AddOmen(Index);
+				}
+			}
+			TActorIterator<AEIBeacon> Beacon(ServerWorld);
+			Session.ServerCopyOfClientHero->TeleportTo(Beacon->GetActorLocation() + FVector(200.0f, 0.0f, 100.0f), FRotator::ZeroRotator);
+			EnterStep(4);
+			return false;
+		}
+		case 4:
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("Guest and server agree on the speed"), Session.ClientHero->GetCharacterMovement()->MaxWalkSpeed, Session.ServerCopyOfClientHero->GetCharacterMovement()->MaxWalkSpeed);
+			Test->TestTrue(TEXT("The omen makes the guest faster"), Session.ClientHero->GetCharacterMovement()->MaxWalkSpeed > Session.ClientHero->GetValues().RunSpeedMetersPerSecond * 100.0f);
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Pressed);
+			EnterStep(5);
+			return false;
+		case 5:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Released);
+			EnterStep(6);
+			return false;
+		case 6:
+		{
+			if (Now - StepAt < 0.3)
+			{
+				return false;
+			}
 			Test->TestEqual(TEXT("The guest's use key lights the beacon"), GuestState->GetRunPhase(), EEIRunPhase::BeaconLit);
 			TActorIterator<AEIBeacon> GuestBeacon(Session.ClientWorld);
 			bool bAnyLit = false;
@@ -482,34 +537,34 @@ public:
 				bAnyLit = bAnyLit || GuestBeacon->IsLit();
 			}
 			Test->TestTrue(TEXT("The guest sees the fire"), bAnyLit);
-			EnterStep(4);
+			EnterStep(7);
 			return false;
 		}
-		case 4:
+		case 7:
 			if (GuestState->GetRunPhase() != EEIRunPhase::BargeWaiting)
 			{
 				return false;
 			}
 			Session.ServerCopyOfClientHero->TeleportTo(GameMode->GetRun()->GetBarge()->GetActorLocation() + FVector(0.0f, 0.0f, -40.0f), FRotator::ZeroRotator);
-			EnterStep(5);
+			EnterStep(8);
 			return false;
-		case 5:
+		case 8:
 			if (Now - StepAt < 0.4)
 			{
 				return false;
 			}
 			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Pressed);
-			EnterStep(6);
+			EnterStep(9);
 			return false;
-		case 6:
+		case 9:
 			if (Now - StepAt < 0.05)
 			{
 				return false;
 			}
 			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Released);
-			EnterStep(7);
+			EnterStep(10);
 			return false;
-		case 7:
+		case 10:
 			if (Now - StepAt < 0.4)
 			{
 				return false;
@@ -517,9 +572,9 @@ public:
 			Test->TestEqual(TEXT("The guest gets away"), GuestState->GetRunPhase(), EEIRunPhase::Escaped);
 			Test->TestNotNull(TEXT("The guest stands on the barge"), Session.ClientHero->GetAttachParentActor());
 			HeightAtBoarding = Session.ClientHero->GetActorLocation().Z;
-			EnterStep(8);
+			EnterStep(11);
 			return false;
-		case 8:
+		case 11:
 			if (Now - StepAt < 0.6)
 			{
 				return false;
@@ -537,6 +592,8 @@ private:
 	int32 Step = 0;
 	double StepAt = 0.0;
 	double HeightAtBoarding = 0.0;
+	const AEIChest* OpenedChest = nullptr;
+	const AActor* HostHero = nullptr;
 };
 
 /**

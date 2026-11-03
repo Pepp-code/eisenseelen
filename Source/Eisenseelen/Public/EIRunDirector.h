@@ -13,6 +13,8 @@ enum class EEIRunPhase : uint8;
 /** The numbers of a run from Data/lauf.json. */
 struct EISENSEELEN_API FEIRunValues
 {
+	float ChestsPerRun = 8.0f;
+	float ChestReachMeters = 3.0f;
 	float RitualAltars = 3.0f;
 	float AltarHoldSeconds = 30.0f;
 	float AltarZoneMeters = 8.0f;
@@ -63,6 +65,8 @@ public:
 
 private:
 	void HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	void PrepareChests();
+	bool OpenChest(AEIHeroCharacter* Hero);
 	void IgniteBeacon(AEIBeacon* Beacon);
 	void HoldBeacon(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingHeroes);

@@ -3,6 +3,7 @@
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
 #include "EIHeroCharacter.h"
+#include "EIOmenComponent.h"
 #include "EIProjectile.h"
 #include "EIViewModelComponent.h"
 #include "EIVisuals.h"
@@ -111,7 +112,7 @@ float UEICasterComponent::GetMaxMana() const
 
 float UEICasterComponent::GetMana() const
 {
-	const float Regained = static_cast<float>(GetWorld()->GetTimeSeconds() - ManaStampedAt) * GetHero()->GetClassValues().ManaPerSecond;
+	const float Regained = static_cast<float>(GetWorld()->GetTimeSeconds() - ManaStampedAt) * GetHero()->GetClassValues().ManaPerSecond * ManaFactor;
 	return FMath::Min(ManaAtStamp + Regained, GetMaxMana());
 }
 
@@ -119,6 +120,13 @@ void UEICasterComponent::SpendMana(float Amount)
 {
 	ManaAtStamp = FMath::Max(0.0f, GetMana() - Amount);
 	ManaStampedAt = GetWorld()->GetTimeSeconds();
+}
+
+void UEICasterComponent::SetManaFactor(float Factor)
+{
+	// What came back until now counts at the old rate.
+	SpendMana(0.0f);
+	ManaFactor = Factor;
 }
 
 void UEICasterComponent::RefillMana()
@@ -244,7 +252,7 @@ void UEICasterComponent::ServerFire_Implementation(EEICast Kind, FVector_NetQuan
 	const double Now = GetWorld()->GetTimeSeconds();
 	const AEIHeroCharacter* Hero = GetHero();
 	const float Cost = GetManaCost(Kind);
-	const float ClockAllowance = static_cast<float>(ServerClockTolerance) * Hero->GetClassValues().ManaPerSecond;
+	const float ClockAllowance = static_cast<float>(ServerClockTolerance) * Hero->GetClassValues().ManaPerSecond * ManaFactor;
 	if (Hero->IsDead() || !CanAfford(Cost - ClockAllowance))
 	{
 		return;
@@ -275,7 +283,9 @@ void UEICasterComponent::SpawnProjectile(EEICast Kind, const FVector& Target)
 	AEIProjectile* Projectile = GetWorld()->SpawnActorDeferred<AEIProjectile>(AEIProjectile::StaticClass(), Spawn, Hero, Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (Projectile != nullptr)
 	{
-		Projectile->Configure(GetProjectile(Kind), Kind != EEICast::Bolt);
+		FEIProjectileValues WithOmens = GetProjectile(Kind);
+		WithOmens.Damage *= Hero->GetOmens()->GetFactor(EEIOmenEffect::FireDamage);
+		Projectile->Configure(WithOmens, Kind != EEICast::Bolt);
 		Projectile->FinishSpawning(Spawn);
 	}
 }

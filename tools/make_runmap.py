@@ -31,6 +31,9 @@ COVER_CLEAR_M = 22
 COVER_MIN_SIZE_M = 2
 COVER_MAX_SIZE_M = 5
 COVER_MAX_HEIGHT_M = 3
+PLACE_CHEST_OFFSET_M = 4
+PLACE_CHEST_ANGLE = 215
+FREE_CHEST_CLEAR_M = 10
 # A new volume's brush is a cube of this size. Paths are only needed near the floor.
 VOLUME_BRUSH_M = 2
 NAVIGATION_HEIGHT_M = 12
@@ -96,6 +99,30 @@ def add_cover(actors, layout):
         add_box(actors, "Deckung", (x, y, height / 2), (size_x, size_y, height), rotation=(0, 0, rng.uniform(0, 90)))
         taken.append((x, y))
         placed += 1
+    return taken
+
+
+def add_chests(actors, layout, taken):
+    """One at every place, and more out in the open. A run only uses some of them."""
+    chest_class = unreal.load_class(None, "/Script/Eisenseelen.EIChest")
+    for index, place in enumerate(layout["orte"]):
+        # Inside the ruin, with its front to the altar in the middle.
+        angle = index * 53 + PLACE_CHEST_ANGLE
+        x = place["x_m"] + PLACE_CHEST_OFFSET_M * math.cos(math.radians(angle))
+        y = place["y_m"] + PLACE_CHEST_OFFSET_M * math.sin(math.radians(angle))
+        spawn(actors, chest_class, location=(x * CM_PER_M, y * CM_PER_M, 0), rotation=(0, 0, angle + 180), label="Truhe")
+
+    # A random generator of its own, so that more chests do not move the cover around.
+    rng = random.Random(layout["deckung_zufall"] + 1)
+    half = layout["boden_m"] / 2 - COVER_CLEAR_M
+    placed = 0
+    while placed < layout["truhen_frei"]:
+        x, y = rng.uniform(-half, half), rng.uniform(-half, half)
+        if any(math.hypot(x - other_x, y - other_y) < FREE_CHEST_CLEAR_M for other_x, other_y in taken):
+            continue
+        spawn(actors, chest_class, location=(x * CM_PER_M, y * CM_PER_M, 0), rotation=(0, 0, rng.uniform(0, 360)), label="Truhe")
+        taken.append((x, y))
+        placed += 1
 
 
 def add_launch_pads(actors, pads):
@@ -129,7 +156,8 @@ def main():
     for index, place in enumerate(layout["orte"]):
         add_place(actors, place, index)
         spawn(actors, altar_class, location=(place["x_m"] * CM_PER_M, place["y_m"] * CM_PER_M, 0), label="Altar")
-    add_cover(actors, layout)
+    taken = add_cover(actors, layout)
+    add_chests(actors, layout, taken)
     add_launch_pads(actors, layout["sprungfelder"])
 
     navigation = spawn(actors, unreal.NavMeshBoundsVolume, label="Wegfindung")

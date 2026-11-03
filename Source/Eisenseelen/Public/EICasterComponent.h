@@ -69,6 +69,9 @@ public:
 	void RefillMana();
 	bool CanAffordFireball() const;
 
+	/** How fast the mana comes back compared to the class's normal rate. */
+	void SetManaFactor(float Factor);
+
 	/** Seconds of the flash left after a cast failed for lack of mana. For the HUD. */
 	float GetManaDeniedFlash() const { return ManaDeniedRemaining; }
 
@@ -95,6 +98,7 @@ private:
 	double SpellReadyAt = 0.0;
 	float ManaAtStamp = 0.0f;
 	double ManaStampedAt = 0.0;
+	float ManaFactor = 1.0f;
 
 	float ManaDeniedRemaining = 0.0f;
 };

@@ -5,6 +5,7 @@
 #include "EIEnemy.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EIOmenComponent.h"
 #include "EIPoses.h"
 #include "EIViewModelComponent.h"
 #include "EIVisuals.h"
@@ -448,7 +449,7 @@ void UEISwordComponent::HitActor(AActor* Target, const FVector& Location)
 		return;
 	}
 
-	const float Damage = Swing.Damage * FMath::Max(0.0f, 1.0f - Swing.TargetFalloff * HitThisSwing.Num());
+	const float Damage = Swing.Damage * FMath::Max(0.0f, 1.0f - Swing.TargetFalloff * HitThisSwing.Num()) * Hero->GetOmens()->GetFactor(EEIOmenEffect::SwordDamage);
 	HitThisSwing.Add(Target);
 	UGameplayStatics::ApplyDamage(Target, Damage, Hero->GetController(), Hero, nullptr);
 	if (AEIEnemy* Enemy = Cast<AEIEnemy>(Target); Enemy != nullptr && SwingKind == EEISwingKind::Heavy)

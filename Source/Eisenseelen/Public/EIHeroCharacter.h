@@ -10,6 +10,7 @@ class UCameraComponent;
 class UEICasterComponent;
 class UEIHealthComponent;
 class UEIHeroMovementComponent;
+class UEIOmenComponent;
 class AEISkyBarge;
 class UEISwordComponent;
 class UEIViewModelComponent;
@@ -52,6 +53,10 @@ public:
 	float GetHurtFlash() const { return HurtFlashRemaining; }
 	UEISwordComponent* GetSword() const { return Sword; }
 	UEICasterComponent* GetCaster() const { return Caster; }
+	UEIOmenComponent* GetOmens() const { return Omens; }
+
+	/** Called on the server and the owner when the set of omens changed. */
+	void OnOmensChanged();
 
 	EEIHeroClass GetHeroClass() const { return HeroClass; }
 	const FEIClassValues& GetClassValues() const { return ClassValues; }
@@ -130,6 +135,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEICasterComponent> Caster;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEIOmenComponent> Omens;
 
 	UPROPERTY(ReplicatedUsing = OnRep_HeroClass)
 	EEIHeroClass HeroClass = EEIHeroClass::Bladewarden;
