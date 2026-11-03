@@ -24,6 +24,7 @@
 		"anteil_3_spieler": 0.85,
 		"anteil_4_spieler": 1.0,
 		"anteil_erkundung": 0.35,
+		"anteil_ritual": 0.8,
 		"anteil_leuchtfeuer": 1.0,
 		"bedrohung_spitze": 30
 	}

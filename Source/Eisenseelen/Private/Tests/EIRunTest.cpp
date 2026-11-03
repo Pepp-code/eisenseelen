@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #include "AIController.h"
+#include "EIAltar.h"
 #include "EIBeacon.h"
 #include "EIEnemy.h"
 #include "EIGameMode.h"
@@ -65,6 +66,16 @@ namespace
 		Horde->ApplyValues(Values);
 	}
 
+	/** No ritual, for a test that looks at what comes after it. It only counts for the run that starts next. */
+	void SkipRitual(const FEIPlayContext& Context)
+	{
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		FEIRunValues Values = Run->GetValues();
+		Values.RitualAltars = 0.0f;
+		Run->ApplyValues(Values);
+		Run->ResetRun();
+	}
+
 	float ExpectedBudget(const FEIPlayContext& Context, float PhaseShare)
 	{
 		const FEIDirectorValues& Director = GetGameMode(Context)->GetHorde()->GetValues().Director;
@@ -102,6 +113,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		SwitchOffDirector(Context);
+		SkipRitual(Context);
 		Context.Test->TestEqual(TEXT("The run starts on the barge"), GetState(Context)->GetRunPhase(), EEIRunPhase::OnBarge);
 		Context.Test->TestTrue(TEXT("The barge flies high"), Context.Hero->GetActorLocation().Z > GetBarge(Context)->GetDeckHeight());
 		Context.Test->TestTrue(TEXT("The hero stands on the deck"), Context.Movement->IsMovingOnGround());
@@ -109,7 +121,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 
 	// Running off the deck begins the run, and the fall is a flight.
 	Steps.Add(Press(EKeys::W));
-	Steps.Add(WaitForPhase(TEXT("the hero leaves the barge"), 6.0, EEIRunPhase::Exploring));
+	Steps.Add(WaitForPhase(TEXT("the hero leaves the barge"), 6.0, EEIRunPhase::RitualDone));
 	Steps.Add(Wait(1.5));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -142,7 +154,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("Far from a beacon the use key does nothing"), GetState(Context)->GetRunPhase(), EEIRunPhase::Exploring);
+		Context.Test->TestEqual(TEXT("Far from a beacon the use key does nothing"), GetState(Context)->GetRunPhase(), EEIRunPhase::RitualDone);
 		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
 	}));
 	Steps.Add(Wait(0.1));
@@ -282,12 +294,13 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Hero->SetCanBeDamaged(false);
+		SkipRitual(Context);
 		Context.Test->TestFalse(TEXT("On the barge nothing comes yet"), GetGameMode(Context)->GetHorde()->IsHordeActive());
 		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
 	}));
 
 	// The quiet phase: a share of the budget, and it fills up.
-	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Exploring));
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::RitualDone));
 	Steps.Add(WaitUntil(TEXT("the enemies of the quiet phase are there"), 20.0, [CheckNewEnemies, TooMuchThreat](const FEIPlayContext& Context)
 	{
 		CheckNewEnemies(Context);
@@ -352,11 +365,12 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 		Context.Test->TestFalse(TEXT("A fresh run has no blood moon"), GetState(Context)->IsBloodMoon());
 		Context.Test->TestFalse(TEXT("On the barge nothing comes again"), GetGameMode(Context)->GetHorde()->IsHordeActive());
 		Context.Hero->SetCanBeDamaged(false);
+		SkipRitual(Context);
 		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
 	}));
 
 	// At the beacon the last wave comes with the full budget.
-	Steps.Add(WaitForPhase(TEXT("the run begins again"), 2.0, EEIRunPhase::Exploring));
+	Steps.Add(WaitForPhase(TEXT("the run begins again"), 2.0, EEIRunPhase::RitualDone));
 	AddTap(Steps, EKeys::F);
 	Steps.Add(WaitForPhase(TEXT("the beacon burns"), 1.0, EEIRunPhase::BeaconLit));
 	Steps.Add(Wait(0.05));
@@ -365,6 +379,127 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
 		Context.Test->AddInfo(FString::Printf(TEXT("At the beacon: budget %.1f"), Horde->GetThreatBudget()));
 		Context.Test->TestNearlyEqual(TEXT("The beacon brings the full budget"), Horde->GetThreatBudget(), ExpectedBudget(Context, Horde->GetValues().Director.BeaconShare), 0.01f);
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIRitualTest,
+	"Eisenseelen.Play.Run.Ritual",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIRitualTest::RunTest(const FString& Parameters)
+{
+	constexpr float ShortHoldSeconds = 0.5f;
+	const TSharedRef<TWeakObjectPtr<AEIAltar>> FirstAltar = MakeShared<TWeakObjectPtr<AEIAltar>>();
+	const TSharedRef<float> HoldLeft = MakeShared<float>(0.0f);
+
+	const auto StandAtActiveAltar = [](const FEIPlayContext& Context)
+	{
+		const FVector Location = GetGameMode(Context)->GetRun()->GetActiveAltar()->GetActorLocation();
+		Teleport(Context, FVector(Location.X + 300.0f, Location.Y, HeroHeight), 180.0f);
+	};
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([FirstAltar](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		SwitchOffDirector(Context);
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		FEIRunValues Short = Run->GetValues();
+		Short.AltarHoldSeconds = ShortHoldSeconds;
+		Run->ApplyValues(Short);
+		Run->ResetRun();
+
+		// One altar burns, and the marker shows it already from the barge.
+		int32 Active = 0;
+		int32 Altars = 0;
+		for (TActorIterator<AEIAltar> It(Context.World); It; ++It)
+		{
+			++Altars;
+			Active += It->IsActive() ? 1 : 0;
+		}
+		Context.Test->TestEqual(TEXT("Every place has an altar"), Altars, 8);
+		Context.Test->TestEqual(TEXT("One altar burns"), Active, 1);
+		Context.Test->TestEqual(TEXT("The ritual has three altars"), GetState(Context)->GetAltarsTotal(), 3);
+		*FirstAltar = Run->GetActiveAltar();
+
+		// Away from the barge and from the altar.
+		const FVector AltarLocation = Run->GetActiveAltar()->GetActorLocation();
+		Teleport(Context, AltarLocation + FVector(2000.0f, 0.0f, HeroHeight), 180.0f);
+	}));
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Exploring));
+
+	// The beacons stay cold until the ritual is broken.
+	Steps.Add(Do([](const FEIPlayContext& Context) { StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f); }));
+	Steps.Add(Wait(0.1));
+	AddTap(Steps, EKeys::F);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([StandAtActiveAltar](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("Before the ritual is broken the beacon stays cold"), GetState(Context)->GetRunPhase(), EEIRunPhase::Exploring);
+		StandAtActiveAltar(Context);
+	}));
+
+	// In the zone of the altar the time runs, and too many enemies stop it.
+	Steps.Add(WaitForPhase(TEXT("the ritual begins"), 1.0, EEIRunPhase::Ritual));
+	Steps.Add(Do([HoldLeft](const FEIPlayContext& Context)
+	{
+		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
+		const float Expected = ExpectedBudget(Context, Horde->GetValues().Director.RitualShare);
+		Context.Test->TestNearlyEqual(TEXT("The ritual brings more enemies"), GetGameMode(Context)->GetHorde()->GetThreatBudget(), Expected, 0.01f);
+		const FVector AltarLocation = GetGameMode(Context)->GetRun()->GetActiveAltar()->GetActorLocation();
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), AltarLocation + FVector(-300.0f, -200.0f + Index * 200.0f, HeroHeight), FRotator::ZeroRotator);
+		}
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([HoldLeft](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("Too many enemies block the altar"), GetState(Context)->IsAltarBlocked());
+		*HoldLeft = GetState(Context)->GetAltarHoldLeft();
+	}));
+	Steps.Add(Wait(0.2));
+	Steps.Add(Do([HoldLeft](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("With too many enemies the time stands still"), GetState(Context)->GetAltarHoldLeft(), *HoldLeft);
+		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
+		{
+			It->Destroy();
+		}
+	}));
+
+	// Without them the altar breaks, and the next one wakes up somewhere else.
+	Steps.Add(WaitUntil(TEXT("the first altar breaks"), 3.0, [](const FEIPlayContext& Context) { return GetState(Context)->GetAltarsBroken() == 1; }));
+	Steps.Add(Do([FirstAltar, StandAtActiveAltar](const FEIPlayContext& Context)
+	{
+		const AEIAltar* NextAltar = GetGameMode(Context)->GetRun()->GetActiveAltar();
+		Context.Test->TestEqual(TEXT("The altar is broken"), FirstAltar->Get()->GetState(), EEIAltarState::Broken);
+		Context.Test->TestTrue(TEXT("The next altar is another one"), NextAltar != FirstAltar->Get() && NextAltar->IsActive());
+		StandAtActiveAltar(Context);
+	}));
+	Steps.Add(WaitUntil(TEXT("the second altar breaks"), 3.0, [](const FEIPlayContext& Context) { return GetState(Context)->GetAltarsBroken() == 2; }));
+	Steps.Add(Do(StandAtActiveAltar));
+
+	// After the third the ritual is over, and now a beacon can burn.
+	Steps.Add(WaitForPhase(TEXT("the ritual is broken"), 3.0, EEIRunPhase::RitualDone));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestNull(TEXT("No altar burns any more"), GetGameMode(Context)->GetRun()->GetActiveAltar());
+		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
+	}));
+	Steps.Add(Wait(0.1));
+	AddTap(Steps, EKeys::F);
+	Steps.Add(WaitForPhase(TEXT("the beacon burns"), 1.0, EEIRunPhase::BeaconLit));
+
+	// R wakes the ritual up again.
+	AddTap(Steps, EKeys::R);
+	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::OnBarge));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("A fresh ritual has no broken altars"), GetState(Context)->GetAltarsBroken(), 0);
+		Context.Test->TestNotNull(TEXT("A fresh ritual has an altar"), GetGameMode(Context)->GetRun()->GetActiveAltar());
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

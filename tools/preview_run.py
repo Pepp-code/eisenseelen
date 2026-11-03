@@ -55,7 +55,8 @@ def stand_looking_at(location, target, height=STAND_HEIGHT):
 
 def scenario():
     with open(os.path.join(unreal.Paths.project_dir(), "Data", "lauf.json"), encoding="utf-8") as file:
-        hold_seconds = json.load(file)["leuchtfeuer_halten_s"]
+        run_values = json.load(file)
+    hold_seconds = run_values["leuchtfeuer_halten_s"]
 
     yield SHADER_WAIT_SECONDS
     player().preview_invulnerable()
@@ -86,6 +87,28 @@ def scenario():
     player().preview_corruption(0)
     yield 6.0
 
+    # The ritual: the first altar from afar and from inside its zone, and all of them broken after that.
+    altars = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar)
+    first = True
+    while True:
+        altar = next((a for a in altars if a.is_active()), None)
+        if altar is None:
+            break
+        spot = altar.get_actor_location()
+        if first:
+            stand_looking_at((spot.x + 1800, spot.y + 300), (spot.x, spot.y, 200))
+            yield SETTLE_SECONDS
+            shot()
+            yield AFTER_SHOT_SECONDS
+        stand_looking_at((spot.x + 450, spot.y), (spot.x, spot.y, 200))
+        yield SETTLE_SECONDS
+        if first:
+            shot()
+            yield AFTER_SHOT_SECONDS
+        first = False
+        player().preview_break_altar()
+        yield 0.5
+
     # A beacon from afar and from close by.
     beacon = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIBeacon)[0].get_actor_location()
     fire = (beacon.x, beacon.y, 950)
@@ -100,7 +123,8 @@ def scenario():
     shot()
     yield AFTER_SHOT_SECONDS
 
-    # The fire burns, the zone shows, the wave comes and the barge is on its way. The hero waits behind the beacon.
+    # With the ritual broken the fire can burn: the zone shows, the wave comes and the barge is on its way.
+    # The hero waits behind the beacon.
     yield from tap("F")
     stand_looking_at(behind_beacon, (0, 0, -300))
     yield SETTLE_SECONDS

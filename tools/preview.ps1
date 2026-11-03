@@ -9,7 +9,7 @@ Die Bilder landen in Saved\Screenshots\WindowsEditor.
 param(
 	[ValidateSet('waffen', 'lauf')]
 	[string]$Szene = 'waffen',
-	[int]$TimeoutSeconds = 300
+	[int]$TimeoutSeconds = 420
 )
 
 $ErrorActionPreference = 'Stop'

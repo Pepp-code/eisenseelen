@@ -125,8 +125,10 @@ def main():
     floor_size = layout["boden_m"]
     add_box(actors, "Boden", (0, 0, -0.5), (floor_size, floor_size, 1))
     add_edge(actors, floor_size, layout["rand_hoehe_m"])
+    altar_class = unreal.load_class(None, "/Script/Eisenseelen.EIAltar")
     for index, place in enumerate(layout["orte"]):
         add_place(actors, place, index)
+        spawn(actors, altar_class, location=(place["x_m"] * CM_PER_M, place["y_m"] * CM_PER_M, 0), label="Altar")
     add_cover(actors, layout)
     add_launch_pads(actors, layout["sprungfelder"])
 

@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "EIRunDirector.generated.h"
 
+class AEIAltar;
 class AEIBeacon;
 class AEIHeroCharacter;
 class AEISkyBarge;
@@ -12,6 +13,10 @@ enum class EEIRunPhase : uint8;
 /** The numbers of a run from Data/lauf.json. */
 struct EISENSEELEN_API FEIRunValues
 {
+	float RitualAltars = 3.0f;
+	float AltarHoldSeconds = 30.0f;
+	float AltarZoneMeters = 8.0f;
+	float AltarBlockedFromEnemies = 3.0f;
 	float BeaconHoldSeconds = 60.0f;
 	float BeaconReachMeters = 4.0f;
 	float BeaconZoneMeters = 15.0f;
@@ -47,13 +52,18 @@ public:
 	void Interact(AEIHeroCharacter* Hero);
 
 	AEISkyBarge* GetBarge() const { return Barge; }
+	AEIAltar* GetActiveAltar() const;
 
 	/** The clock raises it by itself. Directly only for preview pictures. */
 	void SetCorruptionStage(int32 Stage);
 
+	/** For preview pictures: the active altar needs no more time. */
+	void SkipAltarHold() { AltarHoldLeft = 0.0f; }
+
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	void HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void IgniteBeacon(AEIBeacon* Beacon);
 	void HoldBeacon(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingHeroes);
@@ -67,7 +77,13 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<AEIBeacon> LitBeacon;
 
+	/** The altars of this run in the order they wake up. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AEIAltar>> AltarOrder;
+
 	FEIRunValues Values;
 	bool bPrepared = false;
 	float HoldLeft = 0.0f;
+	int32 AltarsBroken = 0;
+	float AltarHoldLeft = 0.0f;
 };

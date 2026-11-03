@@ -1,5 +1,6 @@
 #include "EIHud.h"
 
+#include "EIAltar.h"
 #include "EIBeacon.h"
 #include "EICasterComponent.h"
 #include "EIEnemy.h"
@@ -36,6 +37,7 @@ namespace
 	constexpr float ThreatMarkSize = 18.0f;
 	constexpr float ThreatEdgeShare = 0.42f;
 	const FLinearColor BeaconMarkColor(1.0f, 0.55f, 0.1f);
+	const FLinearColor AltarMarkColor(0.7f, 0.3f, 1.0f);
 	const FLinearColor BargeMarkColor(0.5f, 0.85f, 1.0f);
 	const FLinearColor WarningTextColor(1.0f, 0.25f, 0.15f);
 	constexpr float WorldMarkSize = 10.0f;
@@ -178,15 +180,44 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	{
 		return FString::Printf(TEXT("%s %.0f m"), Name, FVector::Dist(Hero->GetActorLocation(), Location) / CentimetersPerMeter);
 	};
+	const auto DrawActiveAltar = [this, &DistanceLabel]()
+	{
+		for (TActorIterator<AEIAltar> It(GetWorld()); It; ++It)
+		{
+			if (It->IsActive())
+			{
+				DrawWorldMark(It->GetCrystalLocation(), DistanceLabel(TEXT("Altar"), It->GetActorLocation()), AltarMarkColor);
+			}
+		}
+	};
 
 	switch (State->GetRunPhase())
 	{
 	case EEIRunPhase::OnBarge:
 		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse."), Margin, LineY, TextColor);
+		DrawActiveAltar();
 		break;
 
 	case EEIRunPhase::Exploring:
-		DrawLine(FString::Printf(TEXT("%s   Entz\u00FCnde ein Leuchtfeuer, um die Barke zu rufen"), *Clock), Margin, LineY, TextColor);
+		DrawLine(FString::Printf(TEXT("%s   St\u00F6re das Ritual: Halte den Altar"), *Clock), Margin, LineY, TextColor);
+		DrawActiveAltar();
+		break;
+
+	case EEIRunPhase::Ritual:
+		DrawLine(FString::Printf(TEXT("%s   Altar %d von %d: noch %.0f s halten"), *Clock, State->GetAltarsBroken() + 1, State->GetAltarsTotal(), State->GetAltarHoldLeft()), Margin, LineY, TextColor);
+		DrawActiveAltar();
+		if (State->IsAltarBlocked())
+		{
+			DrawLine(TEXT("Zu viele Gegner am Altar!"), CenterX - 150.0f, PromptY, WarningTextColor, 1.5f);
+		}
+		else if (!State->IsAltarHeld())
+		{
+			DrawLine(TEXT("Geh zum Altar!"), CenterX - 90.0f, PromptY, TextColor, 1.5f);
+		}
+		break;
+
+	case EEIRunPhase::RitualDone:
+		DrawLine(FString::Printf(TEXT("%s   Das Ritual ist gest\u00F6rt. Entz\u00FCnde ein Leuchtfeuer, um die Barke zu rufen"), *Clock), Margin, LineY, TextColor);
 		for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)
 		{
 			DrawWorldMark(It->GetFireLocation(), DistanceLabel(TEXT("Leuchtfeuer"), It->GetActorLocation()), BeaconMarkColor);

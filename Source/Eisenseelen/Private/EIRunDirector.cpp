@@ -1,8 +1,10 @@
 #include "EIRunDirector.h"
 
 #include "Dom/JsonObject.h"
+#include "EIAltar.h"
 #include "EIBeacon.h"
 #include "EIDataFile.h"
+#include "EIEnemy.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
@@ -24,6 +26,10 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("lauf.json"), OutError);
 	FEIRunValues Loaded;
 	if (!Root.IsValid()
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("ritual_altare"), 0.0, 100.0, Loaded.RitualAltars, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_halten_s"), 0.1, 3600.0, Loaded.AltarHoldSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_zone_m"), 1.0, 100.0, Loaded.AltarZoneMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_blockiert_ab_gegner"), 1.0, 100.0, Loaded.AltarBlockedFromEnemies, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_halten_s"), 0.1, 3600.0, Loaded.BeaconHoldSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_reichweite_m"), 0.5, 100.0, Loaded.BeaconReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_zone_m"), 1.0, 200.0, Loaded.BeaconZoneMeters, OutError)
@@ -74,6 +80,23 @@ void UEIRunDirector::ResetRun()
 	State->ResetRunClock();
 	State->SetBeaconHold(0.0f, false);
 	SetCorruptionStage(0);
+
+	AltarOrder.Reset();
+	AltarsBroken = 0;
+	for (TActorIterator<AEIAltar> It(GetWorld()); It; ++It)
+	{
+		It->SetState(EEIAltarState::Dormant);
+		AltarOrder.Insert(*It, FMath::RandRange(0, AltarOrder.Num()));
+	}
+	const int32 AltarsThisRun = FMath::Min(FMath::RoundToInt(Values.RitualAltars), AltarOrder.Num());
+	AltarOrder.SetNum(AltarsThisRun);
+	State->SetAltarProgress(0, AltarsThisRun);
+	AltarHoldLeft = Values.AltarHoldSeconds;
+	State->SetAltarHold(AltarHoldLeft, false, false);
+	if (AltarOrder.Num() > 0)
+	{
+		AltarOrder[0]->SetState(EEIAltarState::Active);
+	}
 	if (Barge == nullptr)
 	{
 		State->SetRunPhase(EEIRunPhase::None);
@@ -83,10 +106,52 @@ void UEIRunDirector::ResetRun()
 	State->SetRunPhase(EEIRunPhase::OnBarge);
 }
 
+AEIAltar* UEIRunDirector::GetActiveAltar() const
+{
+	return AltarOrder.IsValidIndex(AltarsBroken) ? AltarOrder[AltarsBroken] : nullptr;
+}
+
+void UEIRunDirector::HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+{
+	AEIAltar* Altar = GetActiveAltar();
+	const bool bHeld = LivingHeroes.ContainsByPredicate([Altar](const AEIHeroCharacter* Hero) { return Altar->IsInZone(Hero); });
+	int32 EnemiesInZone = 0;
+	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
+	{
+		EnemiesInZone += !It->IsDead() && Altar->IsInZone(*It) ? 1 : 0;
+	}
+	const bool bBlocked = EnemiesInZone >= FMath::RoundToInt(Values.AltarBlockedFromEnemies);
+	if (bHeld && !bBlocked)
+	{
+		AltarHoldLeft -= DeltaTime;
+	}
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	State->SetAltarHold(AltarHoldLeft, bHeld, bBlocked);
+	if (AltarHoldLeft > 0.0f)
+	{
+		return;
+	}
+
+	// Broken. The ritual moves on to the next place, or it is over.
+	Altar->SetState(EEIAltarState::Broken);
+	++AltarsBroken;
+	AltarHoldLeft = Values.AltarHoldSeconds;
+	State->SetAltarProgress(AltarsBroken, AltarOrder.Num());
+	State->SetAltarHold(AltarHoldLeft, false, false);
+	if (AEIAltar* NextAltar = GetActiveAltar())
+	{
+		NextAltar->SetState(EEIAltarState::Active);
+	}
+	else
+	{
+		State->SetRunPhase(EEIRunPhase::RitualDone);
+	}
+}
+
 void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 {
 	const EEIRunPhase Phase = GetWorld()->GetGameState<AEIGameState>()->GetRunPhase();
-	if (Phase == EEIRunPhase::Exploring)
+	if (Phase == EEIRunPhase::RitualDone)
 	{
 		for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)
 		{
@@ -141,9 +206,19 @@ void UEIRunDirector::UpdateThreatBudget(EEIRunPhase Phase, int32 HeroCount)
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
 	const FEIDirectorValues& Director = Horde->GetValues().Director;
+	float PhaseShare = Director.BeaconShare;
 	// The blood moon knows no quiet phases.
-	const bool bFullShare = State->IsBloodMoon() || Phase != EEIRunPhase::Exploring;
-	const float PhaseShare = bFullShare ? Director.BeaconShare : Director.ExploringShare;
+	if (!State->IsBloodMoon())
+	{
+		if (Phase == EEIRunPhase::Exploring || Phase == EEIRunPhase::RitualDone)
+		{
+			PhaseShare = Director.ExploringShare;
+		}
+		else if (Phase == EEIRunPhase::Ritual)
+		{
+			PhaseShare = Director.RitualShare;
+		}
+	}
 	const float PlayerShare = Director.PlayerShare[FMath::Clamp(HeroCount, 1, 4) - 1];
 	const float CorruptionFactor = 1.0f + Values.CorruptionThreatPerStage * State->GetCorruptionStage();
 	Horde->SetThreatBudget(FMath::Min(Director.FullThreat * PlayerShare * PhaseShare * CorruptionFactor, Director.PeakThreat), PhaseShare);
@@ -230,11 +305,22 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 			if (Hero->GetActorLocation().Z < Barge->GetDeckHeight() - LeftBargeBelowCm)
 			{
 				State->StartRunClock();
-				State->SetRunPhase(EEIRunPhase::Exploring);
+				State->SetRunPhase(AltarOrder.IsEmpty() ? EEIRunPhase::RitualDone : EEIRunPhase::Exploring);
 				SetHorde(true);
 				break;
 			}
 		}
+		break;
+
+	case EEIRunPhase::Exploring:
+		if (LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return GetActiveAltar()->IsInZone(Hero); }))
+		{
+			State->SetRunPhase(EEIRunPhase::Ritual);
+		}
+		break;
+
+	case EEIRunPhase::Ritual:
+		HoldAltar(LivingHeroes, DeltaTime);
 		break;
 
 	case EEIRunPhase::BeaconLit:

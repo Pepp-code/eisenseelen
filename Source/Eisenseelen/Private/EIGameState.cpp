@@ -23,6 +23,11 @@ void AEIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIGameState, RunEndedAfter);
 	DOREPLIFETIME(AEIGameState, BeaconHoldLeft);
 	DOREPLIFETIME(AEIGameState, bBeaconHeld);
+	DOREPLIFETIME(AEIGameState, AltarsBroken);
+	DOREPLIFETIME(AEIGameState, AltarsTotal);
+	DOREPLIFETIME(AEIGameState, AltarHoldLeft);
+	DOREPLIFETIME(AEIGameState, bAltarHeld);
+	DOREPLIFETIME(AEIGameState, bAltarBlocked);
 	DOREPLIFETIME(AEIGameState, CorruptionStage);
 	DOREPLIFETIME(AEIGameState, CorruptionShare);
 	DOREPLIFETIME(AEIGameState, bBloodMoon);
@@ -58,6 +63,19 @@ void AEIGameState::SetBeaconHold(float SecondsLeft, bool bHeld)
 {
 	BeaconHoldLeft = SecondsLeft;
 	bBeaconHeld = bHeld;
+}
+
+void AEIGameState::SetAltarProgress(int32 Broken, int32 Total)
+{
+	AltarsBroken = Broken;
+	AltarsTotal = Total;
+}
+
+void AEIGameState::SetAltarHold(float SecondsLeft, bool bHeld, bool bBlocked)
+{
+	AltarHoldLeft = SecondsLeft;
+	bAltarHeld = bHeld;
+	bAltarBlocked = bBlocked;
 }
 
 void AEIGameState::SetCorruption(int32 Stage, float Share, bool bIsBloodMoon)

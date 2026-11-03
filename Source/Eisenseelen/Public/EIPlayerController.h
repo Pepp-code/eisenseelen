@@ -31,6 +31,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewCorruption(int32 Stage);
 
+	/** For preview pictures: the active altar breaks as soon as a hero stands in its zone, whatever the enemies do. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewBreakAltar();
+
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);
 

@@ -59,6 +59,14 @@ void AEIPlayerController::PreviewCorruption(int32 Stage)
 	}
 }
 
+void AEIPlayerController::PreviewBreakAltar()
+{
+	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
+	{
+		GameMode->GetRun()->SkipAltarHold();
+	}
+}
+
 void AEIPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();

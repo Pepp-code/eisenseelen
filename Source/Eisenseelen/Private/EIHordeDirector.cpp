@@ -62,6 +62,7 @@ bool FEIHordeValues::LoadFromProjectFile(FEIHordeValues& OutValues, FString& Out
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_3_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[2], OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_4_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[3], OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_erkundung"), 0.0, 10.0, Loaded.Director.ExploringShare, OutError)
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_ritual"), 0.0, 10.0, Loaded.Director.RitualShare, OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_leuchtfeuer"), 0.0, 10.0, Loaded.Director.BeaconShare, OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_spitze"), 0.0, 10000.0, Loaded.Director.PeakThreat, OutError))
 	{

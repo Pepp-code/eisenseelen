@@ -1,4 +1,8 @@
 {
+	"ritual_altare": 3,
+	"altar_halten_s": 30,
+	"altar_zone_m": 8,
+	"altar_blockiert_ab_gegner": 3,
 	"leuchtfeuer_halten_s": 60,
 	"leuchtfeuer_reichweite_m": 4,
 	"leuchtfeuer_zone_m": 15,

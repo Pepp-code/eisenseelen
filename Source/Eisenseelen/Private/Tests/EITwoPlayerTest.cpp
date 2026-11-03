@@ -435,7 +435,9 @@ public:
 			Test->TestEqual(TEXT("The guest knows the run has not begun"), GuestState->GetRunPhase(), EEIRunPhase::OnBarge);
 			FEIRunValues Short = GameMode->GetRun()->GetValues();
 			Short.BeaconHoldSeconds = 1.0f;
+			Short.RitualAltars = 0.0f;
 			GameMode->GetRun()->ApplyValues(Short);
+			GameMode->GetRun()->ResetRun();
 			for (FConstPlayerControllerIterator It = ServerWorld->GetPlayerControllerIterator(); It; ++It)
 			{
 				if (It->Get()->IsLocalController())
@@ -454,7 +456,7 @@ public:
 			{
 				return false;
 			}
-			Test->TestEqual(TEXT("The guest sees the run begin"), GuestState->GetRunPhase(), EEIRunPhase::Exploring);
+			Test->TestEqual(TEXT("The guest sees the run begin"), GuestState->GetRunPhase(), EEIRunPhase::RitualDone);
 			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Pressed);
 			EnterStep(2);
 			return false;

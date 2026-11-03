@@ -59,17 +59,17 @@ Der Entwickler startet den Editor mit `Editor_starten.bat` (Laufkarte) oder `Tes
 
 ## Aktueller Stand
 
-Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 26 Tests sind grün, darunter vier mit echtem Gast im Netz.
+Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 27 Tests sind grün, darunter vier mit echtem Gast im Netz.
 
 - **Bewegung:** Laufen, Sprint auf Shift, Sprung 1 m, Schwerkraft-Faktor 1,6, Ausweichen auf V, Luftlenkung, Sprungfelder. Bunnyhop und Tempo-Kette sind auf Wunsch des Entwicklers gestrichen: Ein Sprung nimmt nie mehr Tempo mit als am Boden erlaubt.
 - **Klingenwacht:** Leichte Hiebe immer hin und her, schwerer Hieb, der Gegner taumeln lässt (pro Gegnerart in `Data/gegner.json` einstellbar), Treff-Stopp, Klingenspur. Rechte Maus halten blockt von vorn, in den ersten 0,2 s ist es eine Parade, die den Gegner taumeln lässt.
 - **Arkanist:** Linke Maus Feuerstab ohne Wartezeit, rechte Maus halten für den Feuerball, beides kostet Mana mit Anzeige. Feuerball auch auf Q mit Abklingzeit. Klassenwechsel auf C.
 - **Gegner:** Knochenläufer als graue Kapseln mit Wegfindung auf der Laufkarte, in der Testarena Horde auf H, Neustart auf R.
-- **Lauf:** Graue Laufkarte mit 300 × 300 m. Start auf der Himmelsbarke, Sturzflug, zwei Leuchtfeuer, 60 Sekunden halten, mit F in die Barke steigen. Alle 2 Minuten steigt die Verderbnis bis zum Blutmond, Himmel und Nebel färben sich. Der Direktor bringt Gegner außerhalb der Sicht, je nach Phase und Verderbnis.
+- **Lauf:** Graue Laufkarte mit 300 × 300 m. Start auf der Himmelsbarke, Sturzflug, Ritual stören (drei Altare je 30 Sekunden halten), dann ein Leuchtfeuer entzünden, 60 Sekunden halten und mit F in die Barke steigen. Alle 2 Minuten steigt die Verderbnis bis zum Blutmond, Himmel und Nebel färben sich. Der Direktor bringt Gegner außerhalb der Sicht, je nach Phase und Verderbnis.
 
 Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war ein Wunsch nach dem ersten Spielen. Alles andere wurde noch nicht selbst gespielt.
 
-**Als Nächstes in Stufe 2, in dieser Reihenfolge:** Ritual stören, Truhen und 5 Omen, Knochenwerfer und Schildträger, Frostrune und Dampfexplosion.
+**Als Nächstes in Stufe 2, in dieser Reihenfolge:** Truhen und 5 Omen, Knochenwerfer und Schildträger, Frostrune und Dampfexplosion.
 
 **Bewusst noch nicht dabei:** Waffenzauber und Runen (Plan, Abschnitt zu den Zaubern), Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Wegfindung der Gegner, Klassen-Passive.
 

@@ -12,6 +12,7 @@ struct EISENSEELEN_API FEIDirectorValues
 	float FullThreat = 44.0f;
 	float PlayerShare[4] = { 0.45f, 0.7f, 0.85f, 1.0f };
 	float ExploringShare = 0.35f;
+	float RitualShare = 0.8f;
 	float BeaconShare = 1.0f;
 	float PeakThreat = 30.0f;
 };
