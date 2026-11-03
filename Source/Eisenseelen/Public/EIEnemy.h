@@ -20,12 +20,16 @@ struct EISENSEELEN_API FEIEnemyValues
 	float HitZoneMeters = 2.2f;
 	float RecoverSeconds = 0.6f;
 	float HeavyHitStaggerFactor = 1.0f;
+	float SightMeters = 25.0f;
+	float AlarmMeters = 12.0f;
+	float GiveUpMeters = 50.0f;
+	float StayAwakeSeconds = 6.0f;
 
 	static bool LoadFromProjectFile(FEIEnemyValues& OutValues, FString& OutError);
 };
 
 /**
- * The bone runner, a grey capsule for now. It finds its way to the nearest hero, winds up visibly and audibly, and only then
+ * The bone runner, a grey capsule for now. It stands watch or hunts, finds its way to the nearest hero, winds up visibly and audibly, and only then
  * strikes, so a hero who moves away in time takes no damage. A parry or a heavy hit staggers it, which interrupts
  * everything it does. All of its decisions happen on the server.
  */
@@ -53,9 +57,19 @@ public:
 	void MarkAsGuard() { bGuard = true; }
 	bool IsGuard() const { return bGuard; }
 
+	/** Server only. It stands here and only comes when it notices a hero. An enemy without this call hunts right away. */
+	void StandWatch(const FVector& NewHome);
+
+	/** Whether it is not after a hero at the moment. */
+	bool IsWatching() const { return State == EState::Watch || State == EState::GoHome; }
+	bool HasHome() const { return bHasHome; }
+
 	UEIHealthComponent* GetHealth() const { return Health; }
 	const FEIEnemyValues& GetValues() const { return Values; }
 	void ApplyValues(const FEIEnemyValues& NewValues);
+
+	/** Server only. More life and more damage, for enemies that come later in a run. */
+	void ApplyStrength(float Factor);
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
@@ -70,11 +84,16 @@ private:
 		Chase,
 		Windup,
 		Recover,
-		Stagger
+		Stagger,
+		Watch,
+		GoHome
 	};
 
 	UFUNCTION()
 	void OnRep_Telegraphing();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastNoticed();
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHurt();
@@ -89,6 +108,9 @@ private:
 	AActor* FindNearestHero() const;
 	void Steer(AActor* Target, float DeltaSeconds);
 	void SteerStraight(const AActor* Target, float DeltaSeconds);
+	bool NoticesHero(float DeltaSeconds);
+	void WakeUp(bool bTellNeighbours);
+	void WalkHome(float DeltaSeconds);
 	bool StandsOnPaths() const;
 	void StopWalking();
 	void Strike();
@@ -118,6 +140,10 @@ private:
 
 	FEIEnemyValues Values;
 	bool bGuard = false;
+	bool bHasHome = false;
+	FVector Home = FVector::ZeroVector;
+	double AwakeUntil = 0.0;
+	float NoticeCheckRemaining = 0.0f;
 	EState State = EState::Chase;
 	float StateTime = 0.0f;
 	float StaggerSeconds = 0.0f;

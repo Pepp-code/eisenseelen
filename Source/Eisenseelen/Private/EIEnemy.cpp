@@ -40,6 +40,8 @@ namespace
 	constexpr float SidestepSeconds = 0.9f;
 	constexpr float PathGoalReachCm = 50.0f;
 	constexpr float PathRetrySeconds = 0.5f;
+	constexpr float NoticeCheckSeconds = 0.25f;
+	constexpr float HomeReachCm = 200.0f;
 
 	constexpr int32 DebrisPieces = 7;
 	constexpr float DebrisLifeSeconds = 1.8f;
@@ -68,7 +70,11 @@ bool FEIEnemyValues::LoadFromProjectFile(FEIEnemyValues& OutValues, FString& Out
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("ausholen_s"), 0.0, 10.0, Loaded.WindupSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("trefferzone_m"), 0.5, 20.0, Loaded.HitZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(**Runner, TEXT("erholung_s"), 0.0, 10.0, Loaded.RecoverSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("taumeln_faktor_schwerer_hieb_0_bis_1"), 0.0, 1.0, Loaded.HeavyHitStaggerFactor, OutError))
+		|| !FEIDataFile::ReadNumber(**Runner, TEXT("taumeln_faktor_schwerer_hieb_0_bis_1"), 0.0, 1.0, Loaded.HeavyHitStaggerFactor, OutError)
+		|| !FEIDataFile::ReadNumber(**Runner, TEXT("sicht_m"), 1.0, 500.0, Loaded.SightMeters, OutError)
+		|| !FEIDataFile::ReadNumber(**Runner, TEXT("alarm_umkreis_m"), 0.0, 500.0, Loaded.AlarmMeters, OutError)
+		|| !FEIDataFile::ReadNumber(**Runner, TEXT("aufgeben_m"), 1.0, 1000.0, Loaded.GiveUpMeters, OutError)
+		|| !FEIDataFile::ReadNumber(**Runner, TEXT("wach_mindestens_s"), 0.0, 600.0, Loaded.StayAwakeSeconds, OutError))
 	{
 		return false;
 	}
@@ -138,6 +144,92 @@ void AEIEnemy::ApplyValues(const FEIEnemyValues& NewValues)
 	GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter;
 }
 
+void AEIEnemy::ApplyStrength(float Factor)
+{
+	Values.Damage *= Factor;
+	Health->Reset(Values.Life * Factor);
+}
+
+void AEIEnemy::StandWatch(const FVector& NewHome)
+{
+	Home = NewHome;
+	bHasHome = true;
+	State = EState::Watch;
+	StateTime = 0.0f;
+	// Not all at the same moment.
+	NoticeCheckRemaining = FMath::FRandRange(0.0f, NoticeCheckSeconds);
+	SetActorRotation(FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f));
+}
+
+bool AEIEnemy::NoticesHero(float DeltaSeconds)
+{
+	NoticeCheckRemaining -= DeltaSeconds;
+	if (NoticeCheckRemaining > 0.0f)
+	{
+		return false;
+	}
+	NoticeCheckRemaining = NoticeCheckSeconds;
+	const double Sight = Values.SightMeters * CentimetersPerMeter;
+	const FVector Eye = GetPawnViewLocation();
+	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+	{
+		if (It->IsDead() || FVector::Dist(It->GetActorLocation(), GetActorLocation()) > Sight)
+		{
+			continue;
+		}
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(EIEnemySight), false, this);
+		if (!GetWorld()->LineTraceTestByObjectType(Eye, It->GetPawnViewLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), Query))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void AEIEnemy::WakeUp(bool bTellNeighbours)
+{
+	AwakeUntil = GetWorld()->GetTimeSeconds() + Values.StayAwakeSeconds;
+	if (!IsWatching())
+	{
+		return;
+	}
+	StopWalking();
+	State = EState::Chase;
+	StateTime = 0.0f;
+	if (!bTellNeighbours)
+	{
+		return;
+	}
+	MulticastNoticed();
+	const double Alarm = Values.AlarmMeters * CentimetersPerMeter;
+	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
+	{
+		if (*It != this && FVector::Dist(It->GetActorLocation(), GetActorLocation()) <= Alarm)
+		{
+			It->WakeUp(false);
+		}
+	}
+}
+
+void AEIEnemy::WalkHome(float DeltaSeconds)
+{
+	AAIController* AI = GetController<AAIController>();
+	if (AI == nullptr || AI->GetMoveStatus() == EPathFollowingStatus::Moving)
+	{
+		return;
+	}
+	PathRetryRemaining -= DeltaSeconds;
+	if (PathRetryRemaining <= 0.0f && StandsOnPaths())
+	{
+		if (AI->MoveToLocation(Home, PathGoalReachCm) != EPathFollowingRequestResult::Failed)
+		{
+			return;
+		}
+		PathRetryRemaining = PathRetrySeconds;
+	}
+	AddMovementInput((Home - GetActorLocation()).GetSafeNormal2D());
+}
+
 void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -187,6 +279,13 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		{
 			return;
 		}
+		if (bHasHome && GetWorld()->GetTimeSeconds() >= AwakeUntil && FVector::Dist(Target->GetActorLocation(), GetActorLocation()) > Values.GiveUpMeters * CentimetersPerMeter)
+		{
+			StopWalking();
+			State = EState::GoHome;
+			StateTime = 0.0f;
+			return;
+		}
 		if (FVector::Dist(Target->GetActorLocation(), GetActorLocation()) <= Values.AttackFromMeters * CentimetersPerMeter)
 		{
 			StopWalking();
@@ -225,6 +324,29 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 			bStaggering = false;
 			State = EState::Chase;
 			StateTime = 0.0f;
+		}
+		return;
+
+	case EState::Watch:
+		if (NoticesHero(DeltaSeconds))
+		{
+			WakeUp(true);
+		}
+		return;
+
+	case EState::GoHome:
+		if (NoticesHero(DeltaSeconds))
+		{
+			WakeUp(true);
+		}
+		else if (FVector::Dist2D(GetActorLocation(), Home) <= HomeReachCm)
+		{
+			StopWalking();
+			State = EState::Watch;
+		}
+		else
+		{
+			WalkHome(DeltaSeconds);
 		}
 		return;
 	}
@@ -343,6 +465,10 @@ float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, 
 	{
 		Hero->NoteCombat();
 	}
+	if (Applied > 0.0f)
+	{
+		WakeUp(true);
+	}
 	if (Applied > 0.0f && !IsDead())
 	{
 		MulticastHurt();
@@ -363,6 +489,11 @@ void AEIEnemy::OnRep_Telegraphing()
 	{
 		EIVisuals::PlaySoundAt(this, TEXT("GegnerAusholen"), GetActorLocation());
 	}
+}
+
+void AEIEnemy::MulticastNoticed_Implementation()
+{
+	EIVisuals::PlaySoundAt(this, TEXT("GegnerAusholen"), GetActorLocation());
 }
 
 void AEIEnemy::MulticastHurt_Implementation()

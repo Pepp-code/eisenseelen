@@ -8,7 +8,11 @@
 		"ausholen_s": 0.5,
 		"trefferzone_m": 2.2,
 		"erholung_s": 0.6,
-		"taumeln_faktor_schwerer_hieb_0_bis_1": 1.0
+		"taumeln_faktor_schwerer_hieb_0_bis_1": 1.0,
+		"sicht_m": 25,
+		"alarm_umkreis_m": 12,
+		"aufgeben_m": 50,
+		"wach_mindestens_s": 6
 	},
 	"horde": {
 		"gleichzeitig_max": 20,
@@ -18,14 +22,16 @@
 		"zu_weit_weg_m": 80
 	},
 	"direktor": {
-		"bedrohung_voll": 33,
+		"bedrohung_je_stufe": 2,
+		"bedrohung_altar": 5,
+		"bedrohung_leuchtfeuer": 7,
+		"bedrohung_spitze": 22,
+		"welle_alle_s": 12,
+		"welle_dauer_s": 3,
+		"nachschub_tempo_anteil": 0.35,
 		"anteil_1_spieler": 0.45,
 		"anteil_2_spieler": 0.7,
 		"anteil_3_spieler": 0.85,
-		"anteil_4_spieler": 1.0,
-		"anteil_erkundung": 0.35,
-		"anteil_ritual": 0.8,
-		"anteil_leuchtfeuer": 1.0,
-		"bedrohung_spitze": 30
+		"anteil_4_spieler": 1.0
 	}
 }

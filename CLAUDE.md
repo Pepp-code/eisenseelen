@@ -59,7 +59,7 @@ Der Entwickler startet den Editor mit `Editor_starten.bat` (Laufkarte) oder `Tes
 
 ## Aktueller Stand
 
-Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 32 Tests sind grün, darunter vier mit echtem Gast im Netz.
+Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 33 Tests sind grün, darunter vier mit echtem Gast im Netz.
 
 - **Bewegung:** Laufen, Sprint auf Shift, Sprung 1 m, Schwerkraft-Faktor 1,6, Luftlenkung, Sprungfelder. Ausweichen auf V ist auf Wunsch des Entwicklers vorerst abgeschaltet und lässt sich mit `ausweichen_an_0_oder_1` in `Data/held.json` wieder einschalten. Bunnyhop und Tempo-Kette sind auf Wunsch des Entwicklers gestrichen: Ein Sprung nimmt nie mehr Tempo mit als am Boden erlaubt.
 - **Leben:** Wer 6 Sekunden weder getroffen wurde noch selbst getroffen hat, bekommt Leben zurück. Werte in `Data/held.json`.

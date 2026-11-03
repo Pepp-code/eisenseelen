@@ -3,6 +3,7 @@
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
 #include "EIEnemy.h"
+#include "EIEnemyCamp.h"
 #include "EIHeroCharacter.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -18,6 +19,9 @@ namespace
 	constexpr int32 PlaceTries = 8;
 	constexpr float InViewDot = 0.35f;
 	constexpr float LeftBehindCheckSeconds = 1.0f;
+	// Reinforcements must not come from so far away that they count as left behind at once.
+	constexpr float CampInReachShare = 0.9f;
+	constexpr float CampSpreadCm = 300.0f;
 
 	bool CanSee(const AEIHeroCharacter& Hero, const FVector& Location)
 	{
@@ -56,15 +60,17 @@ bool FEIHordeValues::LoadFromProjectFile(FEIHordeValues& OutValues, FString& Out
 		|| !FEIDataFile::ReadNumber(**Horde, TEXT("abstand_min_m"), 1.0, 500.0, Loaded.MinDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(**Horde, TEXT("abstand_max_m"), 1.0, 500.0, Loaded.MaxDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(**Horde, TEXT("zu_weit_weg_m"), 1.0, 1000.0, Loaded.TooFarMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_voll"), 0.0, 10000.0, Loaded.Director.FullThreat, OutError)
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_je_stufe"), 0.0, 10000.0, Loaded.Director.ThreatPerStage, OutError)
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_altar"), 0.0, 10000.0, Loaded.Director.AltarThreat, OutError)
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_leuchtfeuer"), 0.0, 10000.0, Loaded.Director.BeaconThreat, OutError)
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_spitze"), 0.0, 10000.0, Loaded.Director.PeakThreat, OutError)
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("welle_alle_s"), 0.1, 3600.0, Loaded.Director.WaveEverySeconds, OutError)
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("welle_dauer_s"), 0.0, 3600.0, Loaded.Director.WaveBurstSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("nachschub_tempo_anteil"), 0.0, 10.0, Loaded.Director.QuietSpawnShare, OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_1_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[0], OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_2_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[1], OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_3_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[2], OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_4_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[3], OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_erkundung"), 0.0, 10.0, Loaded.Director.ExploringShare, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_ritual"), 0.0, 10.0, Loaded.Director.RitualShare, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_leuchtfeuer"), 0.0, 10.0, Loaded.Director.BeaconShare, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_spitze"), 0.0, 10000.0, Loaded.Director.PeakThreat, OutError))
+		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_4_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[3], OutError))
 	{
 		return false;
 	}
@@ -104,7 +110,7 @@ float UEIHordeDirector::CountThreat() const
 	float Threat = 0.0f;
 	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
 	{
-		Threat += It->IsDead() ? 0.0f : It->GetValues().Threat;
+		Threat += It->IsDead() || It->IsWatching() ? 0.0f : It->GetValues().Threat;
 	}
 	return Threat;
 }
@@ -144,7 +150,28 @@ AEIEnemy* UEIHordeDirector::SpawnAt(const FVector& Location)
 {
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
-	return GetWorld()->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Location, FRotator::ZeroRotator, Params);
+	AEIEnemy* Enemy = GetWorld()->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Location, FRotator::ZeroRotator, Params);
+	if (Enemy != nullptr)
+	{
+		Enemy->ApplyStrength(EnemyStrength);
+	}
+	return Enemy;
+}
+
+void UEIHordeDirector::SpawnWatchers(const FVector& Center, float DistanceCm, int32 Count)
+{
+	const float FirstAngle = FMath::FRandRange(0.0f, UE_TWO_PI);
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		const float Angle = FirstAngle + UE_TWO_PI * Index / Count;
+		const FVector Ground(Center.X + FMath::Cos(Angle) * DistanceCm, Center.Y + FMath::Sin(Angle) * DistanceCm, 0.0f);
+		FVector Location;
+		AEIEnemy* Watcher = FindStandingPlace(Ground, Location) ? SpawnAt(Location) : nullptr;
+		if (Watcher != nullptr)
+		{
+			Watcher->StandWatch(Watcher->GetActorLocation());
+		}
+	}
 }
 
 TArray<AEIEnemy*> UEIHordeDirector::SpawnGuards(const FVector& Center, float DistanceCm, int32 Count)
@@ -181,12 +208,32 @@ AEIEnemy* UEIHordeDirector::SpawnOne()
 		return nullptr;
 	}
 	const float MinDistance = Values.MinDistanceMeters * CentimetersPerMeter;
+	const float CampInReach = Values.TooFarMeters * CentimetersPerMeter * CampInReachShare;
+	TArray<FVector> Camps;
+	for (TActorIterator<AEIEnemyCamp> It(GetWorld()); It; ++It)
+	{
+		Camps.Add(It->GetActorLocation());
+	}
 	for (int32 Try = 0; Try < PlaceTries; ++Try)
 	{
 		const FVector Center = Heroes[FMath::RandRange(0, Heroes.Num() - 1)]->GetActorLocation();
-		const float Distance = FMath::FRandRange(Values.MinDistanceMeters, Values.MaxDistanceMeters) * CentimetersPerMeter;
+		const TArray<FVector> CampsInReach = Camps.FilterByPredicate([&Center, MinDistance, CampInReach](const FVector& Camp)
+		{
+			const double Distance = FVector::Dist2D(Camp, Center);
+			return Distance >= MinDistance && Distance <= CampInReach;
+		});
 		const float Angle = FMath::FRandRange(0.0f, UE_TWO_PI);
-		const FVector Ground(Center.X + FMath::Cos(Angle) * Distance, Center.Y + FMath::Sin(Angle) * Distance, 0.0f);
+		FVector Ground;
+		if (!CampsInReach.IsEmpty())
+		{
+			const FVector Camp = CampsInReach[FMath::RandRange(0, CampsInReach.Num() - 1)];
+			Ground = FVector(Camp.X + FMath::Cos(Angle) * CampSpreadCm, Camp.Y + FMath::Sin(Angle) * CampSpreadCm, 0.0f);
+		}
+		else
+		{
+			const float Distance = FMath::FRandRange(Values.MinDistanceMeters, Values.MaxDistanceMeters) * CentimetersPerMeter;
+			Ground = FVector(Center.X + FMath::Cos(Angle) * Distance, Center.Y + FMath::Sin(Angle) * Distance, 0.0f);
+		}
 
 		FVector Location;
 		if (!FindStandingPlace(Ground, Location))
@@ -211,8 +258,8 @@ void UEIHordeDirector::RemoveEnemiesLeftBehind()
 	const double TooFar = Values.TooFarMeters * CentimetersPerMeter;
 	for (TActorIterator<AEIEnemy> Enemy(GetWorld()); Enemy; ++Enemy)
 	{
-		// Running away from guards must not break the seal of their chest.
-		if (Enemy->IsGuard())
+		// Running away from guards must not break the seal of their chest, and whoever has a home goes back to it.
+		if (Enemy->IsGuard() || Enemy->HasHome())
 		{
 			continue;
 		}

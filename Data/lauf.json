@@ -1,4 +1,6 @@
 {
+	"lager_faktor": 1,
+	"lager_radius_m": 3,
 	"truhen_pro_lauf": 5,
 	"truhe_reichweite_m": 3,
 	"truhe_zone_m": 10,
@@ -14,5 +16,6 @@
 	"barke_abflug_tempo_m_pro_s": 6,
 	"verderbnis_alle_s": 120,
 	"verderbnis_stufen": 6,
-	"verderbnis_bedrohung_je_stufe": 0.12
+	"verderbnis_bedrohung_je_stufe": 0.12,
+	"verderbnis_gegner_staerke_je_stufe": 0.1
 }

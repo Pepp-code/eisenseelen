@@ -92,7 +92,9 @@ void AEIHud::DrawHUD()
 	const TCHAR* ClassName = bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht");
 	const TCHAR* HordeNote = bHasRun ? TEXT("") : (bHorde ? TEXT("Horde an   ") : TEXT("Horde aus   "));
 	const TCHAR* ClassKeys = bArcanist ? TEXT("Linke Maus Schuss   Rechte Maus halten: Feuerball") : TEXT("Linke Maus Hieb (halten: schwerer Hieb)   Rechte Maus halten: blocken, kurz vor dem Treffer: Parade");
-	DrawLine(FString::Printf(TEXT("%s   %s   %sGegner %d"), ClassName, ClassKeys, HordeNote, Enemies), Margin, Margin + 24.0f, TextColor);
+	// On the run map most enemies stand far away in their camps, so that number would say nothing.
+	const FString EnemyNote = bHasRun ? FString() : FString::Printf(TEXT("   %sGegner %d"), HordeNote, Enemies);
+	DrawLine(FString::Printf(TEXT("%s   %s%s"), ClassName, ClassKeys, *EnemyNote), Margin, Margin + 24.0f, TextColor);
 
 	if (Hero->GetHurtFlash() > 0.0f)
 	{

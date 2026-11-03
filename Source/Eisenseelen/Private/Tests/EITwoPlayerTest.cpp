@@ -444,6 +444,7 @@ public:
 			FEIRunValues Short = GameMode->GetRun()->GetValues();
 			Short.BeaconHoldSeconds = 1.0f;
 			Short.RitualAltars = 0.0f;
+			Short.CampFactor = 0.0f;
 			GameMode->GetRun()->ApplyValues(Short);
 			GameMode->GetRun()->ResetRun();
 			for (FConstPlayerControllerIterator It = ServerWorld->GetPlayerControllerIterator(); It; ++It)

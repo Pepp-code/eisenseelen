@@ -36,6 +36,7 @@ CHEST_CLEAR_EDGE_M = 16
 CHEST_CLEAR_PLACE_M = 32
 CHEST_CLEAR_PAD_M = 18
 CHEST_CLEAR_COVER_M = 15
+CHEST_CLEAR_CAMP_M = 26
 CHEST_CLEAR_CHEST_M = 35
 # A new volume's brush is a cube of this size. Paths are only needed near the floor.
 VOLUME_BRUSH_M = 2
@@ -105,6 +106,14 @@ def add_cover(actors, layout):
     return taken
 
 
+def add_camps(actors, layout):
+    """The fixed places where enemies stand watch. The game fills them when a run begins."""
+    camp_class = unreal.load_class(None, "/Script/Eisenseelen.EIEnemyCamp")
+    for camp in layout["lager"]:
+        actor = spawn(actors, camp_class, location=(camp["x_m"] * CM_PER_M, camp["y_m"] * CM_PER_M, 0), label="Lager")
+        actor.set_editor_property("enemies", camp["gegner"])
+
+
 def add_chests(actors, layout, cover):
     """Out in the open, each with room for its fight. A run only uses some of them."""
     chest_class = unreal.load_class(None, "/Script/Eisenseelen.EIChest")
@@ -114,6 +123,7 @@ def add_chests(actors, layout, cover):
     keep_clear = [(point, CHEST_CLEAR_COVER_M) for point in cover]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PLACE_M) for p in layout["orte"] + layout["leuchtfeuer"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PAD_M) for p in layout["sprungfelder"]]
+    keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_CAMP_M) for p in layout["lager"]]
     keep_clear.append(((0, 0), CHEST_CLEAR_PLACE_M))
     placed = 0
     while placed < layout["truhen"]:
@@ -157,6 +167,7 @@ def main():
         add_place(actors, place, index)
         spawn(actors, altar_class, location=(place["x_m"] * CM_PER_M, place["y_m"] * CM_PER_M, 0), label="Altar")
     taken = add_cover(actors, layout)
+    add_camps(actors, layout)
     add_chests(actors, layout, taken)
     add_launch_pads(actors, layout["sprungfelder"])
 

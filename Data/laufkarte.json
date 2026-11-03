@@ -21,6 +21,26 @@
 		{ "x_m": 70, "y_m": -40, "turm_hoehe_m": 5 },
 		{ "x_m": -90, "y_m": 60, "turm_hoehe_m": 5 }
 	],
+	"lager": [
+		{ "x_m": 0, "y_m": 94, "gegner": 3 },
+		{ "x_m": 93, "y_m": 70, "gegner": 3 },
+		{ "x_m": 130, "y_m": 4, "gegner": 3 },
+		{ "x_m": 46, "y_m": -90, "gegner": 3 },
+		{ "x_m": -53, "y_m": -86, "gegner": 3 },
+		{ "x_m": -131, "y_m": -29, "gegner": 3 },
+		{ "x_m": -71, "y_m": 18, "gegner": 3 },
+		{ "x_m": 48, "y_m": 14, "gegner": 3 },
+		{ "x_m": -15, "y_m": 70, "gegner": 4 },
+		{ "x_m": -65, "y_m": 85, "gegner": 4 },
+		{ "x_m": 30, "y_m": 70, "gegner": 4 },
+		{ "x_m": -10, "y_m": -55, "gegner": 4 },
+		{ "x_m": 105, "y_m": -50, "gegner": 4 },
+		{ "x_m": -95, "y_m": -80, "gegner": 4 },
+		{ "x_m": 125, "y_m": 100, "gegner": 4 },
+		{ "x_m": 5, "y_m": -130, "gegner": 4 },
+		{ "x_m": 85, "y_m": -125, "gegner": 4 },
+		{ "x_m": -125, "y_m": 65, "gegner": 4 }
+	],
 	"truhen": 14,
 	"deckung_anzahl": 30,
 	"deckung_zufall": 7
