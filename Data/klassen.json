@@ -1,10 +1,14 @@
 {
 	"klingenwacht": {
 		"leben": 150,
-		"zauber_abklingzeit_faktor": 1.0
+		"zauber_abklingzeit_faktor": 1.0,
+		"mana": 0,
+		"mana_pro_s": 0
 	},
 	"arkanist": {
 		"leben": 90,
-		"zauber_abklingzeit_faktor": 0.8
+		"zauber_abklingzeit_faktor": 0.8,
+		"mana": 100,
+		"mana_pro_s": 20
 	}
 }

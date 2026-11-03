@@ -7,10 +7,11 @@
 class AEIHeroCharacter;
 
 UENUM()
-enum class EEIProjectileKind : uint8
+enum class EEICast : uint8
 {
 	Bolt,
-	Fireball
+	ChargedFireball,
+	SpellFireball
 };
 
 /** The numbers of one projectile from Data/waffen.json. */
@@ -19,7 +20,7 @@ struct FEIProjectileValues
 	float Damage = 40.0f;
 	float RadiusMeters = 1.5f;
 	float SpeedMetersPerSecond = 60.0f;
-	float CooldownSeconds = 0.5f;
+	float ManaCost = 10.0f;
 };
 
 struct EISENSEELEN_API FEICasterValues
@@ -27,14 +28,16 @@ struct EISENSEELEN_API FEICasterValues
 	FEIProjectileValues Bolt;
 	FEIProjectileValues Fireball;
 	float HoldForFireballSeconds = 0.4f;
+	float SpellCooldownSeconds = 6.0f;
 
 	FEICasterValues();
 	static bool LoadFromProjectFile(FEICasterValues& OutValues, FString& OutError);
 };
 
 /**
- * Fire magic. The arcanist's staff fires a bolt on a tap and a fireball on a hold, and both classes cast the fireball
- * with the spell key. The owner sees it at once, the server spawns the real projectile and checks the cooldowns.
+ * Fire magic. The arcanist's staff fires a bolt on a tap and a fireball on a hold, without any wait but for mana. Both
+ * classes also cast the fireball with the spell key, which needs no charge but has a cooldown. The owner sees it at
+ * once, the server spawns the real projectile and checks cooldown and mana.
  */
 UCLASS()
 class EISENSEELEN_API UEICasterComponent : public UActorComponent
@@ -54,18 +57,30 @@ public:
 	void Deactivate();
 
 	float GetChargeFraction() const;
-	float GetFireballCooldownFraction() const;
-	float GetFireballCooldownSeconds() const;
+	float GetSpellCooldownFraction() const;
+	float GetSpellCooldownSeconds() const;
+
+	/** The mana of the hero's class. It refills over time, and a class without mana pays nothing. */
+	float GetMana() const;
+	float GetMaxMana() const;
+	void SpendMana(float Amount);
+	void RefillMana();
+	bool CanAffordFireball() const;
+
+	/** Seconds of the flash left after a cast failed for lack of mana. For the HUD. */
+	float GetManaDeniedFlash() const { return ManaDeniedRemaining; }
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
 	UFUNCTION(Server, Reliable)
-	void ServerFire(EEIProjectileKind Kind, FVector_NetQuantize Target);
+	void ServerFire(EEICast Kind, FVector_NetQuantize Target);
 
 	AEIHeroCharacter* GetHero() const;
-	void FireAsOwner(EEIProjectileKind Kind);
-	void SpawnProjectile(EEIProjectileKind Kind, const FVector& Target);
+	const FEIProjectileValues& GetProjectile(EEICast Kind) const;
+	bool CanAfford(float Cost) const;
+	void FireAsOwner(EEICast Kind);
+	void SpawnProjectile(EEICast Kind, const FVector& Target);
 	FVector FindAimPoint() const;
 
 	FEICasterValues Values;
@@ -73,7 +88,10 @@ private:
 	bool bHolding = false;
 	double HoldStartedAt = 0.0;
 
-	// Each side keeps its own cooldowns: the owner to answer at once, the server to have the last word.
-	double BoltReadyAt = 0.0;
-	double FireballReadyAt = 0.0;
+	// Each side keeps its own cooldown and mana: the owner to answer at once, the server to have the last word.
+	double SpellReadyAt = 0.0;
+	float ManaAtStamp = 0.0f;
+	double ManaStampedAt = 0.0;
+
+	float ManaDeniedRemaining = 0.0f;
 };

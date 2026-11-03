@@ -41,7 +41,9 @@ bool FEIClassValues::LoadFromProjectFile(EEIHeroClass HeroClass, FEIClassValues&
 	}
 	FEIClassValues Loaded;
 	if (!FEIDataFile::ReadNumber(**Object, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
-		|| !FEIDataFile::ReadNumber(**Object, TEXT("zauber_abklingzeit_faktor"), 0.05, 10.0, Loaded.SpellCooldownFactor, OutError))
+		|| !FEIDataFile::ReadNumber(**Object, TEXT("zauber_abklingzeit_faktor"), 0.05, 10.0, Loaded.SpellCooldownFactor, OutError)
+		|| !FEIDataFile::ReadNumber(**Object, TEXT("mana"), 0.0, 100000.0, Loaded.Mana, OutError)
+		|| !FEIDataFile::ReadNumber(**Object, TEXT("mana_pro_s"), 0.0, 100000.0, Loaded.ManaPerSecond, OutError))
 	{
 		return false;
 	}
@@ -88,6 +90,7 @@ void AEIHeroCharacter::BeginPlay()
 	Sword->LoadValues();
 	Caster->LoadValues();
 	LoadClassValues();
+	Caster->RefillMana();
 	if (HasAuthority())
 	{
 		Health->Reset(ClassValues.Life);
@@ -132,6 +135,7 @@ void AEIHeroCharacter::SetHeroClass(EEIHeroClass NewClass)
 void AEIHeroCharacter::OnRep_HeroClass()
 {
 	LoadClassValues();
+	Caster->RefillMana();
 	Sword->Deactivate();
 	Caster->Deactivate();
 	ApplyClassToView();

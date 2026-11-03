@@ -2,6 +2,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
+#include "EICasterComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIProjectile.h"
@@ -199,7 +200,8 @@ private:
 };
 
 /**
- * The guest fights: a sword swing and a staff bolt must count on the server and show up on the guest's machine.
+ * The guest fights: a sword swing and a staff bolt must count on the server and show up on the guest's machine, and
+ * the server has the last word on the guest's mana.
  */
 class FEITwoPlayerCombatCommand : public IAutomationLatentCommand
 {
@@ -299,12 +301,46 @@ public:
 			EnterStep(7);
 			return false;
 		case 7:
-			if (Now - StepAt < 0.8)
+		{
+			if (Now - StepAt < 0.1)
+			{
+				return false;
+			}
+			const UEICasterComponent* GuestCaster = Session.ClientHero->GetCaster();
+			const UEICasterComponent* ServerCaster = Session.ServerCopyOfClientHero->GetCaster();
+			Test->AddInfo(FString::Printf(TEXT("After the bolt the guest has %.1f mana, the server says %.1f"), GuestCaster->GetMana(), ServerCaster->GetMana()));
+			Test->TestTrue(TEXT("The bolt costs the guest mana"), GuestCaster->GetMana() < GuestCaster->GetMaxMana());
+			Test->TestNearlyEqual(TEXT("Guest and server agree on the mana"), GuestCaster->GetMana(), ServerCaster->GetMana(), 3.0f);
+			EnterStep(8);
+			return false;
+		}
+		case 8:
+			if (Now - StepAt < 0.7)
 			{
 				return false;
 			}
 			Test->AddInfo(FString::Printf(TEXT("The guest's bolt: the server counts %d hits for %.0f damage"), ServerDummy->GetHitCount(), ServerDummy->GetLastDamage()));
 			Test->TestEqual(TEXT("The guest's bolt counts on the server"), ServerDummy->GetHitCount(), 1);
+			ServerDummy->ResetHits();
+			// Only the server's mana runs out, so the guest still fires and the server has to refuse.
+			Session.ServerCopyOfClientHero->GetCaster()->SpendMana(Session.ServerCopyOfClientHero->GetCaster()->GetMaxMana());
+			EISendTestKey(Session.ClientPlayer, EKeys::LeftMouseButton, IE_Pressed);
+			EnterStep(9);
+			return false;
+		case 9:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::LeftMouseButton, IE_Released);
+			EnterStep(10);
+			return false;
+		case 10:
+			if (Now - StepAt < 0.5)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("The server refuses a bolt without mana"), ServerDummy->GetHitCount(), 0);
 			return true;
 		default:
 			return true;

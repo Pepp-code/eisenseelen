@@ -31,14 +31,15 @@
 			"schaden": 40,
 			"radius_m": 1.5,
 			"tempo_m_pro_s": 60,
-			"abklingzeit_s": 0.5
+			"mana_kosten": 10
 		},
 		"feuerball": {
 			"schaden": 120,
 			"radius_m": 4,
 			"tempo_m_pro_s": 30,
-			"abklingzeit_s": 6
+			"mana_kosten": 40
 		},
-		"halten_fuer_feuerball_s": 0.4
+		"halten_fuer_feuerball_s": 0.4,
+		"abklingzeit_taste_q_s": 6
 	}
 }

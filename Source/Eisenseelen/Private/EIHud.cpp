@@ -20,6 +20,8 @@ namespace
 	const FLinearColor DodgeColor(0.3f, 0.7f, 1.0f);
 	const FLinearColor ChargeColor(1.0f, 0.7f, 0.2f);
 	const FLinearColor SpellColor(1.0f, 0.42f, 0.1f);
+	const FLinearColor ManaColor(0.2f, 0.4f, 1.0f);
+	const FLinearColor NoManaColor(0.9f, 0.1f, 0.1f);
 	const FLinearColor BarBack(0.0f, 0.0f, 0.0f, 0.55f);
 	constexpr float Margin = 24.0f;
 	constexpr float BarWidth = 260.0f;
@@ -98,13 +100,25 @@ void AEIHud::DrawHUD()
 	const UEICasterComponent* Caster = Hero->GetCaster();
 	const float SpellX = Margin + BarWidth + Margin;
 	const float SpellY = LifeY - 56.0f;
-	DrawBar(SpellX, SpellY, BarWidth / 2.0f, BarHeight, 1.0f - Caster->GetFireballCooldownFraction(), SpellColor);
-	DrawLine(TEXT("Feuerball"), SpellX, SpellY - 24.0f, TextColor);
+	DrawBar(SpellX, SpellY, BarWidth / 2.0f, BarHeight, 1.0f - Caster->GetSpellCooldownFraction(), SpellColor);
+	DrawLine(TEXT("Q Feuerball"), SpellX, SpellY - 24.0f, TextColor);
 
-	const float Charge = Hero->GetHeroClass() == EEIHeroClass::Arcanist ? Caster->GetChargeFraction() : Hero->GetSword()->GetChargeFraction();
+	if (Caster->GetMaxMana() > 0.0f)
+	{
+		DrawBar(Margin, SpellY, BarWidth, BarHeight, Caster->GetMana() / Caster->GetMaxMana(), ManaColor);
+		if (Caster->GetManaDeniedFlash() > 0.0f)
+		{
+			DrawRect(NoManaColor, Margin, SpellY, BarWidth, BarHeight);
+		}
+		DrawLine(FString::Printf(TEXT("Mana %.0f / %.0f"), Caster->GetMana(), Caster->GetMaxMana()), Margin, SpellY - 24.0f, TextColor);
+	}
+
+	const bool bArcanist = Hero->GetHeroClass() == EEIHeroClass::Arcanist;
+	const float Charge = bArcanist ? Caster->GetChargeFraction() : Hero->GetSword()->GetChargeFraction();
 	if (Charge > 0.25f)
 	{
-		DrawBar(Width / 2.0f - 60.0f, Height / 2.0f + 40.0f, 120.0f, 8.0f, Charge, Charge >= 1.0f ? FLinearColor::White : ChargeColor);
+		const FLinearColor ChargeBarColor = bArcanist && !Caster->CanAffordFireball() ? NoManaColor : (Charge >= 1.0f ? FLinearColor::White : ChargeColor);
+		DrawBar(Width / 2.0f - 60.0f, Height / 2.0f + 40.0f, 120.0f, 8.0f, Charge, ChargeBarColor);
 	}
 }
 

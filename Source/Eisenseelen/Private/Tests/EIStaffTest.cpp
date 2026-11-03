@@ -58,6 +58,22 @@ namespace
 	{
 		return WaitUntil(TEXT("the projectile bursts"), 3.0, [](const FEIPlayContext& Context) { return CountProjectiles(Context) == 0; });
 	}
+
+	FEIPlayStep WaitForFullMana()
+	{
+		return WaitUntil(TEXT("the mana is back"), 8.0, [](const FEIPlayContext& Context)
+		{
+			const UEICasterComponent* Caster = Context.Hero->GetCaster();
+			return Caster->GetMana() >= Caster->GetMaxMana();
+		});
+	}
+
+	void AddChargedRelease(TArray<FEIPlayStep>& Steps)
+	{
+		Steps.Add(Press(EKeys::LeftMouseButton));
+		Steps.Add(WaitUntil(TEXT("the staff charges"), 2.0, [](const FEIPlayContext& Context) { return Context.Hero->GetCaster()->GetChargeFraction() >= 1.0f; }));
+		Steps.Add(Release(EKeys::LeftMouseButton));
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -82,57 +98,92 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	}));
 	Steps.Add(Wait(0.3));
 
-	// A tap fires one bolt, and the bolt does its damage at the target.
+	// A tap fires one bolt and costs its mana.
 	AddTap(Steps, EKeys::LeftMouseButton);
 	Steps.Add(WaitUntil(TEXT("a bolt flies"), 1.0, [](const FEIPlayContext& Context) { return CountProjectiles(Context) == 1; }));
-
-	// During the cooldown a second tap fires nothing.
-	AddTap(Steps, EKeys::LeftMouseButton);
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("The staff waits for its cooldown"), CountProjectiles(Context), 1);
+		const UEICasterComponent* Caster = Context.Hero->GetCaster();
+		const float Spent = Caster->GetMaxMana() - Caster->GetMana();
+		Context.Test->AddInfo(FString::Printf(TEXT("A bolt costs %.1f of %.0f mana, %.0f minus what came back"), Spent, Caster->GetMaxMana(), Caster->GetValues().Bolt.ManaCost));
+		Context.Test->TestTrue(TEXT("A bolt costs mana"), Spent > Caster->GetValues().Bolt.ManaCost * 0.5f);
 	}));
-	Steps.Add(WaitForNoProjectiles());
+
+	// The next tap fires at once, and each bolt does its damage at the target.
+	AddTap(Steps, EKeys::LeftMouseButton);
+	Steps.Add(WaitUntil(TEXT("both bolts burst"), 2.0, [](const FEIPlayContext& Context) { return SortedDummies(Context.World)[1]->GetHitCount() == 2; }));
 	Steps.Add(Do([LifeBefore](const FEIPlayContext& Context)
 	{
 		const AEITrainingDummy* Middle = SortedDummies(Context.World)[1];
 		const float Expected = Context.Hero->GetCaster()->GetValues().Bolt.Damage;
-		Context.Test->AddInfo(FString::Printf(TEXT("A bolt from 1000 cm did %.0f damage, expected %.0f"), Middle->GetLastDamage(), Expected));
+		Context.Test->AddInfo(FString::Printf(TEXT("Two quick bolts from 1000 cm: %d hits for %.0f damage each, expected %.0f"), Middle->GetHitCount(), Middle->GetLastDamage(), Expected));
 		Context.Test->TestEqual(TEXT("A bolt does its damage"), Middle->GetLastDamage(), Expected);
 		Context.Test->TestEqual(TEXT("Fire does not hurt heroes"), Context.Hero->GetHealth()->GetHealth(), *LifeBefore);
 	}));
-	Steps.Add(Wait(0.6));
+	Steps.Add(WaitForNoProjectiles());
+	Steps.Add(WaitForFullMana());
 
-	// A hold fires a fireball, whose wide burst reaches all dummies. Then it cools down.
+	// The reported case: fully charged fireballs right after each other. The wide burst reaches all dummies.
 	Steps.Add(Do([](const FEIPlayContext& Context) { AimAtMiddleDummy(Context); }));
-	Steps.Add(Press(EKeys::LeftMouseButton));
-	Steps.Add(WaitUntil(TEXT("the staff charges"), 2.0, [](const FEIPlayContext& Context) { return Context.Hero->GetCaster()->GetChargeFraction() >= 1.0f; }));
-	Steps.Add(Release(EKeys::LeftMouseButton));
+	AddChargedRelease(Steps);
 	Steps.Add(WaitUntil(TEXT("a fireball flies"), 1.0, [](const FEIPlayContext& Context) { return CountProjectiles(Context) == 1; }));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		const float Cooldown = Context.Hero->GetCaster()->GetFireballCooldownSeconds();
-		Context.Test->AddInfo(FString::Printf(TEXT("The arcanist's fireball cools down in %.1f s"), Cooldown));
-		Context.Test->TestTrue(TEXT("The fireball starts its cooldown"), Context.Hero->GetCaster()->GetFireballCooldownFraction() > 0.5f);
-		Context.Test->TestTrue(TEXT("The arcanist casts faster"), Cooldown < Context.Hero->GetCaster()->GetValues().Fireball.CooldownSeconds);
-	}));
+	AddChargedRelease(Steps);
+	Steps.Add(WaitUntil(TEXT("both fireballs burst"), 3.0, [](const FEIPlayContext& Context) { return SortedDummies(Context.World)[1]->GetHitCount() == 2; }));
 	Steps.Add(WaitForNoProjectiles());
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		const float Expected = Context.Hero->GetCaster()->GetValues().Fireball.Damage;
 		for (const AEITrainingDummy* Dummy : SortedDummies(Context.World))
 		{
-			Context.Test->TestEqual(TEXT("The fireball's burst reaches every dummy"), Dummy->GetLastDamage(), Expected);
+			Context.Test->TestEqual(TEXT("Both fireballs reach every dummy"), Dummy->GetHitCount(), 2);
+			Context.Test->TestEqual(TEXT("A fireball does its damage"), Dummy->GetLastDamage(), Expected);
 		}
+		Context.Test->TestEqual(TEXT("Charging starts no cooldown"), Context.Hero->GetCaster()->GetSpellCooldownFraction(), 0.0f);
 	}));
 
-	// Q during the cooldown does nothing.
+	// Without enough mana nothing fires, and the HUD gets told so.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEICasterComponent* Caster = Context.Hero->GetCaster();
+		Caster->SpendMana(Caster->GetMana());
+	}));
+	AddChargedRelease(Steps);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEICasterComponent* Caster = Context.Hero->GetCaster();
+		Context.Test->TestEqual(TEXT("No fireball without mana"), CountProjectiles(Context), 0);
+		Context.Test->TestTrue(TEXT("The failed fireball shows"), Caster->GetManaDeniedFlash() > 0.0f);
+		Caster->SpendMana(Caster->GetMana());
+	}));
+	AddTap(Steps, EKeys::LeftMouseButton);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("No bolt without mana"), CountProjectiles(Context), 0);
+	}));
+
+	// Then the mana comes back by itself.
+	Steps.Add(WaitForFullMana());
+
+	// Q needs no charge, but it costs mana and has a cooldown.
+	AddTap(Steps, EKeys::Q);
+	Steps.Add(WaitUntil(TEXT("Q casts"), 1.0, [](const FEIPlayContext& Context) { return CountProjectiles(Context) == 1; }));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const UEICasterComponent* Caster = Context.Hero->GetCaster();
+		Context.Test->AddInfo(FString::Printf(TEXT("The arcanist's Q cools down in %.1f s"), Caster->GetSpellCooldownSeconds()));
+		Context.Test->TestTrue(TEXT("Q starts its cooldown"), Caster->GetSpellCooldownFraction() > 0.5f);
+		Context.Test->TestTrue(TEXT("The arcanist casts faster"), Caster->GetSpellCooldownSeconds() < Caster->GetValues().SpellCooldownSeconds);
+		Context.Test->TestTrue(TEXT("Q costs mana"), Caster->GetMaxMana() - Caster->GetMana() > Caster->GetValues().Fireball.ManaCost * 0.5f);
+	}));
 	AddTap(Steps, EKeys::Q);
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("Q waits for the cooldown"), CountProjectiles(Context), 0);
+		Context.Test->TestEqual(TEXT("Q waits for its cooldown"), CountProjectiles(Context), 1);
 	}));
+	Steps.Add(WaitForNoProjectiles());
 
 	// One bolt kills a runner.
 	Steps.Add(Wait(0.6));
@@ -156,6 +207,7 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestEqual(TEXT("The class survives a restart"), Context.Hero->GetHeroClass(), EEIHeroClass::Arcanist);
+		Context.Test->TestEqual(TEXT("A fresh arcanist has full mana"), Context.Hero->GetCaster()->GetMana(), Context.Hero->GetCaster()->GetMaxMana());
 	}));
 	AddTap(Steps, EKeys::C);
 	Steps.Add(Wait(0.1));
@@ -174,7 +226,9 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	Steps.Add(WaitUntil(TEXT("the blade warden casts"), 1.0, [](const FEIPlayContext& Context) { return CountProjectiles(Context) == 1; }));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("The blade warden casts at the normal pace"), Context.Hero->GetCaster()->GetFireballCooldownSeconds(), Context.Hero->GetCaster()->GetValues().Fireball.CooldownSeconds);
+		const UEICasterComponent* Caster = Context.Hero->GetCaster();
+		Context.Test->TestEqual(TEXT("The blade warden casts at the normal pace"), Caster->GetSpellCooldownSeconds(), Caster->GetValues().SpellCooldownSeconds);
+		Context.Test->TestEqual(TEXT("The blade warden has no mana to pay"), Caster->GetMaxMana(), 0.0f);
 	}));
 	return RunInArena(this, MoveTemp(Steps));
 }

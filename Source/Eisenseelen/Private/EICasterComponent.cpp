@@ -13,7 +13,8 @@ namespace
 	constexpr float AimRangeCm = 20000.0f;
 	constexpr float MuzzleForwardCm = 60.0f;
 	// The owner's clock runs slightly ahead of the server's, so the server allows a little early firing.
-	constexpr double ServerCooldownTolerance = 0.1;
+	constexpr double ServerClockTolerance = 0.1;
+	constexpr float ManaDeniedFlashSeconds = 0.3f;
 
 	bool ReadProjectile(const FJsonObject& Staff, const TCHAR* Name, FEIProjectileValues& Out, FString& OutError)
 	{
@@ -26,7 +27,7 @@ namespace
 		return FEIDataFile::ReadNumber(**Projectile, TEXT("schaden"), 0.0, 10000.0, Out.Damage, OutError)
 			&& FEIDataFile::ReadNumber(**Projectile, TEXT("radius_m"), 0.1, 50.0, Out.RadiusMeters, OutError)
 			&& FEIDataFile::ReadNumber(**Projectile, TEXT("tempo_m_pro_s"), 1.0, 500.0, Out.SpeedMetersPerSecond, OutError)
-			&& FEIDataFile::ReadNumber(**Projectile, TEXT("abklingzeit_s"), 0.0, 120.0, Out.CooldownSeconds, OutError);
+			&& FEIDataFile::ReadNumber(**Projectile, TEXT("mana_kosten"), 0.0, 10000.0, Out.ManaCost, OutError);
 	}
 }
 
@@ -35,7 +36,7 @@ FEICasterValues::FEICasterValues()
 	Fireball.Damage = 120.0f;
 	Fireball.RadiusMeters = 4.0f;
 	Fireball.SpeedMetersPerSecond = 30.0f;
-	Fireball.CooldownSeconds = 6.0f;
+	Fireball.ManaCost = 40.0f;
 }
 
 bool FEICasterValues::LoadFromProjectFile(FEICasterValues& OutValues, FString& OutError)
@@ -54,7 +55,8 @@ bool FEICasterValues::LoadFromProjectFile(FEICasterValues& OutValues, FString& O
 	FEICasterValues Loaded;
 	if (!ReadProjectile(**Staff, TEXT("schuss"), Loaded.Bolt, OutError)
 		|| !ReadProjectile(**Staff, TEXT("feuerball"), Loaded.Fireball, OutError)
-		|| !FEIDataFile::ReadNumber(**Staff, TEXT("halten_fuer_feuerball_s"), 0.05, 5.0, Loaded.HoldForFireballSeconds, OutError))
+		|| !FEIDataFile::ReadNumber(**Staff, TEXT("halten_fuer_feuerball_s"), 0.05, 5.0, Loaded.HoldForFireballSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(**Staff, TEXT("abklingzeit_taste_q_s"), 0.0, 120.0, Loaded.SpellCooldownSeconds, OutError))
 	{
 		return false;
 	}
@@ -91,15 +93,53 @@ float UEICasterComponent::GetChargeFraction() const
 	return FMath::Clamp(static_cast<float>(GetWorld()->GetTimeSeconds() - HoldStartedAt) / Values.HoldForFireballSeconds, 0.0f, 1.0f);
 }
 
-float UEICasterComponent::GetFireballCooldownSeconds() const
+float UEICasterComponent::GetSpellCooldownSeconds() const
 {
-	return Values.Fireball.CooldownSeconds * GetHero()->GetClassValues().SpellCooldownFactor;
+	return Values.SpellCooldownSeconds * GetHero()->GetClassValues().SpellCooldownFactor;
 }
 
-float UEICasterComponent::GetFireballCooldownFraction() const
+float UEICasterComponent::GetSpellCooldownFraction() const
 {
-	const float Left = static_cast<float>(FireballReadyAt - GetWorld()->GetTimeSeconds());
-	return FMath::Clamp(Left / FMath::Max(GetFireballCooldownSeconds(), KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+	const float Left = static_cast<float>(SpellReadyAt - GetWorld()->GetTimeSeconds());
+	return FMath::Clamp(Left / FMath::Max(GetSpellCooldownSeconds(), KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+}
+
+float UEICasterComponent::GetMaxMana() const
+{
+	return GetHero()->GetClassValues().Mana;
+}
+
+float UEICasterComponent::GetMana() const
+{
+	const float Regained = static_cast<float>(GetWorld()->GetTimeSeconds() - ManaStampedAt) * GetHero()->GetClassValues().ManaPerSecond;
+	return FMath::Min(ManaAtStamp + Regained, GetMaxMana());
+}
+
+void UEICasterComponent::SpendMana(float Amount)
+{
+	ManaAtStamp = FMath::Max(0.0f, GetMana() - Amount);
+	ManaStampedAt = GetWorld()->GetTimeSeconds();
+}
+
+void UEICasterComponent::RefillMana()
+{
+	ManaAtStamp = GetMaxMana();
+	ManaStampedAt = GetWorld()->GetTimeSeconds();
+}
+
+bool UEICasterComponent::CanAfford(float Cost) const
+{
+	return GetMaxMana() <= 0.0f || GetMana() >= Cost;
+}
+
+bool UEICasterComponent::CanAffordFireball() const
+{
+	return CanAfford(Values.Fireball.ManaCost);
+}
+
+const FEIProjectileValues& UEICasterComponent::GetProjectile(EEICast Kind) const
+{
+	return Kind == EEICast::Bolt ? Values.Bolt : Values.Fireball;
 }
 
 void UEICasterComponent::PressStaff()
@@ -120,21 +160,14 @@ void UEICasterComponent::ReleaseStaff()
 	{
 		GetHero()->GetViewModel()->ClearHold();
 	}
-	if (bCharged)
-	{
-		CastFireball();
-	}
-	else if (GetWorld()->GetTimeSeconds() >= BoltReadyAt)
-	{
-		FireAsOwner(EEIProjectileKind::Bolt);
-	}
+	FireAsOwner(bCharged ? EEICast::ChargedFireball : EEICast::Bolt);
 }
 
 void UEICasterComponent::CastFireball()
 {
-	if (GetWorld()->GetTimeSeconds() >= FireballReadyAt)
+	if (GetWorld()->GetTimeSeconds() >= SpellReadyAt)
 	{
-		FireAsOwner(EEIProjectileKind::Fireball);
+		FireAsOwner(EEICast::SpellFireball);
 	}
 }
 
@@ -160,20 +193,22 @@ FVector UEICasterComponent::FindAimPoint() const
 	return GetWorld()->LineTraceSingleByObjectType(Hit, Eye, End, Objects, Query) ? Hit.ImpactPoint : End;
 }
 
-void UEICasterComponent::FireAsOwner(EEIProjectileKind Kind)
+void UEICasterComponent::FireAsOwner(EEICast Kind)
 {
-	const double Now = GetWorld()->GetTimeSeconds();
+	const float Cost = GetProjectile(Kind).ManaCost;
+	if (!CanAfford(Cost))
+	{
+		ManaDeniedRemaining = ManaDeniedFlashSeconds;
+		return;
+	}
+	SpendMana(Cost);
+	if (Kind == EEICast::SpellFireball)
+	{
+		SpellReadyAt = GetWorld()->GetTimeSeconds() + GetSpellCooldownSeconds();
+	}
 	const FVector Target = FindAimPoint();
 	AEIHeroCharacter* Hero = GetHero();
-	const bool bFireball = Kind == EEIProjectileKind::Fireball;
-	if (bFireball)
-	{
-		FireballReadyAt = Now + GetFireballCooldownSeconds();
-	}
-	else
-	{
-		BoltReadyAt = Now + Values.Bolt.CooldownSeconds;
-	}
+	const bool bFireball = Kind != EEICast::Bolt;
 	EIVisuals::PlaySound2D(this, bFireball ? TEXT("Feuerball") : TEXT("Feuerstab"));
 	if (Hero->GetViewModel() != nullptr && Hero->GetHeroClass() == EEIHeroClass::Arcanist)
 	{
@@ -191,33 +226,33 @@ void UEICasterComponent::FireAsOwner(EEIProjectileKind Kind)
 	}
 }
 
-void UEICasterComponent::ServerFire_Implementation(EEIProjectileKind Kind, FVector_NetQuantize Target)
+void UEICasterComponent::ServerFire_Implementation(EEICast Kind, FVector_NetQuantize Target)
 {
 	const double Now = GetWorld()->GetTimeSeconds();
-	if (GetHero()->IsDead())
+	const AEIHeroCharacter* Hero = GetHero();
+	const float Cost = GetProjectile(Kind).ManaCost;
+	const float ClockAllowance = static_cast<float>(ServerClockTolerance) * Hero->GetClassValues().ManaPerSecond;
+	if (Hero->IsDead() || !CanAfford(Cost - ClockAllowance))
 	{
 		return;
 	}
-	if (Kind == EEIProjectileKind::Fireball)
+	if (Kind == EEICast::SpellFireball)
 	{
-		if (Now + ServerCooldownTolerance < FireballReadyAt)
+		if (Now + ServerClockTolerance < SpellReadyAt)
 		{
 			return;
 		}
-		FireballReadyAt = Now + GetFireballCooldownSeconds();
+		SpellReadyAt = Now + GetSpellCooldownSeconds();
 	}
-	else
+	else if (Hero->GetHeroClass() != EEIHeroClass::Arcanist)
 	{
-		if (GetHero()->GetHeroClass() != EEIHeroClass::Arcanist || Now + ServerCooldownTolerance < BoltReadyAt)
-		{
-			return;
-		}
-		BoltReadyAt = Now + Values.Bolt.CooldownSeconds;
+		return;
 	}
+	SpendMana(Cost);
 	SpawnProjectile(Kind, Target);
 }
 
-void UEICasterComponent::SpawnProjectile(EEIProjectileKind Kind, const FVector& Target)
+void UEICasterComponent::SpawnProjectile(EEICast Kind, const FVector& Target)
 {
 	AEIHeroCharacter* Hero = GetHero();
 	const FVector Eye = Hero->GetPawnViewLocation();
@@ -227,7 +262,7 @@ void UEICasterComponent::SpawnProjectile(EEIProjectileKind Kind, const FVector& 
 	AEIProjectile* Projectile = GetWorld()->SpawnActorDeferred<AEIProjectile>(AEIProjectile::StaticClass(), Spawn, Hero, Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (Projectile != nullptr)
 	{
-		Projectile->Configure(Kind == EEIProjectileKind::Fireball ? Values.Fireball : Values.Bolt, Kind == EEIProjectileKind::Fireball);
+		Projectile->Configure(GetProjectile(Kind), Kind != EEICast::Bolt);
 		Projectile->FinishSpawning(Spawn);
 	}
 }
@@ -235,6 +270,7 @@ void UEICasterComponent::SpawnProjectile(EEIProjectileKind Kind, const FVector& 
 void UEICasterComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	ManaDeniedRemaining = FMath::Max(0.0f, ManaDeniedRemaining - DeltaTime);
 	if (bHolding && GetHero()->GetViewModel() != nullptr)
 	{
 		GetHero()->GetViewModel()->HoldPose(TEXT("stab_laden"), GetChargeFraction());

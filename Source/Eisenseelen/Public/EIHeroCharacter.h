@@ -25,6 +25,8 @@ struct EISENSEELEN_API FEIClassValues
 {
 	float Life = 150.0f;
 	float SpellCooldownFactor = 1.0f;
+	float Mana = 0.0f;
+	float ManaPerSecond = 0.0f;
 
 	static bool LoadFromProjectFile(EEIHeroClass HeroClass, FEIClassValues& OutValues, FString& OutError);
 };
