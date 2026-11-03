@@ -1,10 +1,10 @@
 {
 	"lager_faktor": 1,
 	"lager_radius_m": 3,
+	"lager_nachschub_ab_abstand_m": 40,
 	"truhen_pro_lauf": 5,
 	"truhe_reichweite_m": 3,
 	"truhe_zone_m": 10,
-	"truhe_waechter": 8,
 	"truhe_waechter_abstand_m": 6,
 	"ritual_altare": 3,
 	"altar_halten_s": 30,
@@ -16,6 +16,5 @@
 	"barke_abflug_tempo_m_pro_s": 6,
 	"verderbnis_alle_s": 120,
 	"verderbnis_stufen": 6,
-	"verderbnis_bedrohung_je_stufe": 0.12,
 	"verderbnis_gegner_staerke_je_stufe": 0.1
 }

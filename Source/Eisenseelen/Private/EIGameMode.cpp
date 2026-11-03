@@ -44,6 +44,7 @@ void AEIGameMode::ToggleHorde()
 void AEIGameMode::RestartRun()
 {
 	Horde->SetHordeActive(false);
+	Horde->SetRemovingLeftBehind(false);
 	GetGameState<AEIGameState>()->SetHordeActive(false);
 	Horde->RemoveAllEnemies();
 	Horde->LoadValues();

@@ -1,6 +1,7 @@
 #include "EIEnemyCamp.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "EIEnemy.h"
 #include "EIVisuals.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -30,4 +31,23 @@ void AEIEnemyCamp::BeginPlay()
 {
 	Super::BeginPlay();
 	EIVisuals::SetColor(Ashes, AshesColor);
+}
+
+void AEIEnemyCamp::SetMembers(const TArray<AEIEnemy*>& Enemies)
+{
+	Members.Reset();
+	for (AEIEnemy* Enemy : Enemies)
+	{
+		Members.Add(Enemy);
+	}
+}
+
+int32 AEIEnemyCamp::CountMembers() const
+{
+	int32 Count = 0;
+	for (const TWeakObjectPtr<AEIEnemy>& Member : Members)
+	{
+		Count += Member.IsValid() && !Member->IsDead() ? 1 : 0;
+	}
+	return Count;
 }

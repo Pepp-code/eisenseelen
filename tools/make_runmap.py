@@ -111,7 +111,7 @@ def add_camps(actors, layout):
     camp_class = unreal.load_class(None, "/Script/Eisenseelen.EIEnemyCamp")
     for camp in layout["lager"]:
         actor = spawn(actors, camp_class, location=(camp["x_m"] * CM_PER_M, camp["y_m"] * CM_PER_M, 0), label="Lager")
-        actor.set_editor_property("enemies", camp["gegner"])
+        actor.set_editor_property("start_size", camp["groesse"])
 
 
 def add_chests(actors, layout, cover):

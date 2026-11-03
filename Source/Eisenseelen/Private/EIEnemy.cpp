@@ -2,6 +2,7 @@
 
 #include "AIController.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
@@ -11,6 +12,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -22,6 +24,19 @@ namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
 	const FLinearColor BoneColor(0.32f, 0.31f, 0.28f);
+	const FLinearColor ThrowerColor(0.2f, 0.22f, 0.34f);
+	const FLinearColor ShieldBearerColor(0.33f, 0.22f, 0.14f);
+	const FLinearColor ColossusColor(0.22f, 0.07f, 0.07f);
+	const FLinearColor ShieldColor(0.5f, 0.45f, 0.35f);
+	const FVector ShieldPlace(48.0f, 0.0f, 0.0f);
+	const FVector ShieldSize(0.12f, 0.95f, 1.5f);
+	const FVector HeldBonePlace(30.0f, 30.0f, 50.0f);
+	const FVector HeldBoneSize(0.1f, 0.1f, 0.6f);
+	constexpr float ThrowFromForwardCm = 60.0f;
+	constexpr float ThrownBoneLifeSeconds = 3.0f;
+	constexpr float ThrownBoneRadiusCm = 12.0f;
+	const FVector ThrownBoneSize(0.45f, 0.1f, 0.1f);
+	constexpr float ThrownBoneGlow = 1.5f;
 	const FLinearColor WarningColor(1.0f, 0.12f, 0.04f);
 	const FLinearColor HurtColor(1.0f, 0.9f, 0.7f);
 	const FLinearColor StaggerColor(0.75f, 0.7f, 0.2f);
@@ -48,33 +63,53 @@ namespace
 	constexpr float DebrisSpeedCm = 450.0f;
 }
 
-bool FEIEnemyValues::LoadFromProjectFile(FEIEnemyValues& OutValues, FString& OutError)
+const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind)
+{
+	switch (Kind)
+	{
+	case EEIEnemyKind::Thrower:
+		return TEXT("knochenwerfer");
+	case EEIEnemyKind::ShieldBearer:
+		return TEXT("schildtraeger");
+	case EEIEnemyKind::Colossus:
+		return TEXT("kettenkoloss");
+	default:
+		return TEXT("knochenlaeufer");
+	}
+}
+
+bool FEIEnemyValues::LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutValues, FString& OutError)
 {
 	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("gegner.json"), OutError);
-	const TSharedPtr<FJsonObject>* Runner = nullptr;
+	const TSharedPtr<FJsonObject>* Section = nullptr;
 	if (!Root.IsValid())
 	{
 		return false;
 	}
-	if (!Root->TryGetObjectField(TEXT("knochenlaeufer"), Runner))
+	if (!Root->TryGetObjectField(EIEnemyKindKey(Kind), Section))
 	{
-		OutError = TEXT("Der Abschnitt knochenlaeufer fehlt.");
+		OutError = FString::Printf(TEXT("Der Abschnitt %s fehlt."), EIEnemyKindKey(Kind));
 		return false;
 	}
 	FEIEnemyValues Loaded;
-	if (!FEIDataFile::ReadNumber(**Runner, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("bedrohung"), 0.0, 1000.0, Loaded.Threat, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("tempo_m_pro_s"), 0.1, 30.0, Loaded.SpeedMetersPerSecond, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("schaden"), 0.0, 10000.0, Loaded.Damage, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("angriff_ab_abstand_m"), 0.5, 20.0, Loaded.AttackFromMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("ausholen_s"), 0.0, 10.0, Loaded.WindupSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("trefferzone_m"), 0.5, 20.0, Loaded.HitZoneMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("erholung_s"), 0.0, 10.0, Loaded.RecoverSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("taumeln_faktor_schwerer_hieb_0_bis_1"), 0.0, 1.0, Loaded.HeavyHitStaggerFactor, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("sicht_m"), 1.0, 500.0, Loaded.SightMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("alarm_umkreis_m"), 0.0, 500.0, Loaded.AlarmMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("aufgeben_m"), 1.0, 1000.0, Loaded.GiveUpMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Runner, TEXT("wach_mindestens_s"), 0.0, 600.0, Loaded.StayAwakeSeconds, OutError))
+	if (!FEIDataFile::ReadNumber(**Section, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("bedrohung"), 0.0, 1000.0, Loaded.Threat, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("tempo_m_pro_s"), 0.1, 30.0, Loaded.SpeedMetersPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("schaden"), 0.0, 10000.0, Loaded.Damage, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("angriff_ab_abstand_m"), 0.5, 20.0, Loaded.AttackFromMeters, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("ausholen_s"), 0.0, 10.0, Loaded.WindupSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("trefferzone_m"), 0.5, 20.0, Loaded.HitZoneMeters, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("erholung_s"), 0.0, 10.0, Loaded.RecoverSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("taumeln_faktor_schwerer_hieb_0_bis_1"), 0.0, 1.0, Loaded.HeavyHitStaggerFactor, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("sicht_m"), 1.0, 500.0, Loaded.SightMeters, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("alarm_umkreis_m"), 0.0, 500.0, Loaded.AlarmMeters, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("aufgeben_m"), 1.0, 1000.0, Loaded.GiveUpMeters, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("wach_mindestens_s"), 0.0, 600.0, Loaded.StayAwakeSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("groesse_faktor"), 0.2, 10.0, Loaded.Scale, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("drehtempo_grad_pro_s"), 1.0, 3600.0, Loaded.TurnDegreesPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("schild_schaden_faktor_0_bis_1"), 0.0, 1.0, Loaded.ShieldDamageFactor, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("schild_winkel_grad"), 0.0, 360.0, Loaded.ShieldAngleDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(**Section, TEXT("wurf_tempo_m_pro_s"), 0.0, 200.0, Loaded.ThrowSpeedMetersPerSecond, OutError))
 	{
 		return false;
 	}
@@ -99,6 +134,7 @@ AEIEnemy::AEIEnemy()
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
 
 	Body = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Body"));
 	Body->SetupAttachment(GetCapsuleComponent());
@@ -114,6 +150,12 @@ AEIEnemy::AEIEnemy()
 	Head->SetRelativeLocation(FVector(0.0f, 0.0f, BodyHeight + HeadAboveBody));
 	Head->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	Held = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Held"));
+	Held->SetupAttachment(GetCapsuleComponent());
+	Held->SetStaticMesh(Cube.Object);
+	Held->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Held->SetVisibility(false);
+
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
 }
 
@@ -121,19 +163,38 @@ void AEIEnemy::BeginPlay()
 {
 	Super::BeginPlay();
 
-	BodyMaterial = EIVisuals::SetColor(Body, BoneColor);
-	HeadMaterial = EIVisuals::SetColor(Head, BoneColor);
-	if (!HasAuthority())
-	{
-		return;
-	}
 	FString Error;
 	FEIEnemyValues Loaded;
-	if (!FEIEnemyValues::LoadFromProjectFile(Loaded, Error))
+	if (!FEIEnemyValues::LoadFromProjectFile(Kind, Loaded, Error))
 	{
 		FEIDataFile::ReportError(TEXT("gegner.json"), Error);
 	}
 	ApplyValues(Loaded);
+	switch (Kind)
+	{
+	case EEIEnemyKind::Thrower:
+		BaseColor = ThrowerColor;
+		break;
+	case EEIEnemyKind::ShieldBearer:
+		BaseColor = ShieldBearerColor;
+		break;
+	case EEIEnemyKind::Colossus:
+		BaseColor = ColossusColor;
+		break;
+	default:
+		BaseColor = BoneColor;
+		break;
+	}
+	BodyMaterial = EIVisuals::SetColor(Body, BaseColor);
+	HeadMaterial = EIVisuals::SetColor(Head, BaseColor);
+	ShowHeldPart();
+	SetActorScale3D(FVector(Values.Scale));
+	if (!HasAuthority())
+	{
+		return;
+	}
+	// A bigger body must not start in the floor.
+	AddActorWorldOffset(FVector(0.0f, 0.0f, (Values.Scale - 1.0f) * GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()));
 	Health->Reset(Values.Life);
 	Health->OnDied.AddUObject(this, &AEIEnemy::HandleDied);
 }
@@ -142,6 +203,25 @@ void AEIEnemy::ApplyValues(const FEIEnemyValues& NewValues)
 {
 	Values = NewValues;
 	GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter;
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, Values.TurnDegreesPerSecond, 0.0f);
+}
+
+void AEIEnemy::ShowHeldPart()
+{
+	if (Values.ShieldDamageFactor < 1.0f)
+	{
+		Held->SetRelativeLocation(ShieldPlace);
+		Held->SetRelativeScale3D(ShieldSize);
+		EIVisuals::SetColor(Held, ShieldColor);
+		Held->SetVisibility(true);
+	}
+	else if (Values.ThrowSpeedMetersPerSecond > 0.0f)
+	{
+		Held->SetRelativeLocation(HeldBonePlace);
+		Held->SetRelativeScale3D(HeldBoneSize);
+		EIVisuals::SetColor(Held, BoneColor);
+		Held->SetVisibility(true);
+	}
 }
 
 void AEIEnemy::ApplyStrength(float Factor)
@@ -235,6 +315,7 @@ void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AEIEnemy, bTelegraphing);
 	DOREPLIFETIME(AEIEnemy, bStaggering);
+	DOREPLIFETIME(AEIEnemy, Kind);
 }
 
 bool AEIEnemy::IsDead() const
@@ -286,7 +367,7 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 			StateTime = 0.0f;
 			return;
 		}
-		if (FVector::Dist(Target->GetActorLocation(), GetActorLocation()) <= Values.AttackFromMeters * CentimetersPerMeter)
+		if (CanAttack(Target))
 		{
 			StopWalking();
 			State = EState::Windup;
@@ -299,6 +380,12 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		return;
 
 	case EState::Windup:
+		// A throw goes where the thrower looks. A shield bearer does not turn now, which is the moment to get around him.
+		if (Values.ThrowSpeedMetersPerSecond > 0.0f && Target != nullptr)
+		{
+			const FRotator Facing = (Target->GetActorLocation() - GetActorLocation()).GetSafeNormal2D().Rotation();
+			SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), Facing, DeltaSeconds, Values.TurnDegreesPerSecond));
+		}
 		if (StateTime >= Values.WindupSeconds)
 		{
 			bTelegraphing = false;
@@ -445,9 +532,64 @@ void AEIEnemy::SteerStraight(const AActor* Target, float DeltaSeconds)
 	AddMovementInput(Direction);
 }
 
+bool AEIEnemy::CanAttack(const AActor* Target) const
+{
+	if (FVector::Dist(Target->GetActorLocation(), GetActorLocation()) > Values.AttackFromMeters * CentimetersPerMeter)
+	{
+		return false;
+	}
+	if (Values.ThrowSpeedMetersPerSecond <= 0.0f)
+	{
+		return true;
+	}
+	// A throw needs a free line.
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(EIEnemyThrow), false, this);
+	return !GetWorld()->LineTraceTestByObjectType(GetPawnViewLocation(), Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), Query);
+}
+
+void AEIEnemy::ThrowBone()
+{
+	const AActor* Target = FindNearestHero();
+	if (Target == nullptr)
+	{
+		return;
+	}
+	const FVector Start = GetPawnViewLocation() + GetActorForwardVector() * ThrowFromForwardCm;
+	const FTransform Spawn((Target->GetActorLocation() - Start).Rotation(), Start);
+	AEIThrownBone* Bone = GetWorld()->SpawnActorDeferred<AEIThrownBone>(AEIThrownBone::StaticClass(), Spawn, this, this, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Bone != nullptr)
+	{
+		Bone->Launch(Values.Damage, Values.ThrowSpeedMetersPerSecond * CentimetersPerMeter);
+		Bone->FinishSpawning(Spawn);
+	}
+}
+
+float AEIEnemy::ReduceByShield(float Amount, const AActor* DamageCauser)
+{
+	const bool bBroken = bNextHitBreaksShield;
+	bNextHitBreaksShield = false;
+	if (Values.ShieldDamageFactor >= 1.0f || bBroken || bStaggering || DamageCauser == nullptr || Amount <= 0.0f)
+	{
+		return Amount;
+	}
+	const FVector ToCauser = (DamageCauser->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	const float MinDot = FMath::Cos(FMath::DegreesToRadians(Values.ShieldAngleDegrees / 2.0f));
+	if (FVector::DotProduct(GetActorForwardVector(), ToCauser) < MinDot)
+	{
+		return Amount;
+	}
+	MulticastShieldBlocked();
+	return Amount * Values.ShieldDamageFactor;
+}
+
 void AEIEnemy::Strike()
 {
 	MulticastStrike();
+	if (Values.ThrowSpeedMetersPerSecond > 0.0f)
+	{
+		ThrowBone();
+		return;
+	}
 	const float HitZone = Values.HitZoneMeters * CentimetersPerMeter;
 	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
 	{
@@ -460,7 +602,8 @@ void AEIEnemy::Strike()
 
 float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	const float Applied = Health->ApplyDamage(Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser));
+	const float Incoming = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	const float Applied = Health->ApplyDamage(ReduceByShield(Incoming, DamageCauser));
 	if (AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(DamageCauser); Hero != nullptr && Applied > 0.0f)
 	{
 		Hero->NoteCombat();
@@ -496,6 +639,11 @@ void AEIEnemy::MulticastNoticed_Implementation()
 	EIVisuals::PlaySoundAt(this, TEXT("GegnerAusholen"), GetActorLocation());
 }
 
+void AEIEnemy::MulticastShieldBlocked_Implementation()
+{
+	EIVisuals::PlaySoundAt(this, TEXT("Blocken"), GetActorLocation());
+}
+
 void AEIEnemy::MulticastHurt_Implementation()
 {
 	HurtFlashRemaining = HurtFlashSeconds;
@@ -511,6 +659,7 @@ void AEIEnemy::MulticastDie_Implementation()
 	EIVisuals::PlaySoundAt(this, TEXT("GegnerTod"), GetActorLocation());
 	Body->SetVisibility(false);
 	Head->SetVisibility(false);
+	Held->SetVisibility(false);
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -527,7 +676,7 @@ void AEIEnemy::UpdateLook(float DeltaSeconds)
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);
 	const float Hurt = HurtFlashRemaining / HurtFlashSeconds;
 	StaggerBlend = FMath::FInterpConstantTo(StaggerBlend, bStaggering ? 1.0f : 0.0f, DeltaSeconds, StaggerBlendPerSecond);
-	const FLinearColor Calm = FMath::Lerp(FMath::Lerp(BoneColor, WarningColor, TelegraphBlend), StaggerColor, StaggerBlend);
+	const FLinearColor Calm = FMath::Lerp(FMath::Lerp(BaseColor, WarningColor, TelegraphBlend), StaggerColor, StaggerBlend);
 	const FLinearColor Color = FMath::Lerp(Calm, HurtColor, Hurt);
 	const float Glow = FMath::Max(TelegraphBlend * WarningGlow, Hurt * HurtGlow);
 	for (UMaterialInstanceDynamic* Material : { BodyMaterial.Get(), HeadMaterial.Get() })
@@ -570,4 +719,66 @@ void AEIBoneDebris::BeginPlay()
 		Piece->SetPhysicsLinearVelocity(FMath::VRand() * DebrisSpeedCm + FVector(0.0f, 0.0f, DebrisSpeedCm * 0.5f));
 		Piece->SetPhysicsAngularVelocityInDegrees(FMath::VRand() * 720.0f);
 	}
+}
+
+AEIThrownBone::AEIThrownBone()
+{
+	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
+	SetReplicatingMovement(true);
+	InitialLifeSpan = ThrownBoneLifeSeconds;
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
+
+	Collision = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));
+	Collision->InitSphereRadius(ThrownBoneRadiusCm);
+	Collision->SetCollisionObjectType(ECC_WorldDynamic);
+	Collision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	Collision->SetCollisionResponseToAllChannels(ECR_Block);
+	Collision->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	Collision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+	SetRootComponent(Collision);
+
+	Bone = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Bone"));
+	Bone->SetupAttachment(Collision);
+	Bone->SetStaticMesh(Cube.Object);
+	Bone->SetRelativeScale3D(ThrownBoneSize);
+	Bone->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	Flight = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Flight"));
+	Flight->ProjectileGravityScale = 0.0f;
+	Flight->bRotationFollowsVelocity = true;
+	Flight->bShouldBounce = false;
+}
+
+void AEIThrownBone::Launch(float InDamage, float SpeedCm)
+{
+	Damage = InDamage;
+	Flight->InitialSpeed = SpeedCm;
+	Flight->MaxSpeed = SpeedCm;
+}
+
+void AEIThrownBone::BeginPlay()
+{
+	Super::BeginPlay();
+
+	EIVisuals::SetColor(Bone, BoneColor, ThrownBoneGlow);
+	// Enemies do not hit each other.
+	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
+	{
+		Collision->IgnoreActorWhenMoving(*It, true);
+	}
+	if (HasAuthority())
+	{
+		Flight->OnProjectileStop.AddDynamic(this, &AEIThrownBone::HandleStop);
+	}
+}
+
+void AEIThrownBone::HandleStop(const FHitResult& Hit)
+{
+	if (AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(Hit.GetActor()))
+	{
+		UGameplayStatics::ApplyDamage(Hero, Damage, GetInstigatorController(), this, nullptr);
+	}
+	Destroy();
 }

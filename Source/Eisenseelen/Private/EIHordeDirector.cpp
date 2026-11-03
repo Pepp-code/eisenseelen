@@ -4,6 +4,7 @@
 #include "EIDataFile.h"
 #include "EIEnemy.h"
 #include "EIEnemyCamp.h"
+#include "EIEnemyGroups.h"
 #include "EIHeroCharacter.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -22,6 +23,8 @@ namespace
 	// Reinforcements must not come from so far away that they count as left behind at once.
 	constexpr float CampInReachShare = 0.9f;
 	constexpr float CampSpreadCm = 300.0f;
+	constexpr float ReinforcementRadiusCm = 300.0f;
+	constexpr float MemberSpacingCm = 150.0f;
 
 	bool CanSee(const AEIHeroCharacter& Hero, const FVector& Location)
 	{
@@ -60,13 +63,6 @@ bool FEIHordeValues::LoadFromProjectFile(FEIHordeValues& OutValues, FString& Out
 		|| !FEIDataFile::ReadNumber(**Horde, TEXT("abstand_min_m"), 1.0, 500.0, Loaded.MinDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(**Horde, TEXT("abstand_max_m"), 1.0, 500.0, Loaded.MaxDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(**Horde, TEXT("zu_weit_weg_m"), 1.0, 1000.0, Loaded.TooFarMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_je_stufe"), 0.0, 10000.0, Loaded.Director.ThreatPerStage, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_altar"), 0.0, 10000.0, Loaded.Director.AltarThreat, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_leuchtfeuer"), 0.0, 10000.0, Loaded.Director.BeaconThreat, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("bedrohung_spitze"), 0.0, 10000.0, Loaded.Director.PeakThreat, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("welle_alle_s"), 0.1, 3600.0, Loaded.Director.WaveEverySeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("welle_dauer_s"), 0.0, 3600.0, Loaded.Director.WaveBurstSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Director, TEXT("nachschub_tempo_anteil"), 0.0, 10.0, Loaded.Director.QuietSpawnShare, OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_1_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[0], OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_2_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[1], OutError)
 		|| !FEIDataFile::ReadNumber(**Director, TEXT("anteil_3_spieler"), 0.0, 10.0, Loaded.Director.PlayerShare[2], OutError)
@@ -96,13 +92,6 @@ void UEIHordeDirector::SetHordeActive(bool bActive)
 {
 	bHordeActive = bActive;
 	SpawnBudget = 0.0f;
-	SetThreatBudget(Values.MaxAlive, 1.0f);
-}
-
-void UEIHordeDirector::SetThreatBudget(float Threat, float SpawnRateShare)
-{
-	ThreatBudget = Threat;
-	SpawnShare = SpawnRateShare;
 }
 
 float UEIHordeDirector::CountThreat() const
@@ -146,54 +135,45 @@ bool UEIHordeDirector::FindStandingPlace(const FVector& Ground, FVector& OutLoca
 	return true;
 }
 
-AEIEnemy* UEIHordeDirector::SpawnAt(const FVector& Location)
+AEIEnemy* UEIHordeDirector::SpawnAt(const FVector& Location, EEIEnemyKind Kind)
 {
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
-	AEIEnemy* Enemy = GetWorld()->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Location, FRotator::ZeroRotator, Params);
-	if (Enemy != nullptr)
+	const FTransform Spawn(Location);
+	AEIEnemy* Enemy = GetWorld()->SpawnActorDeferred<AEIEnemy>(AEIEnemy::StaticClass(), Spawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding);
+	if (Enemy == nullptr)
 	{
-		Enemy->ApplyStrength(EnemyStrength);
+		return nullptr;
 	}
+	Enemy->SetKind(Kind);
+	Enemy->FinishSpawning(Spawn);
+	if (!IsValid(Enemy))
+	{
+		return nullptr;
+	}
+	Enemy->ApplyStrength(EnemyStrength);
 	return Enemy;
 }
 
-void UEIHordeDirector::SpawnWatchers(const FVector& Center, float DistanceCm, int32 Count)
+TArray<AEIEnemy*> UEIHordeDirector::SpawnGroup(const FEIEnemyGroup& Group, float CountFactor, const FVector& Center, float RadiusCm)
 {
+	const TArray<EEIEnemyKind> Members = Group.ListMembers(CountFactor);
+	const float Radius = FMath::Max(RadiusCm, Members.Num() * MemberSpacingCm / UE_TWO_PI);
 	const float FirstAngle = FMath::FRandRange(0.0f, UE_TWO_PI);
-	for (int32 Index = 0; Index < Count; ++Index)
+	TArray<AEIEnemy*> Spawned;
+	for (int32 Index = 0; Index < Members.Num(); ++Index)
 	{
-		const float Angle = FirstAngle + UE_TWO_PI * Index / Count;
-		const FVector Ground(Center.X + FMath::Cos(Angle) * DistanceCm, Center.Y + FMath::Sin(Angle) * DistanceCm, 0.0f);
+		const float Angle = FirstAngle + UE_TWO_PI * Index / Members.Num();
+		const FVector Ground(Center.X + FMath::Cos(Angle) * Radius, Center.Y + FMath::Sin(Angle) * Radius, 0.0f);
 		FVector Location;
-		AEIEnemy* Watcher = FindStandingPlace(Ground, Location) ? SpawnAt(Location) : nullptr;
-		if (Watcher != nullptr)
+		AEIEnemy* Enemy = FindStandingPlace(Ground, Location) ? SpawnAt(Location, Members[Index]) : nullptr;
+		if (Enemy != nullptr)
 		{
-			Watcher->StandWatch(Watcher->GetActorLocation());
+			Spawned.Add(Enemy);
 		}
 	}
+	return Spawned;
 }
 
-TArray<AEIEnemy*> UEIHordeDirector::SpawnGuards(const FVector& Center, float DistanceCm, int32 Count)
-{
-	TArray<AEIEnemy*> Guards;
-	const float FirstAngle = FMath::FRandRange(0.0f, UE_TWO_PI);
-	for (int32 Index = 0; Index < Count; ++Index)
-	{
-		const float Angle = FirstAngle + UE_TWO_PI * Index / Count;
-		const FVector Ground(Center.X + FMath::Cos(Angle) * DistanceCm, Center.Y + FMath::Sin(Angle) * DistanceCm, 0.0f);
-		FVector Location;
-		AEIEnemy* Guard = FindStandingPlace(Ground, Location) ? SpawnAt(Location) : nullptr;
-		if (Guard != nullptr)
-		{
-			Guard->MarkAsGuard();
-			Guards.Add(Guard);
-		}
-	}
-	return Guards;
-}
-
-AEIEnemy* UEIHordeDirector::SpawnOne()
+TArray<AEIHeroCharacter*> UEIHordeDirector::GetLivingHeroes() const
 {
 	TArray<AEIHeroCharacter*> Heroes;
 	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
@@ -203,9 +183,28 @@ AEIEnemy* UEIHordeDirector::SpawnOne()
 			Heroes.Add(*It);
 		}
 	}
+	return Heroes;
+}
+
+bool UEIHordeDirector::IsBadPlace(const FVector& Ground, const TArray<AEIHeroCharacter*>& Heroes) const
+{
+	FVector Location;
+	if (!FindStandingPlace(Ground, Location))
+	{
+		return true;
+	}
+	const float MinDistance = Values.MinDistanceMeters * CentimetersPerMeter;
+	return Heroes.ContainsByPredicate([&Location, MinDistance](const AEIHeroCharacter* Hero)
+	{
+		return FVector::Dist2D(Hero->GetActorLocation(), Location) < MinDistance || CanSee(*Hero, Location);
+	});
+}
+
+bool UEIHordeDirector::FindHiddenPlace(const TArray<AEIHeroCharacter*>& Heroes, float RadiusCm, FVector& OutGround) const
+{
 	if (Heroes.IsEmpty())
 	{
-		return nullptr;
+		return false;
 	}
 	const float MinDistance = Values.MinDistanceMeters * CentimetersPerMeter;
 	const float CampInReach = Values.TooFarMeters * CentimetersPerMeter * CampInReachShare;
@@ -234,23 +233,40 @@ AEIEnemy* UEIHordeDirector::SpawnOne()
 			const float Distance = FMath::FRandRange(Values.MinDistanceMeters, Values.MaxDistanceMeters) * CentimetersPerMeter;
 			Ground = FVector(Center.X + FMath::Cos(Angle) * Distance, Center.Y + FMath::Sin(Angle) * Distance, 0.0f);
 		}
-
-		FVector Location;
-		if (!FindStandingPlace(Ground, Location))
+		// Not only the middle, but everyone in the circle around it has to arrive out of sight.
+		const bool bBad = IsBadPlace(Ground, Heroes)
+			|| (RadiusCm > 0.0f && (IsBadPlace(Ground + FVector(RadiusCm, 0.0f, 0.0f), Heroes)
+				|| IsBadPlace(Ground - FVector(RadiusCm, 0.0f, 0.0f), Heroes)
+				|| IsBadPlace(Ground + FVector(0.0f, RadiusCm, 0.0f), Heroes)
+				|| IsBadPlace(Ground - FVector(0.0f, RadiusCm, 0.0f), Heroes)));
+		if (!bBad)
 		{
-			continue;
+			OutGround = Ground;
+			return true;
 		}
-		const bool bBadPlace = Heroes.ContainsByPredicate([&Location, MinDistance](const AEIHeroCharacter* Hero)
-		{
-			return FVector::Dist2D(Hero->GetActorLocation(), Location) < MinDistance || CanSee(*Hero, Location);
-		});
-		if (bBadPlace)
-		{
-			continue;
-		}
-		return SpawnAt(Location);
 	}
-	return nullptr;
+	return false;
+}
+
+AEIEnemy* UEIHordeDirector::SpawnOne()
+{
+	FVector Ground;
+	FVector Location;
+	if (!FindHiddenPlace(GetLivingHeroes(), 0.0f, Ground) || !FindStandingPlace(Ground, Location))
+	{
+		return nullptr;
+	}
+	return SpawnAt(Location, EEIEnemyKind::Runner);
+}
+
+TArray<AEIEnemy*> UEIHordeDirector::SpawnReinforcement(const FEIEnemyGroup& Group, float CountFactor)
+{
+	FVector Ground;
+	if (!FindHiddenPlace(GetLivingHeroes(), ReinforcementRadiusCm, Ground))
+	{
+		return TArray<AEIEnemy*>();
+	}
+	return SpawnGroup(Group, CountFactor, Ground, ReinforcementRadiusCm);
 }
 
 void UEIHordeDirector::RemoveEnemiesLeftBehind()
@@ -278,7 +294,7 @@ void UEIHordeDirector::RemoveEnemiesLeftBehind()
 void UEIHordeDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (!bHordeActive)
+	if (!bHordeActive && !bRemovingLeftBehind)
 	{
 		return;
 	}
@@ -289,11 +305,15 @@ void UEIHordeDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 		LeftBehindCheckRemaining = LeftBehindCheckSeconds;
 		RemoveEnemiesLeftBehind();
 	}
-	SpawnBudget += DeltaTime * Values.SpawnsPerSecond * SpawnShare;
+	if (!bHordeActive)
+	{
+		return;
+	}
+	SpawnBudget += DeltaTime * Values.SpawnsPerSecond;
 	while (SpawnBudget >= 1.0f)
 	{
 		SpawnBudget -= 1.0f;
-		if (CountThreat() < ThreatBudget)
+		if (CountThreat() < Values.MaxAlive)
 		{
 			SpawnOne();
 		}

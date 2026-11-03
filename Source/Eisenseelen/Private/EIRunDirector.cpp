@@ -5,6 +5,7 @@
 #include "EIBeacon.h"
 #include "EIChest.h"
 #include "EIDataFile.h"
+#include "EIEnemy.h"
 #include "EIEnemyCamp.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
@@ -30,10 +31,10 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 	if (!Root.IsValid()
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_faktor"), 0.0, 100.0, Loaded.CampFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_radius_m"), 0.5, 100.0, Loaded.CampRadiusMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_nachschub_ab_abstand_m"), 0.0, 1000.0, Loaded.CampRefillFromMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhen_pro_lauf"), 0.0, 1000.0, Loaded.ChestsPerRun, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_reichweite_m"), 0.5, 100.0, Loaded.ChestReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_zone_m"), 1.0, 100.0, Loaded.ChestZoneMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_waechter"), 0.0, 100.0, Loaded.ChestGuards, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_waechter_abstand_m"), 1.0, 100.0, Loaded.ChestGuardDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("ritual_altare"), 0.0, 100.0, Loaded.RitualAltars, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_halten_s"), 0.1, 3600.0, Loaded.AltarHoldSeconds, OutError)
@@ -45,7 +46,6 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abflug_tempo_m_pro_s"), 0.1, 100.0, Loaded.BargeDepartMetersPerSecond, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_alle_s"), 0.1, 3600.0, Loaded.CorruptionEverySeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_stufen"), 1.0, 100.0, Loaded.CorruptionMaxStage, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_bedrohung_je_stufe"), 0.0, 10.0, Loaded.CorruptionThreatPerStage, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_gegner_staerke_je_stufe"), 0.0, 10.0, Loaded.CorruptionStrengthPerStage, OutError))
 	{
 		return false;
@@ -66,13 +66,10 @@ void UEIRunDirector::LoadValues()
 	{
 		FEIDataFile::ReportError(TEXT("lauf.json"), Error);
 	}
-}
-
-void UEIRunDirector::SetHorde(bool bActive)
-{
-	AEIGameMode* GameMode = CastChecked<AEIGameMode>(GetOwner());
-	GameMode->GetHorde()->SetHordeActive(bActive);
-	GameMode->GetGameState<AEIGameState>()->SetHordeActive(bActive);
+	if (!FEIEnemyGroups::LoadFromProjectFile(Groups, Error))
+	{
+		FEIDataFile::ReportError(TEXT("gruppen.json"), Error);
+	}
 }
 
 void UEIRunDirector::ResetRun()
@@ -89,7 +86,10 @@ void UEIRunDirector::ResetRun()
 	State->ResetRunClock();
 	State->SetBeaconHold(0.0f, false);
 	SetCorruptionStage(0);
-	WaveClock = 0.0f;
+	WaveLeft = 0.0f;
+	ReinforcementLeft = 0.0f;
+	LastStage = 0;
+	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetEnemyStrength(1.0f);
 
 	PrepareChests();
 
@@ -144,25 +144,44 @@ float UEIRunDirector::GetPlayerFactor(int32 HeroCount) const
 	return Director.PlayerShare[FMath::Clamp(HeroCount, 1, 4) - 1] / FMath::Max(Director.PlayerShare[0], KINDA_SMALL_NUMBER);
 }
 
-int32 UEIRunDirector::CountChestGuards(int32 HeroCount) const
+void UEIRunDirector::FillCamp(AEIEnemyCamp* Camp, const FString& Size, int32 HeroCount)
 {
-	const float CorruptionFactor = 1.0f + Values.CorruptionThreatPerStage * GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage();
-	return FMath::RoundToInt(Values.ChestGuards * GetPlayerFactor(HeroCount) * CorruptionFactor);
-}
-
-void UEIRunDirector::FillCamps(int32 HeroCount)
-{
+	const FEIEnemyGroup* Group = Groups.Pick(Size, GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage());
+	if (Group == nullptr)
+	{
+		return;
+	}
 	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
 	const float Factor = Values.CampFactor * GetPlayerFactor(HeroCount);
+	const TArray<AEIEnemy*> Members = Horde->SpawnGroup(*Group, Factor, Camp->GetActorLocation(), Values.CampRadiusMeters * CentimetersPerMeter);
+	for (AEIEnemy* Member : Members)
+	{
+		Member->StandWatch(Member->GetActorLocation());
+	}
+	Camp->SetMembers(Members);
+}
+
+void UEIRunDirector::RefillEmptyCamps(const TArray<AEIHeroCharacter*>& LivingHeroes, const FString& Size)
+{
+	const double NotCloserThan = Values.CampRefillFromMeters * CentimetersPerMeter;
 	for (TActorIterator<AEIEnemyCamp> It(GetWorld()); It; ++It)
 	{
-		Horde->SpawnWatchers(It->GetActorLocation(), Values.CampRadiusMeters * CentimetersPerMeter, FMath::RoundToInt(It->GetEnemies() * Factor));
+		const AEIEnemyCamp* Camp = *It;
+		const bool bHeroNear = LivingHeroes.ContainsByPredicate([Camp, NotCloserThan](const AEIHeroCharacter* Hero)
+		{
+			return FVector::Dist2D(Hero->GetActorLocation(), Camp->GetActorLocation()) < NotCloserThan;
+		});
+		if (Camp->CountMembers() == 0 && !bHeroNear)
+		{
+			FillCamp(*It, Size, LivingHeroes.Num());
+		}
 	}
 }
 
 void UEIRunDirector::UpdateChests(const TArray<AEIHeroCharacter*>& LivingHeroes)
 {
 	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
+	const int32 Stage = GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage();
 	for (AEIChest* Chest : ChestsInUse)
 	{
 		if (Chest->GetState() == EEIChestState::Guarded)
@@ -172,8 +191,16 @@ void UEIRunDirector::UpdateChests(const TArray<AEIHeroCharacter*>& LivingHeroes)
 		else if (Chest->GetState() == EEIChestState::Sealed
 			&& LivingHeroes.ContainsByPredicate([Chest](const AEIHeroCharacter* Hero) { return Chest->IsInZone(Hero); }))
 		{
-			const float DistanceCm = Values.ChestGuardDistanceMeters * CentimetersPerMeter;
-			Chest->SetGuards(Horde->SpawnGuards(Chest->GetActorLocation(), DistanceCm, CountChestGuards(LivingHeroes.Num())));
+			TArray<AEIEnemy*> Guards;
+			if (const FEIEnemyGroup* Group = Groups.Pick(Groups.GetStage(Stage).Chest, Stage))
+			{
+				Guards = Horde->SpawnGroup(*Group, GetPlayerFactor(LivingHeroes.Num()), Chest->GetActorLocation(), Values.ChestGuardDistanceMeters * CentimetersPerMeter);
+			}
+			for (AEIEnemy* Guard : Guards)
+			{
+				Guard->MarkAsGuard();
+			}
+			Chest->SetGuards(Guards);
 		}
 	}
 }
@@ -286,31 +313,55 @@ void UEIRunDirector::UpdateCorruption()
 	}
 }
 
-void UEIRunDirector::UpdateThreatBudget(EEIRunPhase Phase, int32 HeroCount, float DeltaTime)
+bool UEIRunDirector::SendGroup(const FString& Size, int32 HeroCount)
+{
+	const int32 Stage = GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage();
+	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
+	const FEIEnemyGroup* Group = Groups.Pick(Size, Stage);
+	if (Group == nullptr || Horde->CountThreat() >= Groups.GetStage(Stage).ThreatCap * GetPlayerFactor(HeroCount))
+	{
+		return true;
+	}
+	return !Horde->SpawnReinforcement(*Group, GetPlayerFactor(HeroCount)).IsEmpty();
+}
+
+void UEIRunDirector::UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
 {
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
-	const FEIDirectorValues& Director = Horde->GetValues().Director;
 	const int32 Stage = State->GetCorruptionStage();
+	const FEIGroupStage& Row = Groups.GetStage(Stage);
+	const int32 HeroCount = LivingHeroes.Num();
+	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetEnemyStrength(1.0f + Values.CorruptionStrengthPerStage * Stage);
 
-	// Waves attack whoever holds an altar or the fire, and at the blood moon they attack everywhere.
-	float WaveThreat = 0.0f;
-	if (State->IsBloodMoon() || (Phase == EEIRunPhase::BeaconLit && State->IsBeaconHeld()))
+	// A new stage brings life back to empty camps and sends its first group at once.
+	if (Stage != LastStage)
 	{
-		WaveThreat = Director.BeaconThreat;
+		LastStage = Stage;
+		ReinforcementLeft = 0.0f;
+		RefillEmptyCamps(LivingHeroes, Row.Camp);
 	}
-	else if (Phase == EEIRunPhase::Ritual && State->IsAltarHeld())
+	if (Row.ReinforcementEverySeconds > 0.0f)
 	{
-		WaveThreat = Director.AltarThreat;
+		ReinforcementLeft -= DeltaTime;
+		if (ReinforcementLeft <= 0.0f && SendGroup(Row.Reinforcement, HeroCount))
+		{
+			ReinforcementLeft = Row.ReinforcementEverySeconds;
+		}
 	}
-	WaveClock = WaveThreat > 0.0f ? WaveClock + DeltaTime : 0.0f;
-	const bool bWaveNow = WaveThreat > 0.0f && FMath::Fmod(WaveClock, Director.WaveEverySeconds) < Director.WaveBurstSeconds;
 
-	// Before the first stage of the corruption nothing comes by itself, only the camps stand there.
-	const float CorruptionFactor = 1.0f + Values.CorruptionThreatPerStage * Stage;
-	const float Threat = Stage * Director.ThreatPerStage + (bWaveNow ? WaveThreat * CorruptionFactor : 0.0f);
-	Horde->SetThreatBudget(FMath::Min(Threat, Director.PeakThreat) * GetPlayerFactor(HeroCount), bWaveNow ? 1.0f : Director.QuietSpawnShare);
-	Horde->SetEnemyStrength(1.0f + Values.CorruptionStrengthPerStage * Stage);
+	// Waves attack whoever holds an altar or the fire. Whoever comes back gets the next one at once.
+	const bool bAtAltar = Phase == EEIRunPhase::Ritual && State->IsAltarHeld();
+	const bool bAtFire = Phase == EEIRunPhase::BeaconLit && State->IsBeaconHeld();
+	if (!bAtAltar && !bAtFire)
+	{
+		WaveLeft = 0.0f;
+		return;
+	}
+	WaveLeft -= DeltaTime;
+	if (WaveLeft <= 0.0f && SendGroup(bAtFire ? Row.BeaconWave : Row.AltarWave, HeroCount))
+	{
+		WaveLeft = bAtFire ? Groups.BeaconWaveEverySeconds : Groups.AltarWaveEverySeconds;
+	}
 }
 
 void UEIRunDirector::HoldBeacon(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
@@ -338,7 +389,7 @@ void UEIRunDirector::LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingH
 		State->StopRunClock();
 		State->SetRunPhase(EEIRunPhase::Escaped);
 		Barge->Depart(Values.BargeDepartMetersPerSecond * CentimetersPerMeter);
-		SetHorde(false);
+		CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(false);
 	}
 }
 
@@ -375,7 +426,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		{
 			State->StopRunClock();
 			State->SetRunPhase(EEIRunPhase::Failed);
-			SetHorde(false);
+			CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(false);
 		}
 		return;
 	}
@@ -383,7 +434,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	if (Phase != EEIRunPhase::OnBarge)
 	{
 		UpdateCorruption();
-		UpdateThreatBudget(Phase, LivingHeroes.Num(), DeltaTime);
+		UpdateEnemyGroups(Phase, LivingHeroes, DeltaTime);
 		UpdateChests(LivingHeroes);
 	}
 
@@ -396,9 +447,11 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 			{
 				State->StartRunClock();
 				State->SetRunPhase(AltarOrder.IsEmpty() ? EEIRunPhase::RitualDone : EEIRunPhase::Exploring);
-				CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetEnemyStrength(1.0f);
-				FillCamps(LivingHeroes.Num());
-				SetHorde(true);
+				for (TActorIterator<AEIEnemyCamp> Camp(GetWorld()); Camp; ++Camp)
+				{
+					FillCamp(*Camp, Camp->GetStartSize(), LivingHeroes.Num());
+				}
+				CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(true);
 				break;
 			}
 		}

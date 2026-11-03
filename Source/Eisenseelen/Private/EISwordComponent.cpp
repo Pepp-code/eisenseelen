@@ -451,8 +451,13 @@ void UEISwordComponent::HitActor(AActor* Target, const FVector& Location)
 
 	const float Damage = Swing.Damage * FMath::Max(0.0f, 1.0f - Swing.TargetFalloff * HitThisSwing.Num()) * Hero->GetOmens()->GetFactor(EEIOmenEffect::SwordDamage);
 	HitThisSwing.Add(Target);
+	AEIEnemy* Enemy = SwingKind == EEISwingKind::Heavy ? Cast<AEIEnemy>(Target) : nullptr;
+	if (Enemy != nullptr)
+	{
+		Enemy->BreakShieldWithNextHit();
+	}
 	UGameplayStatics::ApplyDamage(Target, Damage, Hero->GetController(), Hero, nullptr);
-	if (AEIEnemy* Enemy = Cast<AEIEnemy>(Target); Enemy != nullptr && SwingKind == EEISwingKind::Heavy)
+	if (Enemy != nullptr)
 	{
 		Enemy->StaggerFromHeavyHit(Values.HeavyStaggerSeconds);
 	}

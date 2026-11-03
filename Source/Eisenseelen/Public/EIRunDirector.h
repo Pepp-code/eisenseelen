@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "EIEnemyGroups.h"
 #include "EIRunDirector.generated.h"
 
 class AEIAltar;
 class AEIBeacon;
 class AEIChest;
+class AEIEnemyCamp;
 class AEIHeroCharacter;
 class AEISkyBarge;
 enum class EEIRunPhase : uint8;
@@ -16,10 +18,10 @@ struct EISENSEELEN_API FEIRunValues
 {
 	float CampFactor = 1.0f;
 	float CampRadiusMeters = 3.0f;
+	float CampRefillFromMeters = 40.0f;
 	float ChestsPerRun = 5.0f;
 	float ChestReachMeters = 3.0f;
 	float ChestZoneMeters = 10.0f;
-	float ChestGuards = 8.0f;
 	float ChestGuardDistanceMeters = 6.0f;
 	float RitualAltars = 3.0f;
 	float AltarHoldSeconds = 30.0f;
@@ -31,7 +33,6 @@ struct EISENSEELEN_API FEIRunValues
 	float BargeDepartMetersPerSecond = 6.0f;
 	float CorruptionEverySeconds = 120.0f;
 	float CorruptionMaxStage = 6.0f;
-	float CorruptionThreatPerStage = 0.12f;
 	float CorruptionStrengthPerStage = 0.1f;
 
 	static bool LoadFromProjectFile(FEIRunValues& OutValues, FString& OutError);
@@ -52,6 +53,9 @@ public:
 	void LoadValues();
 	const FEIRunValues& GetValues() const { return Values; }
 	void ApplyValues(const FEIRunValues& NewValues) { Values = NewValues; }
+
+	/** Who comes when. Tests may change it. */
+	FEIEnemyGroups& GetGroups() { return Groups; }
 
 	/** Puts everything back to the start of a run. */
 	void ResetRun();
@@ -74,15 +78,15 @@ private:
 	void HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void PrepareChests();
 	void UpdateChests(const TArray<AEIHeroCharacter*>& LivingHeroes);
-	int32 CountChestGuards(int32 HeroCount) const;
 	bool OpenChest(AEIHeroCharacter* Hero);
 	void IgniteBeacon(AEIBeacon* Beacon);
 	void HoldBeacon(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingHeroes);
-	void SetHorde(bool bActive);
 	void UpdateCorruption();
-	void UpdateThreatBudget(EEIRunPhase Phase, int32 HeroCount, float DeltaTime);
-	void FillCamps(int32 HeroCount);
+	void UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	void FillCamp(AEIEnemyCamp* Camp, const FString& Size, int32 HeroCount);
+	void RefillEmptyCamps(const TArray<AEIHeroCharacter*>& LivingHeroes, const FString& Size);
+	bool SendGroup(const FString& Size, int32 HeroCount);
 	float GetPlayerFactor(int32 HeroCount) const;
 
 	UPROPERTY(Transient)
@@ -99,9 +103,12 @@ private:
 	TArray<TObjectPtr<AEIChest>> ChestsInUse;
 
 	FEIRunValues Values;
+	FEIEnemyGroups Groups;
 	bool bPrepared = false;
 	float HoldLeft = 0.0f;
 	int32 AltarsBroken = 0;
 	float AltarHoldLeft = 0.0f;
-	float WaveClock = 0.0f;
+	float WaveLeft = 0.0f;
+	float ReinforcementLeft = 0.0f;
+	int32 LastStage = 0;
 };

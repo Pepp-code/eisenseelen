@@ -6,9 +6,26 @@
 
 class UEIHealthComponent;
 class UMaterialInstanceDynamic;
+class UProjectileMovementComponent;
+class USphereComponent;
 class UStaticMeshComponent;
 
-/** The numbers of the bone runner from Data/gegner.json. */
+/** The kinds of enemies. Their numbers stand in Data/gegner.json, and the groups they walk in in Data/gruppen.json. */
+UENUM()
+enum class EEIEnemyKind : uint8
+{
+	Runner,
+	Thrower,
+	ShieldBearer,
+	Colossus
+};
+
+constexpr int32 EIEnemyKindCount = 4;
+
+/** The name of a kind in the data files. */
+EISENSEELEN_API const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind);
+
+/** The numbers of one kind of enemy from Data/gegner.json. */
 struct EISENSEELEN_API FEIEnemyValues
 {
 	float Life = 40.0f;
@@ -24,12 +41,17 @@ struct EISENSEELEN_API FEIEnemyValues
 	float AlarmMeters = 12.0f;
 	float GiveUpMeters = 50.0f;
 	float StayAwakeSeconds = 6.0f;
+	float Scale = 1.0f;
+	float TurnDegreesPerSecond = 720.0f;
+	float ShieldDamageFactor = 1.0f;
+	float ShieldAngleDegrees = 120.0f;
+	float ThrowSpeedMetersPerSecond = 0.0f;
 
-	static bool LoadFromProjectFile(FEIEnemyValues& OutValues, FString& OutError);
+	static bool LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutValues, FString& OutError);
 };
 
 /**
- * The bone runner, a grey capsule for now. It stands watch or hunts, finds its way to the nearest hero, winds up visibly and audibly, and only then
+ * An enemy, a grey capsule for now. It stands watch or hunts, finds its way to the nearest hero, winds up visibly and audibly, and only then
  * strikes, so a hero who moves away in time takes no damage. A parry or a heavy hit staggers it, which interrupts
  * everything it does. All of its decisions happen on the server.
  */
@@ -40,6 +62,13 @@ class EISENSEELEN_API AEIEnemy : public ACharacter
 
 public:
 	AEIEnemy();
+
+	/** Between a deferred spawn and FinishSpawning. An enemy spawned the plain way is a bone runner. */
+	void SetKind(EEIEnemyKind NewKind) { Kind = NewKind; }
+	EEIEnemyKind GetKind() const { return Kind; }
+
+	/** Server only. The next hit goes through a shield. */
+	void BreakShieldWithNextHit() { bNextHitBreaksShield = true; }
 
 	bool IsTelegraphing() const { return bTelegraphing; }
 	bool IsStaggering() const { return bStaggering; }
@@ -96,6 +125,9 @@ private:
 	void MulticastNoticed();
 
 	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastShieldBlocked();
+
+	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHurt();
 
 	UFUNCTION(NetMulticast, Unreliable)
@@ -111,6 +143,10 @@ private:
 	bool NoticesHero(float DeltaSeconds);
 	void WakeUp(bool bTellNeighbours);
 	void WalkHome(float DeltaSeconds);
+	bool CanAttack(const AActor* Target) const;
+	void ThrowBone();
+	float ReduceByShield(float Amount, const AActor* DamageCauser);
+	void ShowHeldPart();
 	bool StandsOnPaths() const;
 	void StopWalking();
 	void Strike();
@@ -122,6 +158,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Head;
+
+	/** The shield of a shield bearer, the bone of a thrower. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> Held;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIHealthComponent> Health;
@@ -138,7 +178,12 @@ private:
 	UPROPERTY(Replicated)
 	bool bStaggering = false;
 
+	UPROPERTY(Replicated)
+	EEIEnemyKind Kind = EEIEnemyKind::Runner;
+
 	FEIEnemyValues Values;
+	FLinearColor BaseColor = FLinearColor::Gray;
+	bool bNextHitBreaksShield = false;
 	bool bGuard = false;
 	bool bHasHome = false;
 	FVector Home = FVector::ZeroVector;
@@ -167,4 +212,35 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+};
+
+/** A bone a thrower throws. It flies straight, and whoever does not step aside in time gets hit. */
+UCLASS()
+class EISENSEELEN_API AEIThrownBone : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AEIThrownBone();
+
+	/** Between the deferred spawn and FinishSpawning. */
+	void Launch(float InDamage, float SpeedCm);
+
+protected:
+	virtual void BeginPlay() override;
+
+private:
+	UFUNCTION()
+	void HandleStop(const FHitResult& Hit);
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<USphereComponent> Collision;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> Bone;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UProjectileMovementComponent> Flight;
+
+	float Damage = 0.0f;
 };

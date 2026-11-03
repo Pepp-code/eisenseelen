@@ -38,6 +38,115 @@ namespace
 	}
 }
 
+namespace
+{
+	AEIEnemy* SpawnKindAhead(const FEIPlayContext& Context, EEIEnemyKind Kind, float DistanceCm)
+	{
+		const FVector Location = Context.Hero->GetActorLocation() + Context.Hero->GetActorForwardVector() * DistanceCm;
+		const FTransform Spawn((Context.Hero->GetActorLocation() - Location).Rotation(), Location);
+		AEIEnemy* Enemy = Context.World->SpawnActorDeferred<AEIEnemy>(AEIEnemy::StaticClass(), Spawn);
+		Enemy->SetKind(Kind);
+		Enemy->FinishSpawning(Spawn);
+		return Enemy;
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIEnemyKindsTest,
+	"Eisenseelen.Play.Enemy.Kinds",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIEnemyKindsTest::RunTest(const FString& Parameters)
+{
+	struct FState
+	{
+		TWeakObjectPtr<AEIEnemy> Enemy;
+		float Life = 0.0f;
+		bool bBoneFlew = false;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+	constexpr float Hit = 100.0f;
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, 0.0f); }));
+	Steps.Add(Wait(0.2));
+
+	// The thrower stays away and hits from afar.
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		State->Enemy = SpawnKindAhead(Context, EEIEnemyKind::Thrower, 1000.0f);
+		State->Life = Context.Hero->GetHealth()->GetHealth();
+	}));
+	Steps.Add(WaitUntil(TEXT("a thrown bone hits the hero"), 4.0, [State](const FEIPlayContext& Context)
+	{
+		TActorIterator<AEIThrownBone> Bone(Context.World);
+		State->bBoneFlew = State->bBoneFlew || static_cast<bool>(Bone);
+		return Context.Hero->GetHealth()->GetHealth() < State->Life;
+	}));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const AEIEnemy* Thrower = State->Enemy.Get();
+		const float Lost = State->Life - Context.Hero->GetHealth()->GetHealth();
+		Context.Test->TestTrue(TEXT("The hit comes from a bone in flight"), State->bBoneFlew);
+		Context.Test->TestEqual(TEXT("A bone does the thrower's damage"), Lost, Thrower->GetValues().Damage);
+		Context.Test->TestTrue(TEXT("The thrower stays at a distance"), FVector::Dist(Thrower->GetActorLocation(), Context.Hero->GetActorLocation()) > 600.0);
+		State->Enemy->Destroy();
+		Context.Hero->SetCanBeDamaged(false);
+	}));
+	Steps.Add(Wait(0.1));
+
+	// The shield holds from the front, but not from behind, and it does not stop a heavy hit.
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Bearer = SpawnKindAhead(Context, EEIEnemyKind::ShieldBearer, 200.0f);
+		State->Enemy = Bearer;
+		FEIEnemyValues Frozen = Bearer->GetValues();
+		Frozen.SpeedMetersPerSecond = 0.0f;
+		Frozen.AttackFromMeters = 0.1f;
+		Bearer->ApplyValues(Frozen);
+		Bearer->GetHealth()->Reset(5000.0f);
+
+		const float Full = Bearer->GetHealth()->GetHealth();
+		Bearer->TakeDamage(Hit, FDamageEvent(), Context.Hero->GetController(), Context.Hero);
+		const float AfterFront = Bearer->GetHealth()->GetHealth();
+		Context.Test->TestNearlyEqual(TEXT("From the front the shield holds"), Full - AfterFront, Hit * Frozen.ShieldDamageFactor, 0.01f);
+		const FRotator Front = Bearer->GetActorRotation();
+		Bearer->SetActorRotation(Front + FRotator(0.0f, 180.0f, 0.0f));
+		Bearer->TakeDamage(Hit, FDamageEvent(), Context.Hero->GetController(), Context.Hero);
+		Context.Test->TestNearlyEqual(TEXT("From behind the shield does not help"), AfterFront - Bearer->GetHealth()->GetHealth(), Hit, 0.01f);
+		Bearer->SetActorRotation(Front);
+		State->Life = Bearer->GetHealth()->GetHealth();
+	}));
+	Steps.Add(Press(EKeys::LeftMouseButton));
+	Steps.Add(Wait(0.75));
+	Steps.Add(Release(EKeys::LeftMouseButton));
+	Steps.Add(WaitUntil(TEXT("the heavy swing is over"), 3.0, [](const FEIPlayContext& Context) { return !Context.Hero->GetSword()->IsSwinging(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Bearer = State->Enemy.Get();
+		const float Lost = State->Life - Bearer->GetHealth()->GetHealth();
+		Context.Test->AddInfo(FString::Printf(TEXT("A heavy hit at 200 cm takes %.0f life from the shield bearer"), Lost));
+		Context.Test->TestNearlyEqual(TEXT("A heavy hit goes through the shield"), Lost, Context.Hero->GetSword()->GetValues().Heavy.Damage, 0.01f);
+		Context.Test->TestTrue(TEXT("A heavy hit staggers the shield bearer"), Bearer->IsStaggering());
+		Bearer->Destroy();
+	}));
+	Steps.Add(Wait(0.1));
+
+	// The colossus is big, tough and does not stagger.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Colossus = SpawnKindAhead(Context, EEIEnemyKind::Colossus, 500.0f);
+		const FEIEnemyValues& Values = Colossus->GetValues();
+		Context.Test->TestEqual(TEXT("The colossus has its size"), static_cast<float>(Colossus->GetActorScale3D().Z), Values.Scale);
+		Context.Test->TestTrue(TEXT("The colossus is bigger than a runner"), Values.Scale > 1.0f);
+		Context.Test->TestEqual(TEXT("The colossus has its life"), Colossus->GetHealth()->GetHealth(), Values.Life);
+		Colossus->StaggerFromHeavyHit(1.0f);
+		Context.Test->TestFalse(TEXT("A heavy hit does not stagger the colossus"), Colossus->IsStaggering());
+		Colossus->Destroy();
+	}));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEIEnemyAttackTest,
 	"Eisenseelen.Play.Enemy.Attack",
