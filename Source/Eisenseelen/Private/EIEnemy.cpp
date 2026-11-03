@@ -65,6 +65,34 @@ namespace
 	constexpr int32 DebrisPieces = 7;
 	constexpr float DebrisLifeSeconds = 1.8f;
 	constexpr float DebrisSpeedCm = 450.0f;
+
+	// Walking.
+	constexpr float WalkFullFromCm = 250.0f;
+	constexpr float WalkBlendSpeed = 8.0f;
+	constexpr float StrideCm = 110.0f;
+	constexpr float WalkBobCm = 7.0f;
+	constexpr float WalkWaddleDegrees = 7.0f;
+	constexpr float WalkLeanDegrees = 9.0f;
+
+	// Standing around.
+	constexpr float IdlePhaseSpeed = 1.3f;
+	constexpr float IdleSwayDegrees = 2.0f;
+
+	// Winding up, striking and being hit.
+	constexpr float WindupLeanDegrees = 16.0f;
+	constexpr float StrikeLeanDegrees = 30.0f;
+	constexpr float StrikeForwardCm = 30.0f;
+	constexpr float StrikeRecoverSpeed = 5.0f;
+	constexpr float RecoilLeanDegrees = 16.0f;
+	constexpr float RecoilRecoverSpeed = 9.0f;
+	constexpr float NoticeHeadCm = 16.0f;
+	constexpr float NoticeRecoverSpeed = 4.0f;
+	constexpr float StaggerWobbleDegrees = 8.0f;
+	constexpr float StaggerWobbleSpeed = 14.0f;
+	const FVector ThrowWindupOffset(-26.0f, 6.0f, 26.0f);
+	const FVector ThrowFlingOffset(45.0f, -10.0f, 0.0f);
+	const FVector ShieldBashOffset(32.0f, 0.0f, 4.0f);
+	const FVector ShieldWindupOffset(-10.0f, 0.0f, 6.0f);
 }
 
 const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind)
@@ -299,6 +327,7 @@ void AEIEnemy::StandWatch(const FVector& NewHome)
 	StateTime = 0.0f;
 	// Not all at the same moment.
 	NoticeCheckRemaining = FMath::FRandRange(0.0f, NoticeCheckSeconds);
+	IdlePhase = FMath::FRandRange(0.0f, UE_TWO_PI);
 	SetActorRotation(FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f));
 }
 
@@ -337,11 +366,11 @@ void AEIEnemy::WakeUp(bool bTellNeighbours)
 	StopWalking();
 	State = EState::Chase;
 	StateTime = 0.0f;
+	MulticastNoticed(bTellNeighbours);
 	if (!bTellNeighbours)
 	{
 		return;
 	}
-	MulticastNoticed();
 	const double Alarm = Values.AlarmMeters * CentimetersPerMeter;
 	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
 	{
@@ -702,9 +731,13 @@ void AEIEnemy::OnRep_Telegraphing()
 	}
 }
 
-void AEIEnemy::MulticastNoticed_Implementation()
+void AEIEnemy::MulticastNoticed_Implementation(bool bCallOut)
 {
-	EIVisuals::PlaySoundAt(this, TEXT("GegnerAusholen"), GetActorLocation());
+	NoticeBlend = 1.0f;
+	if (bCallOut)
+	{
+		EIVisuals::PlaySoundAt(this, TEXT("GegnerAusholen"), GetActorLocation());
+	}
 }
 
 void AEIEnemy::MulticastShieldBlocked_Implementation()
@@ -715,11 +748,13 @@ void AEIEnemy::MulticastShieldBlocked_Implementation()
 void AEIEnemy::MulticastHurt_Implementation()
 {
 	HurtFlashRemaining = HurtFlashSeconds;
+	RecoilBlend = 1.0f;
 }
 
 void AEIEnemy::MulticastStrike_Implementation()
 {
 	TelegraphBlend = 0.0f;
+	StrikeBlend = 1.0f;
 }
 
 void AEIEnemy::MulticastDie_Implementation()
@@ -729,9 +764,12 @@ void AEIEnemy::MulticastDie_Implementation()
 	Head->SetVisibility(false);
 	Held->SetVisibility(false);
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	GetWorld()->SpawnActor<AEIBoneDebris>(GetActorLocation(), FRotator::ZeroRotator, Params);
+	const FTransform Spawn(GetActorLocation());
+	if (AEIBoneDebris* Debris = GetWorld()->SpawnActorDeferred<AEIBoneDebris>(AEIBoneDebris::StaticClass(), Spawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+	{
+		Debris->Setup(BaseColor, Values.Scale);
+		Debris->FinishSpawning(Spawn);
+	}
 }
 
 void AEIEnemy::UpdateLook(float DeltaSeconds)
@@ -753,12 +791,47 @@ void AEIEnemy::UpdateLook(float DeltaSeconds)
 		Material->SetVectorParameterValue(TEXT("Farbe"), Color);
 		Material->SetScalarParameterValue(TEXT("Leuchten"), Glow);
 	}
-	// It rears up while it winds up, readable even without the color.
-	const float HeadLength = HeadAboveBody + TelegraphBlend * TelegraphStretch * 100.0f;
-	// A staggered runner leans back, body and head together.
-	const float Tilt = StaggerBlend * StaggerTiltDegrees;
-	Body->SetRelativeRotation(FRotator(Tilt, 0.0f, 0.0f));
-	Head->SetRelativeLocation(FVector(-FMath::Sin(FMath::DegreesToRadians(Tilt)) * HeadLength, 0.0f, BodyHeight + FMath::Cos(FMath::DegreesToRadians(Tilt)) * HeadLength));
+	UpdatePose(DeltaSeconds);
+}
+
+void AEIEnemy::UpdatePose(float DeltaSeconds)
+{
+	// A body of simple shapes that still walks, winds up, strikes and flinches, all from what it does anyway.
+	const float Speed = static_cast<float>(GetVelocity().Size2D());
+	WalkBlend = FMath::FInterpTo(WalkBlend, FMath::Min(Speed / WalkFullFromCm, 1.0f), DeltaSeconds, WalkBlendSpeed);
+	WalkPhase = FMath::Fmod(WalkPhase + DeltaSeconds * Speed / StrideCm * UE_PI, UE_TWO_PI);
+	IdlePhase = FMath::Fmod(IdlePhase + DeltaSeconds * IdlePhaseSpeed, UE_TWO_PI);
+	StrikeBlend = FMath::FInterpTo(StrikeBlend, 0.0f, DeltaSeconds, StrikeRecoverSpeed);
+	RecoilBlend = FMath::FInterpTo(RecoilBlend, 0.0f, DeltaSeconds, RecoilRecoverSpeed);
+	NoticeBlend = FMath::FInterpTo(NoticeBlend, 0.0f, DeltaSeconds, NoticeRecoverSpeed);
+
+	const float Step = FMath::Sin(WalkPhase);
+	const float Bob = FMath::Abs(Step) * WalkBobCm * WalkBlend;
+	const float Stagger = StaggerBlend * (StaggerTiltDegrees + FMath::Sin(GetWorld()->GetTimeSeconds() * StaggerWobbleSpeed) * StaggerWobbleDegrees);
+	// Positive leans back.
+	const float Lean = Stagger + TelegraphBlend * WindupLeanDegrees + RecoilBlend * RecoilLeanDegrees - WalkBlend * WalkLeanDegrees - StrikeBlend * StrikeLeanDegrees;
+	const float Waddle = Step * WalkWaddleDegrees * WalkBlend + FMath::Sin(IdlePhase) * IdleSwayDegrees * (1.0f - WalkBlend);
+	const float Forward = StrikeBlend * StrikeForwardCm;
+
+	Body->SetRelativeRotation(FRotator(Lean, 0.0f, Waddle));
+	Body->SetRelativeLocation(FVector(Forward, 0.0f, BodyHeight + Bob));
+
+	// It rears up while it winds up, readable even without the color. The head stays on top of the leaning body.
+	const float HeadLength = HeadAboveBody + TelegraphBlend * TelegraphStretch * 100.0f + NoticeBlend * NoticeHeadCm;
+	const float LeanRadians = FMath::DegreesToRadians(Lean);
+	const float WaddleRadians = FMath::DegreesToRadians(Waddle);
+	Head->SetRelativeLocation(FVector(Forward - FMath::Sin(LeanRadians) * HeadLength, FMath::Sin(WaddleRadians) * HeadLength, BodyHeight + Bob + FMath::Cos(LeanRadians) * HeadLength));
+
+	if (Values.ShieldDamageFactor < 1.0f)
+	{
+		Held->SetRelativeLocation(ShieldPlace + ShieldWindupOffset * TelegraphBlend + ShieldBashOffset * StrikeBlend + FVector(0.0f, 0.0f, Bob));
+	}
+	else if (Values.ThrowSpeedMetersPerSecond > 0.0f)
+	{
+		Held->SetRelativeLocation(HeldBonePlace + ThrowWindupOffset * TelegraphBlend + ThrowFlingOffset * StrikeBlend + FVector(0.0f, 0.0f, Bob));
+		// The bone has just left the hand, and the next one is not there yet.
+		Held->SetVisibility(!IsDead() && StrikeBlend < 0.15f);
+	}
 }
 
 AEIBoneDebris::AEIBoneDebris()
@@ -768,22 +841,29 @@ AEIBoneDebris::AEIBoneDebris()
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
 }
 
+void AEIBoneDebris::Setup(const FLinearColor& InColor, float InScale)
+{
+	Color = InColor;
+	Size = InScale;
+}
+
 void AEIBoneDebris::BeginPlay()
 {
 	Super::BeginPlay();
 
 	UStaticMesh* Cube = EIVisuals::GetCube();
-	for (int32 Index = 0; Index < DebrisPieces; ++Index)
+	const int32 Pieces = FMath::RoundToInt(DebrisPieces * Size * Size);
+	for (int32 Index = 0; Index < Pieces; ++Index)
 	{
 		UStaticMeshComponent* Piece = NewObject<UStaticMeshComponent>(this);
 		Piece->SetStaticMesh(Cube);
 		Piece->SetupAttachment(GetRootComponent());
-		Piece->SetWorldScale3D(FVector(FMath::FRandRange(0.08f, 0.14f), FMath::FRandRange(0.08f, 0.14f), FMath::FRandRange(0.2f, 0.5f)));
-		Piece->SetRelativeLocation(FVector(FMath::FRandRange(-20.0f, 20.0f), FMath::FRandRange(-20.0f, 20.0f), FMath::FRandRange(-60.0f, 60.0f)));
+		Piece->SetWorldScale3D(FVector(FMath::FRandRange(0.08f, 0.14f), FMath::FRandRange(0.08f, 0.14f), FMath::FRandRange(0.2f, 0.5f)) * Size);
+		Piece->SetRelativeLocation(FVector(FMath::FRandRange(-20.0f, 20.0f), FMath::FRandRange(-20.0f, 20.0f), FMath::FRandRange(-60.0f, 60.0f)) * Size);
 		Piece->SetCollisionProfileName(TEXT("PhysicsActor"));
 		Piece->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 		Piece->RegisterComponent();
-		EIVisuals::SetColor(Piece, BoneColor);
+		EIVisuals::SetColor(Piece, Color);
 		Piece->SetSimulatePhysics(true);
 		Piece->SetPhysicsLinearVelocity(FMath::VRand() * DebrisSpeedCm + FVector(0.0f, 0.0f, DebrisSpeedCm * 0.5f));
 		Piece->SetPhysicsAngularVelocityInDegrees(FMath::VRand() * 720.0f);

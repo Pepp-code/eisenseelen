@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "EIHeroValues.h"
+#include "EIPoses.h"
 #include "Misc/AutomationTest.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -61,6 +62,11 @@ bool FEIHeroValuesProjectFileTest::RunTest(const FString& Parameters)
 	FEIHeroValues Values;
 	FString Error;
 	if (!FEIHeroValues::LoadFromProjectFile(Values, Error))
+	{
+		AddError(Error);
+	}
+	FEIHandMotion Motion;
+	if (!FEIHandMotion::LoadFromProjectFile(Motion, Error))
 	{
 		AddError(Error);
 	}

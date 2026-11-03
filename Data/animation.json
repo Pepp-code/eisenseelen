@@ -1,0 +1,20 @@
+{
+	"atmen_cm": 0.35,
+	"atmen_pro_s": 0.3,
+	"wippen_hoch_cm": 1.3,
+	"wippen_seite_cm": 1.1,
+	"schrittlaenge_m": 1.7,
+	"sprint_vor_cm": -4,
+	"sprint_rechts_cm": 5,
+	"sprint_hoch_cm": -9,
+	"sprint_nick_grad": -22,
+	"sprint_gier_grad": 8,
+	"sprint_roll_grad": 12,
+	"luft_hoch_cm": 3,
+	"landen_tief_cm": 6,
+	"maus_nachziehen_grad_je_grad_pro_s": 0.012,
+	"maus_nachziehen_max_grad": 4,
+	"sichtfeld_grad": 90,
+	"sichtfeld_sprint_plus_grad": 6,
+	"sichtfeld_sturzflug_plus_grad": 14
+}

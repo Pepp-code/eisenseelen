@@ -2,6 +2,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "EIHeroCharacter.h"
+#include "EIHeroMovementComponent.h"
 #include "EIPoses.h"
 #include "EIVisuals.h"
 #include "Engine/StaticMesh.h"
@@ -28,6 +29,14 @@ namespace
 	const FLinearColor TrailColor(0.6f, 0.75f, 1.0f);
 	constexpr float TrailStrength = 1.2f;
 	constexpr float CancelBlendSeconds = 0.08f;
+
+	constexpr float MotionBlendSpeed = 9.0f;
+	constexpr float LandingRecoverSpeed = 7.0f;
+	constexpr float LookLagRecoverSpeed = 10.0f;
+	constexpr float SprintFromRunShare = 1.15f;
+	constexpr float MaxWalkShare = 1.5f;
+	// While the hand does something on purpose, it should not also wobble.
+	constexpr float BusyCalm = 0.85f;
 }
 
 UEIViewModelComponent::UEIViewModelComponent()
@@ -109,6 +118,19 @@ void UEIViewModelComponent::PlayPose(FName Curve, float Seconds, float TrailFrom
 	HitStopRemaining = 0.0f;
 }
 
+void UEIViewModelComponent::PlayPoseIfIdle(FName Curve, float Seconds)
+{
+	if (PlayingCurve == NAME_None && HeldCurve == NAME_None)
+	{
+		PlayPose(Curve, Seconds);
+	}
+}
+
+void UEIViewModelComponent::NoteLanding(float Strength)
+{
+	LandingDip = FMath::Max(LandingDip, Strength * CastChecked<AEIHeroCharacter>(GetOwner())->GetHandMotion().LandingDipCm);
+}
+
 void UEIViewModelComponent::CancelPose()
 {
 	if (Hand != nullptr)
@@ -169,6 +191,55 @@ FTransform UEIViewModelComponent::CurrentPose() const
 	return Curve != nullptr ? Curve->Evaluate(T) : FTransform::Identity;
 }
 
+FTransform UEIViewModelComponent::AddMotion(const FTransform& Pose, float DeltaTime)
+{
+	const AEIHeroCharacter* Hero = CastChecked<AEIHeroCharacter>(GetOwner());
+	const FEIHandMotion& Motion = Hero->GetHandMotion();
+	const UEIHeroMovementComponent* Movement = Hero->GetHeroMovement();
+	const float Speed = static_cast<float>(Hero->GetVelocity().Size2D());
+	const bool bOnGround = Movement->IsMovingOnGround();
+	const float RunSpeed = FMath::Max(Movement->MaxWalkSpeed, 1.0f);
+	const auto BlendTowards = [DeltaTime](float& Value, float Target) { Value = FMath::FInterpTo(Value, Target, DeltaTime, MotionBlendSpeed); };
+
+	BlendTowards(WalkBlend, bOnGround ? FMath::Min(Speed / RunSpeed, MaxWalkShare) : 0.0f);
+	BlendTowards(SprintBlend, bOnGround && Speed > RunSpeed * SprintFromRunShare ? 1.0f : 0.0f);
+	BlendTowards(AirBlend, bOnGround ? 0.0f : 1.0f);
+	BlendTowards(BusyBlend, PlayingCurve != NAME_None || HeldCurve != NAME_None ? 1.0f : 0.0f);
+	LandingDip = FMath::FInterpTo(LandingDip, 0.0f, DeltaTime, LandingRecoverSpeed);
+	BreathPhase = FMath::Fmod(BreathPhase + DeltaTime * Motion.BreathsPerSecond * UE_TWO_PI, UE_TWO_PI);
+	if (bOnGround)
+	{
+		// One whole swing from side to side takes two steps.
+		BobPhase = FMath::Fmod(BobPhase + DeltaTime * Speed / (Motion.StrideMeters * 100.0f) * UE_PI, UE_TWO_PI);
+	}
+
+	// The hand lags behind when the view turns.
+	const FRotator View = Hero->GetViewRotation();
+	if (bHasLastView && DeltaTime > 0.0f)
+	{
+		const FRotator Turned = (View - LastView).GetNormalized();
+		const float TargetYaw = FMath::Clamp(static_cast<float>(-Turned.Yaw) / DeltaTime * Motion.LookLag, -Motion.LookLagMaxDegrees, Motion.LookLagMaxDegrees);
+		const float TargetPitch = FMath::Clamp(static_cast<float>(-Turned.Pitch) / DeltaTime * Motion.LookLag, -Motion.LookLagMaxDegrees, Motion.LookLagMaxDegrees);
+		LookLagYaw = FMath::FInterpTo(LookLagYaw, TargetYaw, DeltaTime, LookLagRecoverSpeed);
+		LookLagPitch = FMath::FInterpTo(LookLagPitch, TargetPitch, DeltaTime, LookLagRecoverSpeed);
+	}
+	LastView = View;
+	bHasLastView = true;
+
+	const float Calm = 1.0f - BusyBlend * BusyCalm;
+	const float Side = FMath::Sin(BobPhase) * Motion.BobSideCm * WalkBlend;
+	const float Up = FMath::Cos(BobPhase * 2.0f) * Motion.BobUpCm * WalkBlend
+		+ FMath::Sin(BreathPhase) * Motion.BreathCm * (1.0f - FMath::Min(WalkBlend, 1.0f))
+		+ Motion.AirUpCm * AirBlend - LandingDip;
+	const FVector Offset = FVector(Motion.SprintForwardCm * SprintBlend, Side + Motion.SprintRightCm * SprintBlend, Up + Motion.SprintUpCm * SprintBlend) * Calm;
+	const FRotator Turn = FRotator(Motion.SprintPitchDegrees * SprintBlend + LookLagPitch, Motion.SprintYawDegrees * SprintBlend + LookLagYaw, Motion.SprintRollDegrees * SprintBlend) * Calm;
+
+	FTransform Result = Pose;
+	Result.SetTranslation(Pose.GetTranslation() + Offset);
+	Result.SetRotation(FQuat(Turn) * Pose.GetRotation());
+	return Result;
+}
+
 void UEIViewModelComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -202,7 +273,7 @@ void UEIViewModelComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		Blended.Blend(BlendFrom, Pose, 1.0f - BlendRemaining / CancelBlendSeconds);
 		Pose = Blended;
 	}
-	Hand->SetRelativeTransform(Pose);
+	Hand->SetRelativeTransform(PreviewCurve != NAME_None ? Pose : AddMotion(Pose, DeltaTime));
 	UpdateTrail(DeltaTime, bTrailActive || PreviewCurve != NAME_None);
 }
 

@@ -28,6 +28,8 @@ namespace
 	constexpr float DeadEyeDropCm = 110.0f;
 	constexpr float HardLandingSpeedCm = 1500.0f;
 	constexpr float HardLandingKickDegrees = 4.0f;
+	constexpr float FieldOfViewBlendSpeed = 5.0f;
+	constexpr float SprintFromRunShare = 1.15f;
 }
 
 bool FEIClassValues::LoadFromProjectFile(EEIHeroClass HeroClass, FEIClassValues& OutValues, FString& OutError)
@@ -93,6 +95,10 @@ void AEIHeroCharacter::BeginPlay()
 	if (!FEIPoseLibrary::LoadFromProjectFile(Poses, Error))
 	{
 		FEIDataFile::ReportError(TEXT("posen.json"), Error);
+	}
+	if (!FEIHandMotion::LoadFromProjectFile(HandMotion, Error))
+	{
+		FEIDataFile::ReportError(TEXT("animation.json"), Error);
 	}
 	Sword->LoadValues();
 	Caster->LoadValues();
@@ -251,6 +257,7 @@ void AEIHeroCharacter::Tick(float DeltaSeconds)
 	if (IsLocallyControlled())
 	{
 		GetHeroMovement()->SetWantsToSprint(bSprintKeyHeld);
+		UpdateFieldOfView(DeltaSeconds);
 	}
 	UpdateCameraKick(DeltaSeconds);
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);
@@ -258,6 +265,21 @@ void AEIHeroCharacter::Tick(float DeltaSeconds)
 	{
 		UpdateRecovery(DeltaSeconds);
 	}
+}
+
+void AEIHeroCharacter::UpdateFieldOfView(float DeltaSeconds)
+{
+	const UEIHeroMovementComponent* Movement = GetHeroMovement();
+	float Target = HandMotion.FieldOfViewDegrees;
+	if (Movement->IsDiving())
+	{
+		Target += HandMotion.DiveFieldOfViewPlusDegrees;
+	}
+	else if (Movement->IsMovingOnGround() && GetVelocity().Size2D() > Movement->MaxWalkSpeed * SprintFromRunShare)
+	{
+		Target += HandMotion.SprintFieldOfViewPlusDegrees;
+	}
+	Camera->SetFieldOfView(FMath::FInterpTo(Camera->FieldOfView, Target, DeltaSeconds, FieldOfViewBlendSpeed));
 }
 
 void AEIHeroCharacter::NoteCombat()
@@ -365,6 +387,10 @@ void AEIHeroCharacter::MulticastBoardBarge_Implementation(AEISkyBarge* Barge)
 void AEIHeroCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
+	if (IsLocallyControlled() && !bClientUpdating && GetViewModel() != nullptr)
+	{
+		GetViewModel()->NoteLanding(FMath::Clamp(static_cast<float>(-GetVelocity().Z) / HardLandingSpeedCm, 0.0f, 1.0f));
+	}
 	// Landing from the barge hits hard for the eye and the ear, but it does no damage.
 	if (IsLocallyControlled() && !bClientUpdating && GetVelocity().Z < -HardLandingSpeedCm)
 	{

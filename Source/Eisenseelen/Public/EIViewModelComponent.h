@@ -26,6 +26,12 @@ public:
 	void ShowStaff(bool bStaff);
 	void PlayPose(FName Curve, float Seconds, float TrailFrom = 2.0f, float TrailTo = 2.0f);
 
+	/** For a gesture nothing depends on: it does not interrupt a swing or a block. */
+	void PlayPoseIfIdle(FName Curve, float Seconds);
+
+	/** The hand dips when the hero lands. Strength runs from 0 to 1. */
+	void NoteLanding(float Strength);
+
 	/** Breaks off the pose that is playing. The hand blends over from where it is. */
 	void CancelPose();
 	void HoldPose(FName Curve, float T);
@@ -48,6 +54,7 @@ private:
 
 	UStaticMeshComponent* AddPart(USceneComponent* Parent, UStaticMesh* Mesh, const FVector& Location, const FVector& Scale, const FLinearColor& Color, float Glow = 0.0f);
 	FTransform CurrentPose() const;
+	FTransform AddMotion(const FTransform& Pose, float DeltaTime);
 	void UpdateTrail(float DeltaTime, bool bAddSample);
 
 	UPROPERTY(Transient)
@@ -81,4 +88,16 @@ private:
 
 	FTransform BlendFrom = FTransform::Identity;
 	float BlendRemaining = 0.0f;
+
+	float BobPhase = 0.0f;
+	float BreathPhase = 0.0f;
+	float WalkBlend = 0.0f;
+	float SprintBlend = 0.0f;
+	float AirBlend = 0.0f;
+	float BusyBlend = 0.0f;
+	float LandingDip = 0.0f;
+	float LookLagYaw = 0.0f;
+	float LookLagPitch = 0.0f;
+	FRotator LastView = FRotator::ZeroRotator;
+	bool bHasLastView = false;
 };

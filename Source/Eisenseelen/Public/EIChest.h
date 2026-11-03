@@ -52,12 +52,14 @@ public:
 	void OpenFor(AActor* Hero);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void Tick(float DeltaSeconds) override;
 
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	void LoadValues();
+	void ShowLid();
 
 	UFUNCTION()
 	void OnRep_Look();
@@ -94,5 +96,7 @@ private:
 
 	TArray<TWeakObjectPtr<AEIEnemy>> Guards;
 	EEIChestState ShownState = EEIChestState::Sealed;
+	float LidDegrees = 0.0f;
+	float LidTargetDegrees = 0.0f;
 	FEIRunValues Values;
 };

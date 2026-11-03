@@ -190,9 +190,9 @@ void UEIRuneComponent::CastRune()
 	ReadyAt = GetWorld()->GetTimeSeconds() + GetCooldownSeconds();
 	AEIHeroCharacter* Hero = GetHero();
 	EIVisuals::PlaySound2D(this, TEXT("Feuerball"));
-	if (Hero->GetViewModel() != nullptr && Hero->GetHeroClass() == EEIHeroClass::Arcanist)
+	if (Hero->GetViewModel() != nullptr)
 	{
-		Hero->GetViewModel()->PlayPose(TEXT("stab_feuerball"), StaffCastSeconds);
+		Hero->GetViewModel()->PlayPoseIfIdle(Hero->GetHeroClass() == EEIHeroClass::Arcanist ? TEXT("stab_feuerball") : TEXT("schwert_zauber"), StaffCastSeconds);
 	}
 	FVector Location;
 	float Yaw = 0.0f;

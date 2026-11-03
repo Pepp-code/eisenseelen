@@ -88,6 +88,36 @@ namespace
 	}
 }
 
+bool FEIHandMotion::LoadFromProjectFile(FEIHandMotion& OutMotion, FString& OutError)
+{
+	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("animation.json"), OutError);
+	FEIHandMotion Loaded;
+	if (!Root.IsValid()
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("atmen_cm"), 0.0, 50.0, Loaded.BreathCm, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("atmen_pro_s"), 0.0, 10.0, Loaded.BreathsPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("wippen_hoch_cm"), 0.0, 50.0, Loaded.BobUpCm, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("wippen_seite_cm"), 0.0, 50.0, Loaded.BobSideCm, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("schrittlaenge_m"), 0.1, 20.0, Loaded.StrideMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sprint_vor_cm"), -100.0, 100.0, Loaded.SprintForwardCm, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sprint_rechts_cm"), -100.0, 100.0, Loaded.SprintRightCm, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sprint_hoch_cm"), -100.0, 100.0, Loaded.SprintUpCm, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sprint_nick_grad"), -180.0, 180.0, Loaded.SprintPitchDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sprint_gier_grad"), -180.0, 180.0, Loaded.SprintYawDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sprint_roll_grad"), -180.0, 180.0, Loaded.SprintRollDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("luft_hoch_cm"), -100.0, 100.0, Loaded.AirUpCm, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("landen_tief_cm"), 0.0, 100.0, Loaded.LandingDipCm, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("maus_nachziehen_grad_je_grad_pro_s"), 0.0, 1.0, Loaded.LookLag, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("maus_nachziehen_max_grad"), 0.0, 45.0, Loaded.LookLagMaxDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sichtfeld_grad"), 30.0, 150.0, Loaded.FieldOfViewDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sichtfeld_sprint_plus_grad"), 0.0, 60.0, Loaded.SprintFieldOfViewPlusDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sichtfeld_sturzflug_plus_grad"), 0.0, 60.0, Loaded.DiveFieldOfViewPlusDegrees, OutError))
+	{
+		return false;
+	}
+	OutMotion = Loaded;
+	return true;
+}
+
 FTransform FEIPoseCurve::Evaluate(float T) const
 {
 	const FVector Angles = Rotation.Eval(T);

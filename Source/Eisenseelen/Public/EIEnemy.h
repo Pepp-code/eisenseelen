@@ -139,7 +139,7 @@ private:
 	void OnRep_Telegraphing();
 
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastNoticed();
+	void MulticastNoticed(bool bCallOut);
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastShieldBlocked();
@@ -170,6 +170,7 @@ private:
 	void Strike();
 	void HandleDied();
 	void UpdateLook(float DeltaSeconds);
+	void UpdatePose(float DeltaSeconds);
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Body;
@@ -229,6 +230,12 @@ private:
 	float HurtFlashRemaining = 0.0f;
 	float TelegraphBlend = 0.0f;
 	float StaggerBlend = 0.0f;
+	float WalkBlend = 0.0f;
+	float WalkPhase = 0.0f;
+	float IdlePhase = 0.0f;
+	float StrikeBlend = 0.0f;
+	float RecoilBlend = 0.0f;
+	float NoticeBlend = 0.0f;
 };
 
 /** Bones flying apart when a runner dies. Purely for the eye, every machine spawns its own. */
@@ -240,8 +247,15 @@ class EISENSEELEN_API AEIBoneDebris : public AActor
 public:
 	AEIBoneDebris();
 
+	/** Between the deferred spawn and FinishSpawning. */
+	void Setup(const FLinearColor& InColor, float InScale);
+
 protected:
 	virtual void BeginPlay() override;
+
+private:
+	FLinearColor Color = FLinearColor::Gray;
+	float Size = 1.0f;
 };
 
 /** A bone a thrower throws. It flies straight, and whoever does not step aside in time gets hit. */

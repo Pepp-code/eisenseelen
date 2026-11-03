@@ -237,6 +237,11 @@ void UEICasterComponent::FireAsOwner(EEICast Kind)
 		constexpr float StaffFireballSeconds = 0.6f;
 		Hero->GetViewModel()->PlayPose(bFireball ? TEXT("stab_feuerball") : TEXT("stab_schuss"), bFireball ? StaffFireballSeconds : StaffShotSeconds);
 	}
+	else if (Hero->GetViewModel() != nullptr)
+	{
+		constexpr float SwordCastSeconds = 0.5f;
+		Hero->GetViewModel()->PlayPoseIfIdle(TEXT("schwert_zauber"), SwordCastSeconds);
+	}
 	if (GetOwner()->HasAuthority())
 	{
 		SpawnProjectile(Kind, Target);

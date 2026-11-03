@@ -3,6 +3,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "EIDataFile.h"
 #include "EIEnemy.h"
+#include "EIProjectile.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -18,6 +19,8 @@ namespace
 	const FVector SealSizeCm(99.0f, 24.0f, 88.0f);
 	constexpr float GemSizeCm = 22.0f;
 	constexpr float OpenLidDegrees = 75.0f;
+	constexpr float LidDegreesPerSecond = 220.0f;
+	constexpr float SealBurstRadiusCm = 170.0f;
 	constexpr float ZoneDiscHeightCm = 3.0f;
 	// Somebody diving past high above is not in the circle yet.
 	constexpr float ZoneHeightCm = 400.0f;
@@ -34,6 +37,8 @@ AEIChest::AEIChest()
 {
 	bReplicates = true;
 	bAlwaysRelevant = true;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
@@ -185,12 +190,13 @@ void AEIChest::OnRep_Look()
 
 	const APlayerController* LocalPlayer = GetWorld()->GetFirstPlayerController();
 	const bool bOpen = LocalPlayer != nullptr && IsOpenFor(LocalPlayer->GetPawn());
-	// The lid turns around its back edge.
-	const float Angle = bOpen ? OpenLidDegrees : 0.0f;
-	const FVector Hinge(-LidSizeCm.X / 2.0f, 0.0f, BodySizeCm.Z);
-	const FRotator Turn(Angle, 0.0f, 0.0f);
-	const FVector FromHinge = Turn.RotateVector(FVector(LidSizeCm.X / 2.0f, 0.0f, LidSizeCm.Z / 2.0f));
-	Lid->SetRelativeLocationAndRotation(Hinge + FromHinge, Turn);
+	LidTargetDegrees = bOpen ? OpenLidDegrees : 0.0f;
+	if (!bOpen)
+	{
+		LidDegrees = 0.0f;
+	}
+	ShowLid();
+	SetActorTickEnabled(LidDegrees != LidTargetDegrees);
 
 	const bool bFree = State == EEIChestState::Free;
 	Gem->SetVisibility(bInUse && !bOpen);
@@ -211,6 +217,29 @@ void AEIChest::OnRep_Look()
 		else if (bFree)
 		{
 			EIVisuals::PlaySoundAt(this, TEXT("TrefferSchwer"), GetActorLocation());
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(GetMarkLocation(), FRotator::ZeroRotator, Params))
+			{
+				FX->Setup(SealBurstRadiusCm, GemColor);
+			}
 		}
 	}
+}
+
+void AEIChest::ShowLid()
+{
+	// The lid turns around its back edge.
+	const FVector Hinge(-LidSizeCm.X / 2.0f, 0.0f, BodySizeCm.Z);
+	const FRotator Turn(LidDegrees, 0.0f, 0.0f);
+	const FVector FromHinge = Turn.RotateVector(FVector(LidSizeCm.X / 2.0f, 0.0f, LidSizeCm.Z / 2.0f));
+	Lid->SetRelativeLocationAndRotation(Hinge + FromHinge, Turn);
+}
+
+void AEIChest::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	LidDegrees = FMath::FInterpConstantTo(LidDegrees, LidTargetDegrees, DeltaSeconds, LidDegreesPerSecond);
+	ShowLid();
+	SetActorTickEnabled(LidDegrees != LidTargetDegrees);
 }

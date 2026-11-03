@@ -82,6 +82,7 @@ public:
 	void PressSpell();
 	void PressRuneSpell();
 	const FEIPoseLibrary& GetPoses() const { return Poses; }
+	const FEIHandMotion& GetHandMotion() const { return HandMotion; }
 
 	/** Null on everyone but the owner, and until the owner knows it is local. */
 	UEIViewModelComponent* GetViewModel() const { return bViewModelBuilt ? ViewModel : nullptr; }
@@ -124,6 +125,7 @@ private:
 
 	void UpdateCameraKick(float DeltaSeconds);
 	void UpdateRecovery(float DeltaSeconds);
+	void UpdateFieldOfView(float DeltaSeconds);
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UCameraComponent> Camera;
@@ -153,6 +155,7 @@ private:
 
 	FEIHeroValues Values;
 	FEIPoseLibrary Poses;
+	FEIHandMotion HandMotion;
 	bool bViewModelBuilt = false;
 	float CameraKickRemaining = 0.0f;
 	float CameraKickDegrees = 0.0f;
