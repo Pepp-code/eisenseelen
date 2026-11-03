@@ -73,4 +73,4 @@ Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war
 
 **Nicht geprüft:** Töne kann der Agent nicht hören, und die Klingenspur erscheint in keinem Standbild.
 
-**Konzeptbilder:** Die Bilder des Entwicklers von Klingenwacht und Arkanist liegen in `SourceAssets/Konzepte`. Sie zeigen die Richtung und sind kein Bauplan. Die Stilfrage aus dem Plan ist noch offen.
+**Stil (entschieden am 3. November 2026):** Leere Rüstungen, beide Klassen flach aus einfarbigen Flächen ohne Umrisslinien. Die Vorlage ist `SourceAssets/Konzepte/Stilvorlage_beide_Helden.jpg`. Die Bilder in den Unterordnern dort sind frühere Entwürfe. Alle zeigen die Richtung und sind kein Bauplan.
