@@ -59,9 +59,14 @@ public:
 	/** Spawns one enemy at a random place around a random hero. Returns null if no place worked out this time. */
 	AEIEnemy* SpawnOne();
 
+	/** Spawns guards in a circle around a place, in plain sight. Places where it did not work out stay empty. */
+	TArray<AEIEnemy*> SpawnGuards(const FVector& Center, float DistanceCm, int32 Count);
+
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	bool FindStandingPlace(const FVector& Ground, FVector& OutLocation) const;
+	AEIEnemy* SpawnAt(const FVector& Location);
 	void RemoveEnemiesLeftBehind();
 
 	FEIHordeValues Values;

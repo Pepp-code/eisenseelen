@@ -6,6 +6,7 @@
 
 class AEIAltar;
 class AEIBeacon;
+class AEIChest;
 class AEIHeroCharacter;
 class AEISkyBarge;
 enum class EEIRunPhase : uint8;
@@ -13,8 +14,11 @@ enum class EEIRunPhase : uint8;
 /** The numbers of a run from Data/lauf.json. */
 struct EISENSEELEN_API FEIRunValues
 {
-	float ChestsPerRun = 8.0f;
+	float ChestsPerRun = 5.0f;
 	float ChestReachMeters = 3.0f;
+	float ChestZoneMeters = 10.0f;
+	float ChestGuards = 8.0f;
+	float ChestGuardDistanceMeters = 6.0f;
 	float RitualAltars = 3.0f;
 	float AltarHoldSeconds = 30.0f;
 	float AltarZoneMeters = 8.0f;
@@ -66,6 +70,8 @@ public:
 private:
 	void HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void PrepareChests();
+	void UpdateChests(const TArray<AEIHeroCharacter*>& LivingHeroes);
+	int32 CountChestGuards(int32 HeroCount) const;
 	bool OpenChest(AEIHeroCharacter* Hero);
 	void IgniteBeacon(AEIBeacon* Beacon);
 	void HoldBeacon(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
@@ -83,6 +89,9 @@ private:
 	/** The altars of this run in the order they wake up. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AEIAltar>> AltarOrder;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AEIChest>> ChestsInUse;
 
 	FEIRunValues Values;
 	bool bPrepared = false;

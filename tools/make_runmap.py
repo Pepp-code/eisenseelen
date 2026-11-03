@@ -31,9 +31,12 @@ COVER_CLEAR_M = 22
 COVER_MIN_SIZE_M = 2
 COVER_MAX_SIZE_M = 5
 COVER_MAX_HEIGHT_M = 3
-PLACE_CHEST_OFFSET_M = 4
-PLACE_CHEST_ANGLE = 215
-FREE_CHEST_CLEAR_M = 10
+# A chest needs room for the fight around it, away from the altars and beacons, where the fights already are.
+CHEST_CLEAR_EDGE_M = 16
+CHEST_CLEAR_PLACE_M = 32
+CHEST_CLEAR_PAD_M = 18
+CHEST_CLEAR_COVER_M = 15
+CHEST_CLEAR_CHEST_M = 35
 # A new volume's brush is a cube of this size. Paths are only needed near the floor.
 VOLUME_BRUSH_M = 2
 NAVIGATION_HEIGHT_M = 12
@@ -102,26 +105,23 @@ def add_cover(actors, layout):
     return taken
 
 
-def add_chests(actors, layout, taken):
-    """One at every place, and more out in the open. A run only uses some of them."""
+def add_chests(actors, layout, cover):
+    """Out in the open, each with room for its fight. A run only uses some of them."""
     chest_class = unreal.load_class(None, "/Script/Eisenseelen.EIChest")
-    for index, place in enumerate(layout["orte"]):
-        # Inside the ruin, with its front to the altar in the middle.
-        angle = index * 53 + PLACE_CHEST_ANGLE
-        x = place["x_m"] + PLACE_CHEST_OFFSET_M * math.cos(math.radians(angle))
-        y = place["y_m"] + PLACE_CHEST_OFFSET_M * math.sin(math.radians(angle))
-        spawn(actors, chest_class, location=(x * CM_PER_M, y * CM_PER_M, 0), rotation=(0, 0, angle + 180), label="Truhe")
-
     # A random generator of its own, so that more chests do not move the cover around.
     rng = random.Random(layout["deckung_zufall"] + 1)
-    half = layout["boden_m"] / 2 - COVER_CLEAR_M
+    half = layout["boden_m"] / 2 - CHEST_CLEAR_EDGE_M
+    keep_clear = [(point, CHEST_CLEAR_COVER_M) for point in cover]
+    keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PLACE_M) for p in layout["orte"] + layout["leuchtfeuer"]]
+    keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PAD_M) for p in layout["sprungfelder"]]
+    keep_clear.append(((0, 0), CHEST_CLEAR_PLACE_M))
     placed = 0
-    while placed < layout["truhen_frei"]:
+    while placed < layout["truhen"]:
         x, y = rng.uniform(-half, half), rng.uniform(-half, half)
-        if any(math.hypot(x - other_x, y - other_y) < FREE_CHEST_CLEAR_M for other_x, other_y in taken):
+        if any(math.hypot(x - other_x, y - other_y) < clear for (other_x, other_y), clear in keep_clear):
             continue
         spawn(actors, chest_class, location=(x * CM_PER_M, y * CM_PER_M, 0), rotation=(0, 0, rng.uniform(0, 360)), label="Truhe")
-        taken.append((x, y))
+        keep_clear.append(((x, y), CHEST_CLEAR_CHEST_M))
         placed += 1
 
 

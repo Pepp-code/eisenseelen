@@ -43,6 +43,7 @@ namespace
 	const FLinearColor TextShadowColor(0.0f, 0.0f, 0.0f, 0.75f);
 	constexpr float TextShadowOffset = 1.5f;
 	const FLinearColor ChestMarkColor(1.0f, 0.8f, 0.25f);
+	const FLinearColor GuardedChestMarkColor(1.0f, 0.3f, 0.15f);
 	const FLinearColor OmenColor(1.0f, 0.85f, 0.45f);
 	constexpr float ChestMarkRangeCm = 4000.0f;
 	const FLinearColor BargeMarkColor(0.5f, 0.85f, 1.0f);
@@ -225,20 +226,31 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	const EEIRunPhase Phase = State->GetRunPhase();
 	if (Phase != EEIRunPhase::OnBarge && Phase != EEIRunPhase::Escaped && Phase != EEIRunPhase::Failed)
 	{
+		int32 GuardsLeft = 0;
 		for (TActorIterator<AEIChest> It(GetWorld()); It; ++It)
 		{
+			GuardsLeft += It->IsInUse() ? It->GetGuardsLeft() : 0;
 			if (!It->IsInUse() || It->IsOpenFor(Hero) || FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) > ChestMarkRangeCm)
 			{
 				continue;
 			}
-			if (It->IsInReach(Hero))
+			const bool bFree = It->GetState() == EEIChestState::Free;
+			if (!It->IsInReach(Hero))
+			{
+				DrawWorldMark(It->GetMarkLocation(), DistanceLabel(bFree ? TEXT("Truhe") : TEXT("Bewachte Truhe"), It->GetActorLocation()), bFree ? ChestMarkColor : GuardedChestMarkColor);
+			}
+			else if (bFree)
 			{
 				DrawLine(TEXT("F: Truhe \u00F6ffnen"), CenterX - 95.0f, PromptY - 40.0f, TextColor, 1.5f);
 			}
 			else
 			{
-				DrawWorldMark(It->GetMarkLocation(), DistanceLabel(TEXT("Truhe"), It->GetActorLocation()), ChestMarkColor);
+				DrawLine(TEXT("Besiege erst die W\u00E4chter!"), CenterX - 150.0f, PromptY - 40.0f, WarningTextColor, 1.5f);
 			}
+		}
+		if (GuardsLeft > 0)
+		{
+			DrawLine(FString::Printf(TEXT("W\u00E4chter: %d"), GuardsLeft), CenterX - 70.0f, 190.0f, WarningTextColor, 1.5f);
 		}
 	}
 

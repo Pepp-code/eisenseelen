@@ -21,7 +21,7 @@
 		{ "x_m": 70, "y_m": -40, "turm_hoehe_m": 5 },
 		{ "x_m": -90, "y_m": 60, "turm_hoehe_m": 5 }
 	],
-	"truhen_frei": 6,
+	"truhen": 14,
 	"deckung_anzahl": 30,
 	"deckung_zufall": 7
 }

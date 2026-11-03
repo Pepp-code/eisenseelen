@@ -29,6 +29,9 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 	if (!Root.IsValid()
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhen_pro_lauf"), 0.0, 1000.0, Loaded.ChestsPerRun, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_reichweite_m"), 0.5, 100.0, Loaded.ChestReachMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_zone_m"), 1.0, 100.0, Loaded.ChestZoneMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_waechter"), 0.0, 100.0, Loaded.ChestGuards, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_waechter_abstand_m"), 1.0, 100.0, Loaded.ChestGuardDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("ritual_altare"), 0.0, 100.0, Loaded.RitualAltars, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_halten_s"), 0.1, 3600.0, Loaded.AltarHoldSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_zone_m"), 1.0, 100.0, Loaded.AltarZoneMeters, OutError)
@@ -118,19 +121,51 @@ void UEIRunDirector::PrepareChests()
 		Chests.Insert(*It, FMath::RandRange(0, Chests.Num()));
 	}
 	const int32 InUse = FMath::RoundToInt(Values.ChestsPerRun);
+	ChestsInUse.Reset();
 	for (int32 Index = 0; Index < Chests.Num(); ++Index)
 	{
 		Chests[Index]->PrepareForRun(Index < InUse);
+		if (Index < InUse)
+		{
+			ChestsInUse.Add(Chests[Index]);
+		}
+	}
+}
+
+int32 UEIRunDirector::CountChestGuards(int32 HeroCount) const
+{
+	// The number in the file is for one player at the start. It grows like the budget of the horde.
+	const FEIDirectorValues& Director = CastChecked<AEIGameMode>(GetOwner())->GetHorde()->GetValues().Director;
+	const float PlayerFactor = Director.PlayerShare[FMath::Clamp(HeroCount, 1, 4) - 1] / FMath::Max(Director.PlayerShare[0], KINDA_SMALL_NUMBER);
+	const float CorruptionFactor = 1.0f + Values.CorruptionThreatPerStage * GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage();
+	return FMath::RoundToInt(Values.ChestGuards * PlayerFactor * CorruptionFactor);
+}
+
+void UEIRunDirector::UpdateChests(const TArray<AEIHeroCharacter*>& LivingHeroes)
+{
+	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
+	for (AEIChest* Chest : ChestsInUse)
+	{
+		if (Chest->GetState() == EEIChestState::Guarded)
+		{
+			Chest->UpdateGuards();
+		}
+		else if (Chest->GetState() == EEIChestState::Sealed
+			&& LivingHeroes.ContainsByPredicate([Chest](const AEIHeroCharacter* Hero) { return Chest->IsInZone(Hero); }))
+		{
+			const float DistanceCm = Values.ChestGuardDistanceMeters * CentimetersPerMeter;
+			Chest->SetGuards(Horde->SpawnGuards(Chest->GetActorLocation(), DistanceCm, CountChestGuards(LivingHeroes.Num())));
+		}
 	}
 }
 
 bool UEIRunDirector::OpenChest(AEIHeroCharacter* Hero)
 {
-	for (TActorIterator<AEIChest> It(GetWorld()); It; ++It)
+	for (AEIChest* Chest : ChestsInUse)
 	{
-		if (It->IsInUse() && It->IsInReach(Hero) && !It->IsOpenFor(Hero))
+		if (Chest->GetState() == EEIChestState::Free && Chest->IsInReach(Hero) && !Chest->IsOpenFor(Hero))
 		{
-			It->OpenFor(Hero);
+			Chest->OpenFor(Hero);
 			Hero->GetOmens()->GrantRandomOmen();
 			return true;
 		}
@@ -326,6 +361,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	{
 		UpdateCorruption();
 		UpdateThreatBudget(Phase, LivingHeroes.Num());
+		UpdateChests(LivingHeroes);
 	}
 
 	switch (Phase)

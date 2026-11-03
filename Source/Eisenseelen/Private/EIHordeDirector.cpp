@@ -127,6 +127,45 @@ void UEIHordeDirector::RemoveAllEnemies()
 	}
 }
 
+bool UEIHordeDirector::FindStandingPlace(const FVector& Ground, FVector& OutLocation) const
+{
+	FHitResult Floor;
+	const FVector TraceStart = Ground + FVector(0.0f, 0.0f, TraceStartHeightCm);
+	const FVector TraceEnd = Ground - FVector(0.0f, 0.0f, TraceDepthCm);
+	if (!GetWorld()->LineTraceSingleByObjectType(Floor, TraceStart, TraceEnd, FCollisionObjectQueryParams(ECC_WorldStatic)) || Floor.ImpactPoint.Z > MaxGroundHeightCm)
+	{
+		return false;
+	}
+	OutLocation = Floor.ImpactPoint + FVector(0.0f, 0.0f, StandHeightCm);
+	return true;
+}
+
+AEIEnemy* UEIHordeDirector::SpawnAt(const FVector& Location)
+{
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+	return GetWorld()->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Location, FRotator::ZeroRotator, Params);
+}
+
+TArray<AEIEnemy*> UEIHordeDirector::SpawnGuards(const FVector& Center, float DistanceCm, int32 Count)
+{
+	TArray<AEIEnemy*> Guards;
+	const float FirstAngle = FMath::FRandRange(0.0f, UE_TWO_PI);
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		const float Angle = FirstAngle + UE_TWO_PI * Index / Count;
+		const FVector Ground(Center.X + FMath::Cos(Angle) * DistanceCm, Center.Y + FMath::Sin(Angle) * DistanceCm, 0.0f);
+		FVector Location;
+		AEIEnemy* Guard = FindStandingPlace(Ground, Location) ? SpawnAt(Location) : nullptr;
+		if (Guard != nullptr)
+		{
+			Guard->MarkAsGuard();
+			Guards.Add(Guard);
+		}
+	}
+	return Guards;
+}
+
 AEIEnemy* UEIHordeDirector::SpawnOne()
 {
 	TArray<AEIHeroCharacter*> Heroes;
@@ -149,14 +188,11 @@ AEIEnemy* UEIHordeDirector::SpawnOne()
 		const float Angle = FMath::FRandRange(0.0f, UE_TWO_PI);
 		const FVector Ground(Center.X + FMath::Cos(Angle) * Distance, Center.Y + FMath::Sin(Angle) * Distance, 0.0f);
 
-		FHitResult Floor;
-		const FVector TraceStart = Ground + FVector(0.0f, 0.0f, TraceStartHeightCm);
-		const FVector TraceEnd = Ground - FVector(0.0f, 0.0f, TraceDepthCm);
-		if (!GetWorld()->LineTraceSingleByObjectType(Floor, TraceStart, TraceEnd, FCollisionObjectQueryParams(ECC_WorldStatic)) || Floor.ImpactPoint.Z > MaxGroundHeightCm)
+		FVector Location;
+		if (!FindStandingPlace(Ground, Location))
 		{
 			continue;
 		}
-		const FVector Location = Floor.ImpactPoint + FVector(0.0f, 0.0f, StandHeightCm);
 		const bool bBadPlace = Heroes.ContainsByPredicate([&Location, MinDistance](const AEIHeroCharacter* Hero)
 		{
 			return FVector::Dist2D(Hero->GetActorLocation(), Location) < MinDistance || CanSee(*Hero, Location);
@@ -165,9 +201,7 @@ AEIEnemy* UEIHordeDirector::SpawnOne()
 		{
 			continue;
 		}
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
-		return GetWorld()->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Location, FRotator::ZeroRotator, Params);
+		return SpawnAt(Location);
 	}
 	return nullptr;
 }
@@ -177,6 +211,11 @@ void UEIHordeDirector::RemoveEnemiesLeftBehind()
 	const double TooFar = Values.TooFarMeters * CentimetersPerMeter;
 	for (TActorIterator<AEIEnemy> Enemy(GetWorld()); Enemy; ++Enemy)
 	{
+		// Running away from guards must not break the seal of their chest.
+		if (Enemy->IsGuard())
+		{
+			continue;
+		}
 		bool bNearHero = false;
 		for (TActorIterator<AEIHeroCharacter> Hero(GetWorld()); Hero; ++Hero)
 		{

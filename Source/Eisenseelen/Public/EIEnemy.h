@@ -48,6 +48,11 @@ public:
 	void StaggerFromHeavyHit(float Seconds);
 
 	bool IsDead() const;
+
+	/** Server only. A guard stays on the heroes' heels, however far they run. */
+	void MarkAsGuard() { bGuard = true; }
+	bool IsGuard() const { return bGuard; }
+
 	UEIHealthComponent* GetHealth() const { return Health; }
 	const FEIEnemyValues& GetValues() const { return Values; }
 	void ApplyValues(const FEIEnemyValues& NewValues);
@@ -112,6 +117,7 @@ private:
 	bool bStaggering = false;
 
 	FEIEnemyValues Values;
+	bool bGuard = false;
 	EState State = EState::Chase;
 	float StateTime = 0.0f;
 	float StaggerSeconds = 0.0f;

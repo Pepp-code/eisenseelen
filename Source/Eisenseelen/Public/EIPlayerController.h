@@ -35,6 +35,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewBreakAltar();
 
+	/** For preview pictures: all guards of chests fall at once. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewDefeatGuards();
+
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);
 

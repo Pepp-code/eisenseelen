@@ -87,16 +87,19 @@ def scenario():
     player().preview_corruption(0)
     yield 6.0
 
-    # A chest: closed from a few metres away, right there with the prompt, and open with the omen.
+    # A chest: sealed from outside its circle, with its guards in it, free once they have fallen, and open with the omen.
     chest = next(c for c in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIChest) if c.is_in_use())
     spot = chest.get_actor_location()
     front = chest.get_actor_forward_vector()
-    # From the side, because a chest at a place has its altar in front of it.
-    side = chest.get_actor_right_vector()
-    stand_looking_at((spot.x - 600 * side.x, spot.y - 600 * side.y), (spot.x, spot.y, 100))
+    stand_looking_at((spot.x + 1500 * front.x, spot.y + 1500 * front.y), (spot.x, spot.y, 100))
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
+    stand_looking_at((spot.x + 900 * front.x, spot.y + 900 * front.y), (spot.x, spot.y, 100))
+    yield 0.6
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_defeat_guards()
     stand_looking_at((spot.x + 220 * front.x, spot.y + 220 * front.y), (spot.x, spot.y, 60))
     yield SETTLE_SECONDS
     shot()

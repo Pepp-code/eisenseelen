@@ -1,7 +1,10 @@
 #include "EIPlayerController.h"
 
+#include "EIEnemy.h"
 #include "EIGameMode.h"
+#include "Engine/DamageEvents.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIRunDirector.h"
@@ -64,6 +67,17 @@ void AEIPlayerController::PreviewBreakAltar()
 	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
 		GameMode->GetRun()->SkipAltarHold();
+	}
+}
+
+void AEIPlayerController::PreviewDefeatGuards()
+{
+	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
+	{
+		if (It->IsGuard())
+		{
+			It->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		}
 	}
 }
 

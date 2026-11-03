@@ -66,11 +66,11 @@ Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestan
 - **Arkanist:** Linke Maus Feuerstab ohne Wartezeit, rechte Maus halten für den Feuerball, beides kostet Mana mit Anzeige. Feuerball auch auf Q mit Abklingzeit. Klassenwechsel auf C.
 - **Gegner:** Knochenläufer als graue Kapseln mit Wegfindung auf der Laufkarte, in der Testarena Horde auf H, Neustart auf R.
 - **Lauf:** Graue Laufkarte mit 300 × 300 m. Start auf der Himmelsbarke, Sturzflug, Ritual stören (drei Altare je 30 Sekunden halten), dann ein Leuchtfeuer entzünden, 60 Sekunden halten und mit F in die Barke steigen. Alle 2 Minuten steigt die Verderbnis bis zum Blutmond, Himmel und Nebel färben sich. Der Direktor bringt Gegner außerhalb der Sicht, je nach Phase und Verderbnis.
-- **Truhen und Omen:** Die Karte hat 14 Truhen, jeder Lauf nutzt 8 davon. F öffnet eine Truhe und gibt ein zufälliges Omen, das zur Klasse passt. Jeder Spieler öffnet für sich. Die Omen enden mit dem Lauf und stehen als Zeilen in `Data/omen.json`.
+- **Truhen und Omen:** Die Karte hat 14 Truhen, jeder Lauf nutzt 5 davon. Jede steht versiegelt in einem Kreis. Wer ihn betritt, ruft 8 Wächter, mit Verderbnis und mehr Spielern auch mehr. Erst wenn alle gefallen sind, öffnet F die Truhe und gibt ein zufälliges Omen, das zur Klasse passt. Jeder Spieler öffnet für sich. Die Omen enden mit dem Lauf und stehen als Zeilen in `Data/omen.json`.
 
 Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war ein Wunsch nach dem ersten Spielen. Alles andere wurde noch nicht selbst gespielt.
 
-**Als Nächstes in Stufe 2, in dieser Reihenfolge:** Knochenwerfer und Schildträger, Frostrune und Dampfexplosion.
+**Als Nächstes in Stufe 2, in dieser Reihenfolge:** Knochenwerfer und Schildträger, Frostrune und Dampfexplosion. Der Vorschlag für dauerhafte Items und Builds steht im Plan im Reiter „Items und Builds“. Der Entwickler entscheidet noch darüber, und danach kann sich die Reihenfolge ändern.
 
 **Bewusst noch nicht dabei:** Waffenzauber und Runen (Plan, Abschnitt zu den Zaubern), Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Wegfindung der Gegner, Klassen-Passive.
 

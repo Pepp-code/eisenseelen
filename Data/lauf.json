@@ -1,6 +1,9 @@
 {
-	"truhen_pro_lauf": 8,
+	"truhen_pro_lauf": 5,
 	"truhe_reichweite_m": 3,
+	"truhe_zone_m": 10,
+	"truhe_waechter": 8,
+	"truhe_waechter_abstand_m": 6,
 	"ritual_altare": 3,
 	"altar_halten_s": 30,
 	"altar_zone_m": 8,
