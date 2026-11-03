@@ -11,7 +11,6 @@ enum class EEISwingKind : uint8
 {
 	Light1,
 	Light2,
-	Light3,
 	Heavy
 };
 
@@ -55,7 +54,7 @@ struct EISENSEELEN_API FEISwordValues
 };
 
 /**
- * The sword. A press and release is a light swing in a chain of three, a long hold is a heavy swing. The owner sees
+ * The sword. A press and release is a light swing, always back and forth, a long hold is a heavy swing. The owner sees
  * the swing at once. Hits only count on the server, along the blade's path and not through walls. Holding the second
  * key raises a block against hits from the front, whose first moment is a parry that staggers the attacker. An attack
  * goes first, the block comes back after it.

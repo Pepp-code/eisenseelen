@@ -90,7 +90,7 @@ bool FEISwordLightTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("The first target takes the full damage"), FMath::Max3(SortedDummies(Context.World)[0]->GetLastDamage(), SortedDummies(Context.World)[1]->GetLastDamage(), SortedDummies(Context.World)[2]->GetLastDamage()), Light.Damage);
 	}));
 
-	// Three fast taps run through the chain, and a press during a swing is not lost.
+	// Fast taps swing back and forth, and a press during a swing is not lost.
 	Steps.Add(Wait(0.7));
 	Steps.Add(Do([](const FEIPlayContext& Context) { StandBeforeDummies(Context, 180.0f); }));
 	AddTap(Steps, EKeys::LeftMouseButton);
@@ -98,13 +98,13 @@ bool FEISwordLightTest::RunTest(const FString& Parameters)
 	AddTap(Steps, EKeys::LeftMouseButton);
 	Steps.Add(WaitUntil(TEXT("the second chain swing starts"), 1.0, [](const FEIPlayContext& Context) { return Context.Hero->GetSword()->GetSwingKind() == EEISwingKind::Light2; }));
 	AddTap(Steps, EKeys::LeftMouseButton);
-	Steps.Add(WaitUntil(TEXT("the third chain swing starts"), 1.0, [](const FEIPlayContext& Context) { return Context.Hero->GetSword()->GetSwingKind() == EEISwingKind::Light3; }));
+	Steps.Add(WaitUntil(TEXT("the third swing goes back the first way"), 1.0, [](const FEIPlayContext& Context) { return Context.Hero->GetSword()->GetSwingKind() == EEISwingKind::Light1; }));
 	Steps.Add(WaitForSwingEnd());
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		const int32 MiddleHits = SortedDummies(Context.World)[1]->GetHitCount();
-		Context.Test->AddInfo(FString::Printf(TEXT("A chain of three hit the middle dummy %d times at 180 cm"), MiddleHits));
-		Context.Test->TestEqual(TEXT("All three chain swings hit the dummy straight ahead"), MiddleHits, 3);
+		Context.Test->AddInfo(FString::Printf(TEXT("Three swings back and forth hit the middle dummy %d times at 180 cm"), MiddleHits));
+		Context.Test->TestEqual(TEXT("All three swings hit the dummy straight ahead"), MiddleHits, 3);
 	}));
 
 	// After a pause the chain starts over.

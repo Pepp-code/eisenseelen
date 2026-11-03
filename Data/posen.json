@@ -24,16 +24,6 @@
 			{ "t": 1.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 }
 		]
 	},
-	"leicht_3": {
-		"bogen": { "gier_von": 0, "gier_bis": 0, "nick_von": 55, "nick_bis": -35 },
-		"schluessel": [
-			{ "t": 0.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 },
-			{ "t": 0.2, "vor": 30, "rechts": 12, "hoch": 18, "nick": 80, "gier": 5, "roll": 0 },
-			{ "t": 0.42, "vor": 50, "rechts": 8, "hoch": -6, "nick": 35, "gier": 0, "roll": 0 },
-			{ "t": 0.65, "vor": 45, "rechts": 8, "hoch": -32, "nick": -35, "gier": 0, "roll": 0 },
-			{ "t": 1.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 }
-		]
-	},
 	"schwer_laden": {
 		"schluessel": [
 			{ "t": 0.0, "vor": 40, "rechts": 24, "hoch": -24, "nick": 40, "gier": -12, "roll": -10 },

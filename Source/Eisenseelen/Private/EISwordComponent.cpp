@@ -26,7 +26,6 @@ namespace
 		{
 		case EEISwingKind::Light1: return TEXT("leicht_1");
 		case EEISwingKind::Light2: return TEXT("leicht_2");
-		case EEISwingKind::Light3: return TEXT("leicht_3");
 		default: return TEXT("schwer");
 		}
 	}
@@ -266,8 +265,8 @@ EEISwingKind UEISwordComponent::NextLightSwing()
 		NextChainIndex = 0;
 	}
 	const int32 Index = NextChainIndex;
-	NextChainIndex = (NextChainIndex + 1) % 3;
-	return Index == 0 ? EEISwingKind::Light1 : (Index == 1 ? EEISwingKind::Light2 : EEISwingKind::Light3);
+	NextChainIndex = (NextChainIndex + 1) % 2;
+	return Index == 0 ? EEISwingKind::Light1 : EEISwingKind::Light2;
 }
 
 void UEISwordComponent::StartOwnerSwing(EEISwingKind Kind)
