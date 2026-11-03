@@ -206,11 +206,7 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	case EEIRunPhase::Ritual:
 		DrawLine(FString::Printf(TEXT("%s   Altar %d von %d: noch %.0f s halten"), *Clock, State->GetAltarsBroken() + 1, State->GetAltarsTotal(), State->GetAltarHoldLeft()), Margin, LineY, TextColor);
 		DrawActiveAltar();
-		if (State->IsAltarBlocked())
-		{
-			DrawLine(TEXT("Zu viele Gegner am Altar!"), CenterX - 150.0f, PromptY, WarningTextColor, 1.5f);
-		}
-		else if (!State->IsAltarHeld())
+		if (!State->IsAltarHeld())
 		{
 			DrawLine(TEXT("Geh zum Altar!"), CenterX - 90.0f, PromptY, TextColor, 1.5f);
 		}

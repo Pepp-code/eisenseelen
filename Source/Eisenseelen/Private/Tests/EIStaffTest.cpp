@@ -199,7 +199,7 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	// Then the mana comes back by itself.
 	Steps.Add(WaitForFullMana());
 
-	// Q needs no charge, but it costs mana and has a cooldown.
+	// Q needs no charge and no mana, but it has a cooldown.
 	AddTap(Steps, EKeys::Q);
 	Steps.Add(WaitUntil(TEXT("Q casts"), 1.0, [](const FEIPlayContext& Context) { return CountProjectiles(Context) == 1; }));
 	Steps.Add(Do([](const FEIPlayContext& Context)
@@ -208,7 +208,7 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 		Context.Test->AddInfo(FString::Printf(TEXT("The arcanist's Q cools down in %.1f s"), Caster->GetSpellCooldownSeconds()));
 		Context.Test->TestTrue(TEXT("Q starts its cooldown"), Caster->GetSpellCooldownFraction() > 0.5f);
 		Context.Test->TestTrue(TEXT("The arcanist casts faster"), Caster->GetSpellCooldownSeconds() < Caster->GetValues().SpellCooldownSeconds);
-		Context.Test->TestTrue(TEXT("Q costs mana"), Caster->GetMaxMana() - Caster->GetMana() > Caster->GetValues().Fireball.ManaCost * 0.5f);
+		Context.Test->TestEqual(TEXT("Q costs no mana"), Caster->GetMana(), Caster->GetMaxMana());
 	}));
 	AddTap(Steps, EKeys::Q);
 	Steps.Add(Wait(0.05));
@@ -217,6 +217,18 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("Q waits for its cooldown"), CountProjectiles(Context), 1);
 	}));
 	Steps.Add(WaitForNoProjectiles());
+	Steps.Add(WaitUntil(TEXT("Q cools down"), 8.0, [](const FEIPlayContext& Context) { return Context.Hero->GetCaster()->GetSpellCooldownFraction() <= 0.0f; }));
+
+	// So it also works with an empty mana bar.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEICasterComponent* Caster = Context.Hero->GetCaster();
+		Caster->SpendMana(Caster->GetMana());
+	}));
+	AddTap(Steps, EKeys::Q);
+	Steps.Add(WaitUntil(TEXT("Q casts without mana"), 1.0, [](const FEIPlayContext& Context) { return CountProjectiles(Context) == 1; }));
+	Steps.Add(WaitForNoProjectiles());
+	Steps.Add(WaitForFullMana());
 
 	// One bolt kills a runner.
 	Steps.Add(Wait(0.6));

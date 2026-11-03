@@ -135,7 +135,7 @@ void UEIHeroMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSec
 	if (bWantsToDodge)
 	{
 		bWantsToDodge = false;
-		if (IsDodgeReady() && (IsMovingOnGround() || IsFalling()))
+		if (IsDodgeReady() && (IsMovingOnGround() || (IsFalling() && !IsDiving())))
 		{
 			PerformDodge();
 		}
@@ -182,8 +182,12 @@ void UEIHeroMovementComponent::PerformDodge()
 	// A fixed speed instead of a bonus on top, so dodges cannot build up speed.
 	Velocity.X = Direction.X * DodgeSpeedCm;
 	Velocity.Y = Direction.Y * DodgeSpeedCm;
-	Velocity.Z = FMath::Max(Velocity.Z, static_cast<double>(DodgeHopCm));
-	SetMovementMode(MOVE_Falling);
+	// The hop is only for the ground: in the air a dodge must not stop the fall, or dodging would carry the hero far.
+	if (IsMovingOnGround())
+	{
+		Velocity.Z = FMath::Max(Velocity.Z, static_cast<double>(DodgeHopCm));
+		SetMovementMode(MOVE_Falling);
+	}
 	DodgeCooldownRemaining = DodgeCooldownSeconds;
 
 	// A replayed move must not repeat the feedback.

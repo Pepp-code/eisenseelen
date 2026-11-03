@@ -285,7 +285,7 @@ UEIHeroMovementComponent* AEIHeroCharacter::GetHeroMovement() const
 
 bool AEIHeroCharacter::CanJumpWhileFalling() const
 {
-	return JumpCurrentCount == 0;
+	return JumpCurrentCount == 0 && !GetHeroMovement()->IsDiving();
 }
 
 void AEIHeroCharacter::PressJump()

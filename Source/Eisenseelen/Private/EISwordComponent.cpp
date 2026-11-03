@@ -171,6 +171,37 @@ void UEISwordComponent::ReleasePrimary()
 void UEISwordComponent::PressBlock()
 {
 	bBlockKeyHeld = true;
+	bHolding = false;
+	bHasQueuedSwing = false;
+	AEIHeroCharacter* Hero = GetHero();
+	if (Hero->GetViewModel() != nullptr)
+	{
+		Hero->GetViewModel()->ClearHold();
+	}
+	if (bSwinging)
+	{
+		CancelSwing();
+		if (!GetOwner()->HasAuthority())
+		{
+			ServerCancelSwing();
+		}
+	}
+}
+
+void UEISwordComponent::ServerCancelSwing_Implementation()
+{
+	CancelSwing();
+}
+
+void UEISwordComponent::CancelSwing()
+{
+	bSwinging = false;
+	bServerHasQueuedSwing = false;
+	LastSwingEndedAt = GetWorld()->GetTimeSeconds();
+	if (AEIHeroCharacter* Hero = GetHero(); Hero->GetViewModel() != nullptr)
+	{
+		Hero->GetViewModel()->CancelPose();
+	}
 }
 
 void UEISwordComponent::ReleaseBlock()

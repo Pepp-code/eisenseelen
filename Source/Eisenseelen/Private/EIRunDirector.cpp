@@ -4,7 +4,6 @@
 #include "EIAltar.h"
 #include "EIBeacon.h"
 #include "EIDataFile.h"
-#include "EIEnemy.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
@@ -29,7 +28,6 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("ritual_altare"), 0.0, 100.0, Loaded.RitualAltars, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_halten_s"), 0.1, 3600.0, Loaded.AltarHoldSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_zone_m"), 1.0, 100.0, Loaded.AltarZoneMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_blockiert_ab_gegner"), 1.0, 100.0, Loaded.AltarBlockedFromEnemies, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_halten_s"), 0.1, 3600.0, Loaded.BeaconHoldSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_reichweite_m"), 0.5, 100.0, Loaded.BeaconReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_zone_m"), 1.0, 200.0, Loaded.BeaconZoneMeters, OutError)
@@ -92,7 +90,7 @@ void UEIRunDirector::ResetRun()
 	AltarOrder.SetNum(AltarsThisRun);
 	State->SetAltarProgress(0, AltarsThisRun);
 	AltarHoldLeft = Values.AltarHoldSeconds;
-	State->SetAltarHold(AltarHoldLeft, false, false);
+	State->SetAltarHold(AltarHoldLeft, false);
 	if (AltarOrder.Num() > 0)
 	{
 		AltarOrder[0]->SetState(EEIAltarState::Active);
@@ -115,18 +113,12 @@ void UEIRunDirector::HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, fl
 {
 	AEIAltar* Altar = GetActiveAltar();
 	const bool bHeld = LivingHeroes.ContainsByPredicate([Altar](const AEIHeroCharacter* Hero) { return Altar->IsInZone(Hero); });
-	int32 EnemiesInZone = 0;
-	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
-	{
-		EnemiesInZone += !It->IsDead() && Altar->IsInZone(*It) ? 1 : 0;
-	}
-	const bool bBlocked = EnemiesInZone >= FMath::RoundToInt(Values.AltarBlockedFromEnemies);
-	if (bHeld && !bBlocked)
+	if (bHeld)
 	{
 		AltarHoldLeft -= DeltaTime;
 	}
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	State->SetAltarHold(AltarHoldLeft, bHeld, bBlocked);
+	State->SetAltarHold(AltarHoldLeft, bHeld);
 	if (AltarHoldLeft > 0.0f)
 	{
 		return;
@@ -137,7 +129,7 @@ void UEIRunDirector::HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, fl
 	++AltarsBroken;
 	AltarHoldLeft = Values.AltarHoldSeconds;
 	State->SetAltarProgress(AltarsBroken, AltarOrder.Num());
-	State->SetAltarHold(AltarHoldLeft, false, false);
+	State->SetAltarHold(AltarHoldLeft, false);
 	if (AEIAltar* NextAltar = GetActiveAltar())
 	{
 		NextAltar->SetState(EEIAltarState::Active);

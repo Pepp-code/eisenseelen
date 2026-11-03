@@ -133,6 +133,18 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		Context.Test->TestTrue(TEXT("The dive steers fast"), Velocity.Size2D() > DiveSpeed * 0.7f);
 		Context.Test->TestTrue(TEXT("The dive limits the fall"), -Velocity.Z <= FallSpeed + SpeedToleranceCm);
 	}));
+
+	// Neither dodging nor jumping stops the dive.
+	AddTap(Steps, EKeys::V);
+	AddTap(Steps, EKeys::SpaceBar);
+	Steps.Add(Wait(0.03));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const float FallSpeed = Context.Hero->GetValues().DiveFallSpeedMetersPerSecond * CentimetersPerMeter;
+		Context.Test->TestTrue(TEXT("The dive goes on"), Context.Movement->IsDiving());
+		Context.Test->TestTrue(TEXT("No dodge in the dive"), Context.Movement->IsDodgeReady());
+		Context.Test->TestNearlyEqual(TEXT("Nothing stops the fall in the dive"), static_cast<float>(-Context.Hero->GetVelocity().Z), FallSpeed, SpeedToleranceCm);
+	}));
 	Steps.Add(WaitUntil(TEXT("the hero lands"), 15.0, [](const FEIPlayContext& Context) { return Context.Movement->IsMovingOnGround(); }));
 	Steps.Add(Release(EKeys::W));
 	Steps.Add(Wait(0.6));
@@ -392,7 +404,6 @@ bool FEIRitualTest::RunTest(const FString& Parameters)
 {
 	constexpr float ShortHoldSeconds = 0.5f;
 	const TSharedRef<TWeakObjectPtr<AEIAltar>> FirstAltar = MakeShared<TWeakObjectPtr<AEIAltar>>();
-	const TSharedRef<float> HoldLeft = MakeShared<float>(0.0f);
 
 	const auto StandAtActiveAltar = [](const FEIPlayContext& Context)
 	{
@@ -441,39 +452,27 @@ bool FEIRitualTest::RunTest(const FString& Parameters)
 		StandAtActiveAltar(Context);
 	}));
 
-	// In the zone of the altar the time runs, and too many enemies stop it.
+	// In the zone of the altar the time runs, however many enemies stand in it.
 	Steps.Add(WaitForPhase(TEXT("the ritual begins"), 1.0, EEIRunPhase::Ritual));
-	Steps.Add(Do([HoldLeft](const FEIPlayContext& Context)
+	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		const UEIHordeDirector* Horde = GetGameMode(Context)->GetHorde();
 		const float Expected = ExpectedBudget(Context, Horde->GetValues().Director.RitualShare);
 		Context.Test->TestNearlyEqual(TEXT("The ritual brings more enemies"), GetGameMode(Context)->GetHorde()->GetThreatBudget(), Expected, 0.01f);
 		const FVector AltarLocation = GetGameMode(Context)->GetRun()->GetActiveAltar()->GetActorLocation();
-		for (int32 Index = 0; Index < 3; ++Index)
+		for (int32 Index = 0; Index < 6; ++Index)
 		{
-			Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), AltarLocation + FVector(-300.0f, -200.0f + Index * 200.0f, HeroHeight), FRotator::ZeroRotator);
+			Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), AltarLocation + FVector(-300.0f, -300.0f + Index * 120.0f, HeroHeight), FRotator::ZeroRotator);
 		}
 	}));
-	Steps.Add(Wait(0.1));
-	Steps.Add(Do([HoldLeft](const FEIPlayContext& Context)
+
+	Steps.Add(WaitUntil(TEXT("the first altar breaks with enemies in the zone"), 2.0, [](const FEIPlayContext& Context) { return GetState(Context)->GetAltarsBroken() == 1; }));
+	Steps.Add(Do([FirstAltar, StandAtActiveAltar](const FEIPlayContext& Context)
 	{
-		Context.Test->TestTrue(TEXT("Too many enemies block the altar"), GetState(Context)->IsAltarBlocked());
-		*HoldLeft = GetState(Context)->GetAltarHoldLeft();
-	}));
-	Steps.Add(Wait(0.2));
-	Steps.Add(Do([HoldLeft](const FEIPlayContext& Context)
-	{
-		Context.Test->TestEqual(TEXT("With too many enemies the time stands still"), GetState(Context)->GetAltarHoldLeft(), *HoldLeft);
 		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
 		{
 			It->Destroy();
 		}
-	}));
-
-	// Without them the altar breaks, and the next one wakes up somewhere else.
-	Steps.Add(WaitUntil(TEXT("the first altar breaks"), 3.0, [](const FEIPlayContext& Context) { return GetState(Context)->GetAltarsBroken() == 1; }));
-	Steps.Add(Do([FirstAltar, StandAtActiveAltar](const FEIPlayContext& Context)
-	{
 		const AEIAltar* NextAltar = GetGameMode(Context)->GetRun()->GetActiveAltar();
 		Context.Test->TestEqual(TEXT("The altar is broken"), FirstAltar->Get()->GetState(), EEIAltarState::Broken);
 		Context.Test->TestTrue(TEXT("The next altar is another one"), NextAltar != FirstAltar->Get() && NextAltar->IsActive());

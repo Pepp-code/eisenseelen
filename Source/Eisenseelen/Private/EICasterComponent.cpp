@@ -147,6 +147,11 @@ void UEICasterComponent::FireBolt()
 	FireAsOwner(EEICast::Bolt);
 }
 
+float UEICasterComponent::GetManaCost(EEICast Kind) const
+{
+	return Kind == EEICast::SpellFireball ? 0.0f : GetProjectile(Kind).ManaCost;
+}
+
 void UEICasterComponent::PressCharge()
 {
 	bHolding = true;
@@ -203,7 +208,7 @@ FVector UEICasterComponent::FindAimPoint() const
 
 void UEICasterComponent::FireAsOwner(EEICast Kind)
 {
-	const float Cost = GetProjectile(Kind).ManaCost;
+	const float Cost = GetManaCost(Kind);
 	if (!CanAfford(Cost))
 	{
 		ManaDeniedRemaining = ManaDeniedFlashSeconds;
@@ -238,7 +243,7 @@ void UEICasterComponent::ServerFire_Implementation(EEICast Kind, FVector_NetQuan
 {
 	const double Now = GetWorld()->GetTimeSeconds();
 	const AEIHeroCharacter* Hero = GetHero();
-	const float Cost = GetProjectile(Kind).ManaCost;
+	const float Cost = GetManaCost(Kind);
 	const float ClockAllowance = static_cast<float>(ServerClockTolerance) * Hero->GetClassValues().ManaPerSecond;
 	if (Hero->IsDead() || !CanAfford(Cost - ClockAllowance))
 	{

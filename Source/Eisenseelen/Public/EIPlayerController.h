@@ -31,7 +31,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewCorruption(int32 Stage);
 
-	/** For preview pictures: the active altar breaks as soon as a hero stands in its zone, whatever the enemies do. */
+	/** For preview pictures: the active altar breaks as soon as a hero stands in its zone. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewBreakAltar();
 

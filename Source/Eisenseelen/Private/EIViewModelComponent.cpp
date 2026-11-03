@@ -27,6 +27,7 @@ namespace
 	constexpr float TrailBaseFraction = 0.45f;
 	const FLinearColor TrailColor(0.6f, 0.75f, 1.0f);
 	constexpr float TrailStrength = 1.2f;
+	constexpr float CancelBlendSeconds = 0.08f;
 }
 
 UEIViewModelComponent::UEIViewModelComponent()
@@ -108,6 +109,17 @@ void UEIViewModelComponent::PlayPose(FName Curve, float Seconds, float TrailFrom
 	HitStopRemaining = 0.0f;
 }
 
+void UEIViewModelComponent::CancelPose()
+{
+	if (Hand != nullptr)
+	{
+		BlendFrom = Hand->GetRelativeTransform();
+		BlendRemaining = CancelBlendSeconds;
+	}
+	PlayingCurve = NAME_None;
+	HitStopRemaining = 0.0f;
+}
+
 void UEIViewModelComponent::HoldPose(FName Curve, float T)
 {
 	HeldCurve = Curve;
@@ -182,7 +194,15 @@ void UEIViewModelComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 			PlayingCurve = NAME_None;
 		}
 	}
-	Hand->SetRelativeTransform(CurrentPose());
+	FTransform Pose = CurrentPose();
+	if (BlendRemaining > 0.0f)
+	{
+		BlendRemaining = FMath::Max(0.0f, BlendRemaining - DeltaTime);
+		FTransform Blended;
+		Blended.Blend(BlendFrom, Pose, 1.0f - BlendRemaining / CancelBlendSeconds);
+		Pose = Blended;
+	}
+	Hand->SetRelativeTransform(Pose);
 	UpdateTrail(DeltaTime, bTrailActive || PreviewCurve != NAME_None);
 }
 

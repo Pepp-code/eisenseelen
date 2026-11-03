@@ -25,6 +25,9 @@ public:
 
 	void ShowStaff(bool bStaff);
 	void PlayPose(FName Curve, float Seconds, float TrailFrom = 2.0f, float TrailTo = 2.0f);
+
+	/** Breaks off the pose that is playing. The hand blends over from where it is. */
+	void CancelPose();
 	void HoldPose(FName Curve, float T);
 	void ClearHold();
 	void HitStop(float Seconds);
@@ -75,4 +78,7 @@ private:
 	float PreviewT = 0.0f;
 
 	float HitStopRemaining = 0.0f;
+
+	FTransform BlendFrom = FTransform::Identity;
+	float BlendRemaining = 0.0f;
 };

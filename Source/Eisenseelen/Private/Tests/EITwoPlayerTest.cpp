@@ -540,7 +540,8 @@ private:
 };
 
 /**
- * The guest blocks: the server must know about the block from the guest's moves alone, and decides about the hit.
+ * The guest blocks: the block breaks off a swing on the server too, the server must know about the block from the
+ * guest's moves alone, and it decides about the hit.
  */
 class FEITwoPlayerBlockCommand : public IAutomationLatentCommand
 {
@@ -586,10 +587,36 @@ public:
 			{
 				return false;
 			}
-			EISendTestKey(Session.ClientPlayer, EKeys::RightMouseButton, IE_Pressed);
+			EISendTestKey(Session.ClientPlayer, EKeys::LeftMouseButton, IE_Pressed);
 			EnterStep(2);
 			return false;
 		case 2:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::LeftMouseButton, IE_Released);
+			EnterStep(3);
+			return false;
+		case 3:
+			if (Now - StepAt < 0.06)
+			{
+				return false;
+			}
+			Test->TestTrue(TEXT("The guest's swing runs on the server"), ServerHero->GetSword()->IsSwinging());
+			EISendTestKey(Session.ClientPlayer, EKeys::RightMouseButton, IE_Pressed);
+			EnterStep(4);
+			return false;
+		case 4:
+			if (Now - StepAt < 0.1)
+			{
+				return false;
+			}
+			Test->TestFalse(TEXT("The guest's block breaks off the swing on the guest"), Session.ClientHero->GetSword()->IsSwinging());
+			Test->TestFalse(TEXT("The guest's block breaks off the swing on the server"), ServerHero->GetSword()->IsSwinging());
+			EnterStep(5);
+			return false;
+		case 5:
 		{
 			if (Now - StepAt < 0.6)
 			{
@@ -603,19 +630,19 @@ public:
 			const float Expected = TestHit * (1.0f - ServerHero->GetSword()->GetValues().Block.DamageReduction);
 			Test->TestNearlyEqual(TEXT("The server reduces the hit"), Before - ServerHero->GetHealth()->GetHealth(), Expected, 0.01f);
 			Causer->Destroy();
-			EnterStep(3);
+			EnterStep(6);
 			return false;
 		}
-		case 3:
+		case 6:
 			if (Now - StepAt < 0.1)
 			{
 				return false;
 			}
 			Test->TestTrue(TEXT("The guest sees the block catch the hit"), Session.ClientHero->GetSword()->GetBlockFlash() > 0.0f);
 			EISendTestKey(Session.ClientPlayer, EKeys::RightMouseButton, IE_Released);
-			EnterStep(4);
+			EnterStep(7);
 			return false;
-		case 4:
+		case 7:
 		{
 			if (Now - StepAt < 0.3)
 			{

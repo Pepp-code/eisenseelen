@@ -93,7 +93,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	/** The one jump stays unused after a dodge or a fall, it is only spent by jumping. */
+	/** The one jump stays unused after a dodge or a fall, it is only spent by jumping. Only the dive has none to offer. */
 	virtual bool CanJumpWhileFalling() const override;
 
 private:

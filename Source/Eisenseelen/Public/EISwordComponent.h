@@ -56,8 +56,8 @@ struct EISENSEELEN_API FEISwordValues
 /**
  * The sword. A press and release is a light swing, always back and forth, a long hold is a heavy swing. The owner sees
  * the swing at once. Hits only count on the server, along the blade's path and not through walls. Holding the second
- * key raises a block against hits from the front, whose first moment is a parry that staggers the attacker. An attack
- * goes first, the block comes back after it.
+ * key raises a block against hits from the front, whose first moment is a parry that staggers the attacker. Pressing it
+ * breaks off a swing or a charge. An attack out of a held block goes first, and the block comes back after it.
  */
 UCLASS()
 class EISENSEELEN_API UEISwordComponent : public UActorComponent
@@ -95,6 +95,9 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerBeginSwing(EEISwingKind Kind);
 
+	UFUNCTION(Server, Reliable)
+	void ServerCancelSwing();
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHitFeedback(FVector_NetQuantize Location, bool bHeavy);
 
@@ -105,6 +108,7 @@ private:
 	void StartOwnerSwing(EEISwingKind Kind);
 	void BeginSwing(EEISwingKind Kind);
 	void EndSwing();
+	void CancelSwing();
 	EEISwingKind NextLightSwing();
 	void SweepBlade(float FromT, float ToT);
 	void HitActor(AActor* Target, const FVector& Location);

@@ -56,6 +56,72 @@ namespace
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIBlockBreaksOffTest,
+	"Eisenseelen.Play.Sword.BlockBreaksOff",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIBlockBreaksOffTest::RunTest(const FString& Parameters)
+{
+	const auto ExpectBlockWithoutSwing = [](const TCHAR* What)
+	{
+		return Do([What](const FEIPlayContext& Context)
+		{
+			Context.Test->TestFalse(What, Context.Hero->GetSword()->IsSwinging());
+			Context.Test->TestTrue(TEXT("The block is up at once"), Context.Movement->IsBlocking());
+		});
+	};
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context) { StandBeforeDummies(Context, 180.0f); }));
+	Steps.Add(Wait(0.1));
+
+	// A heavy swing is broken off before it reaches anything: the block goes up and nothing is hit.
+	Steps.Add(Press(EKeys::LeftMouseButton));
+	Steps.Add(WaitUntil(TEXT("the sword charges"), 2.0, [](const FEIPlayContext& Context) { return Context.Hero->GetSword()->GetChargeFraction() >= 1.0f; }));
+	Steps.Add(Release(EKeys::LeftMouseButton));
+	Steps.Add(WaitUntil(TEXT("the swing starts"), 1.0, [](const FEIPlayContext& Context) { return Context.Hero->GetSword()->IsSwinging(); }));
+	Steps.Add(Press(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.03));
+	Steps.Add(ExpectBlockWithoutSwing(TEXT("The block breaks off a swing")));
+	Steps.Add(Wait(0.7));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		for (const AEITrainingDummy* Dummy : SortedDummies(Context.World))
+		{
+			Context.Test->TestEqual(TEXT("A swing broken off in time hits nothing"), Dummy->GetHitCount(), 0);
+		}
+	}));
+	Steps.Add(Release(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.1));
+
+	// A charge is broken off too: letting go of the attack key afterwards starts nothing.
+	Steps.Add(Press(EKeys::LeftMouseButton));
+	Steps.Add(Wait(0.2));
+	Steps.Add(Press(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.03));
+	Steps.Add(ExpectBlockWithoutSwing(TEXT("The block breaks off a charge")));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestFalse(TEXT("The charge is gone"), Context.Hero->GetSword()->IsHolding());
+	}));
+	Steps.Add(Release(EKeys::LeftMouseButton));
+	Steps.Add(Wait(0.05));
+	Steps.Add(ExpectBlockWithoutSwing(TEXT("Letting go after that starts no swing")));
+	Steps.Add(Release(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.1));
+
+	// So is a swing that waits for its turn: nothing follows.
+	AddTap(Steps, EKeys::LeftMouseButton);
+	Steps.Add(Wait(0.03));
+	AddTap(Steps, EKeys::LeftMouseButton);
+	Steps.Add(Press(EKeys::RightMouseButton));
+	Steps.Add(Wait(0.6));
+	Steps.Add(ExpectBlockWithoutSwing(TEXT("The block also takes back the swing that waited")));
+	Steps.Add(Release(EKeys::RightMouseButton));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEISwordLightTest,
 	"Eisenseelen.Play.Sword.Light",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

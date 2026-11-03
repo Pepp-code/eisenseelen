@@ -16,7 +16,6 @@ struct EISENSEELEN_API FEIRunValues
 	float RitualAltars = 3.0f;
 	float AltarHoldSeconds = 30.0f;
 	float AltarZoneMeters = 8.0f;
-	float AltarBlockedFromEnemies = 3.0f;
 	float BeaconHoldSeconds = 60.0f;
 	float BeaconReachMeters = 4.0f;
 	float BeaconZoneMeters = 15.0f;
@@ -57,7 +56,7 @@ public:
 	/** The clock raises it by itself. Directly only for preview pictures. */
 	void SetCorruptionStage(int32 Stage);
 
-	/** For preview pictures: the active altar needs no more time. */
+	/** For preview pictures, which need not wait: the active altar needs no more time. */
 	void SkipAltarHold() { AltarHoldLeft = 0.0f; }
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;

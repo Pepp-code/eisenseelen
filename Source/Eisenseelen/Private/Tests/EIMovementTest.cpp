@@ -135,6 +135,23 @@ bool FEIDodgeTest::RunTest(const FString& Parameters)
 		Context.Test->TestNearlyEqual(TEXT("A dodge works in the air"), HorizontalSpeed(Context), DodgeSpeedCm(Context), SpeedToleranceCm);
 	}));
 	Steps.Add(WaitForGround());
+	Steps.Add(WaitForDodgeReady());
+
+	// But it does not stop a fall.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Teleport(Context, OpenFloor + FVector(0.0f, 0.0f, 500.0f), BackwardsYaw);
+		Context.Movement->SetMovementMode(MOVE_Falling);
+		Context.Movement->Velocity = FVector(0.0, 0.0, -300.0);
+	}));
+	AddTap(Steps, EKeys::V);
+	Steps.Add(Wait(0.03));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestFalse(TEXT("The dodge in the fall happens"), Context.Movement->IsDodgeReady());
+		Context.Test->TestTrue(TEXT("A dodge does not stop a fall"), Context.Hero->GetVelocity().Z < -300.0);
+	}));
+	Steps.Add(WaitForGround());
 	return RunInArena(this, MoveTemp(Steps));
 }
 
