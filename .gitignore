@@ -14,3 +14,6 @@ DerivedDataCache/
 
 # Python
 __pycache__/
+
+# Downloads of the concept pictures; the unpacked pictures are tracked
+SourceAssets/Konzepte/*.zip

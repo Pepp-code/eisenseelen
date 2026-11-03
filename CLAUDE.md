@@ -73,6 +73,4 @@ Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war
 
 **Nicht geprüft:** Töne kann der Agent nicht hören, und die Klingenspur erscheint in keinem Standbild.
 
-## Das alte Projekt
-
-Das verworfene Spiel Hexcaliber liegt vollständig unter `C:\Users\Phillip\dev\game-project-ALT-hexcaliber`. Es gehört nicht zu diesem Projekt. Übernimm daraus nichts ohne ausdrücklichen Auftrag.
+**Konzeptbilder:** Die Bilder des Entwicklers von Klingenwacht und Arkanist liegen in `SourceAssets/Konzepte`. Sie zeigen die Richtung und sind kein Bauplan. Die Stilfrage aus dem Plan ist noch offen.
