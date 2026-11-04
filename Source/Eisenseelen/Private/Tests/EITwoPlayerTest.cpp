@@ -38,6 +38,7 @@ namespace
 	const TCHAR* ArenaMap = TEXT("/Game/Maps/L_Testarena");
 	constexpr double TimeoutSeconds = 180.0;
 	constexpr float MaxDriftCm = 25.0f;
+	constexpr float LeaderScale = 1.25f;
 
 	/** The worlds and heroes of a session with a host and one guest, once all of them exist. */
 	struct FTwoPlayerSession
@@ -908,6 +909,31 @@ public:
 				Test->TestTrue(TEXT("The guest's save has the item"), Guest->GetLoot().Num() == 1 && Guest->GetSave().Items.Contains(Guest->GetTable().Items[Guest->GetLoot()[0].Item].Name));
 				const AEIPlayerController* Host = Cast<AEIPlayerController>(ServerWorld->GetFirstPlayerController());
 				Test->TestEqual(TEXT("The host gets nothing of it"), Host->GetProfile()->GetLoot().Num(), 0);
+			}
+			// A leader has to look like one on the guest's screen too.
+			if (AEIEnemy* Leader = ServerWorld->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Session.ServerCopyOfClientHero->GetActorLocation() + FVector(0.0f, 1500.0f, 0.0f), FRotator::ZeroRotator))
+			{
+				Leader->GetHealth()->Reset(100000.0f);
+				Leader->MakeLeader(2.0f, 1.0f, LeaderScale);
+			}
+			EnterStep(9);
+			return false;
+		case 9:
+			if (Now - StepAt < 0.3)
+			{
+				return false;
+			}
+			{
+				bool bSeen = false;
+				for (TActorIterator<AEIEnemy> It(Session.ClientWorld); It; ++It)
+				{
+					if (It->IsLeader())
+					{
+						bSeen = true;
+						Test->TestNearlyEqual(TEXT("The guest sees the leader bigger"), static_cast<float>(It->GetActorScale3D().X), It->GetValues().Scale * LeaderScale, 0.001f);
+					}
+				}
+				Test->TestTrue(TEXT("The guest knows who the leader is"), bSeen);
 			}
 			return true;
 		default:

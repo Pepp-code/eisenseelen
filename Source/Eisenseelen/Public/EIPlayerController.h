@@ -103,6 +103,9 @@ private:
 
 	AEIHeroCharacter* GetLivingHero() const;
 
+	/** The hero, if the keys and the mouse belong to the hero right now and not to the gear page. */
+	AEIHeroCharacter* GetHeroForControls() const;
+
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIProfileComponent> Profile;
 

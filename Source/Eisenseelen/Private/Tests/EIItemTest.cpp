@@ -729,6 +729,19 @@ bool FEIGearMenuTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("After the best it starts over"), Gear(Context)->GetWornQuality(EEISlot::Weapon), 0);
 	}));
 
+	// C still works with the page open, and the page follows.
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([Page](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("With the page open C changes the class"), Context.Hero->GetHeroClass(), EEIHeroClass::Arcanist);
+		FEIGearMenu& Menu = Page(Context);
+		Context.Test->TestTrue(TEXT("The page shows the other class"), Menu.Shows(TEXT("Arkanist")));
+		Context.Test->TestNotNull(TEXT("The page offers what fits it"), Menu.FindButton(TEXT("Froststab")));
+	}));
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
+
 	// I closes it, and the hero is free again.
 	AddTap(Steps, EKeys::I);
 	Steps.Add(Wait(0.05));

@@ -227,14 +227,18 @@ void AEIPlayerController::SetupInputComponent()
 
 AEIHeroCharacter* AEIPlayerController::GetLivingHero() const
 {
-	// While the page is open, the keys and the mouse belong to it.
 	AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>();
-	return Hero != nullptr && !Hero->IsDead() && !bMenuOpen ? Hero : nullptr;
+	return Hero != nullptr && !Hero->IsDead() ? Hero : nullptr;
+}
+
+AEIHeroCharacter* AEIPlayerController::GetHeroForControls() const
+{
+	return bMenuOpen ? nullptr : GetLivingHero();
 }
 
 void AEIPlayerController::HandleMove(const FInputActionValue& Value)
 {
-	if (APawn* Hero = GetLivingHero())
+	if (APawn* Hero = GetHeroForControls())
 	{
 		const FVector2D Input = Value.Get<FVector2D>();
 		Hero->AddMovementInput(Hero->GetActorForwardVector(), Input.Y);
@@ -261,7 +265,7 @@ void AEIPlayerController::ApplyLookInput(const FVector2D& Input)
 
 void AEIPlayerController::HandleJumpStarted()
 {
-	if (AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetHeroForControls())
 	{
 		Hero->PressJump();
 	}
@@ -277,7 +281,7 @@ void AEIPlayerController::HandleJumpEnded()
 
 void AEIPlayerController::HandleSprintStarted()
 {
-	if (AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetHeroForControls())
 	{
 		Hero->SetSprintKey(true);
 	}
@@ -299,7 +303,7 @@ void AEIPlayerController::HandlePrimaryPressed()
 	{
 		Menu.Click(MouseX, MouseY);
 	}
-	if (AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetHeroForControls())
 	{
 		Hero->PressPrimary();
 	}
@@ -307,7 +311,7 @@ void AEIPlayerController::HandlePrimaryPressed()
 
 void AEIPlayerController::HandlePrimaryReleased()
 {
-	if (AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetHeroForControls())
 	{
 		Hero->ReleasePrimary();
 	}
@@ -315,7 +319,7 @@ void AEIPlayerController::HandlePrimaryReleased()
 
 void AEIPlayerController::HandleSecondaryPressed()
 {
-	if (AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetHeroForControls())
 	{
 		Hero->PressSecondary();
 	}
@@ -323,7 +327,7 @@ void AEIPlayerController::HandleSecondaryPressed()
 
 void AEIPlayerController::HandleSecondaryReleased()
 {
-	if (AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetHeroForControls())
 	{
 		Hero->ReleaseSecondary();
 	}
@@ -376,7 +380,7 @@ void AEIPlayerController::ServerRestartRun_Implementation()
 
 void AEIPlayerController::HandleSpell()
 {
-	if (AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetHeroForControls())
 	{
 		Hero->PressSpell();
 	}
@@ -384,7 +388,7 @@ void AEIPlayerController::HandleSpell()
 
 void AEIPlayerController::HandleRuneSpell()
 {
-	if (AEIHeroCharacter* Hero = GetLivingHero())
+	if (AEIHeroCharacter* Hero = GetHeroForControls())
 	{
 		Hero->PressRuneSpell();
 	}

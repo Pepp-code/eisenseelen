@@ -284,6 +284,10 @@ void AEIEnemy::BeginPlay()
 	HeadMaterial = EIVisuals::SetColor(Head, BaseColor);
 	ShowHeldPart();
 	SetActorScale3D(FVector(Values.Scale));
+	if (IsLeader())
+	{
+		OnRep_LeaderScale();
+	}
 	if (Values.ChargeSpeedMetersPerSecond > 0.0f)
 	{
 		// The sizes count within the enemy, so they are divided by its own size.
