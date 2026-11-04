@@ -58,6 +58,7 @@ private:
 	int32 BuildChoices(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
 	void BuildSums(const UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, float X, float Y);
 	void BuildComparison(const UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, int32 Item, float X, float Y);
+	void BuildAttributes(UEIProfileComponent& Profile, float X, float Bottom, float MouseX, float MouseY);
 
 	TArray<FEIMenuElement> Elements;
 	EEISlot SelectedSlot = EEISlot::Weapon;

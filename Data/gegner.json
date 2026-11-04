@@ -17,7 +17,9 @@
 		"drehtempo_grad_pro_s": 720,
 		"schild_schaden_faktor_0_bis_1": 1,
 		"schild_winkel_grad": 120,
-		"wurf_tempo_m_pro_s": 0
+		"wurf_tempo_m_pro_s": 0,
+		"erfahrung": 1,
+		"item_chance_0_bis_1": 0.005
 	},
 	"knochenwerfer": {
 		"leben": 60,
@@ -37,7 +39,9 @@
 		"drehtempo_grad_pro_s": 720,
 		"schild_schaden_faktor_0_bis_1": 1,
 		"schild_winkel_grad": 120,
-		"wurf_tempo_m_pro_s": 20
+		"wurf_tempo_m_pro_s": 20,
+		"erfahrung": 2,
+		"item_chance_0_bis_1": 0.01
 	},
 	"schildtraeger": {
 		"leben": 220,
@@ -57,7 +61,9 @@
 		"drehtempo_grad_pro_s": 140,
 		"schild_schaden_faktor_0_bis_1": 0.2,
 		"schild_winkel_grad": 120,
-		"wurf_tempo_m_pro_s": 0
+		"wurf_tempo_m_pro_s": 0,
+		"erfahrung": 3,
+		"item_chance_0_bis_1": 0.02
 	},
 	"kettenkoloss": {
 		"leben": 900,
@@ -84,7 +90,9 @@
 		"ansturm_bis_abstand_m": 15,
 		"ansturm_ankuendigung_s": 1.1,
 		"ansturm_schaden": 40,
-		"ansturm_pause_s": 7
+		"ansturm_pause_s": 7,
+		"erfahrung": 20,
+		"item_chance_0_bis_1": 0.25
 	},
 	"horde": {
 		"gleichzeitig_max": 20,

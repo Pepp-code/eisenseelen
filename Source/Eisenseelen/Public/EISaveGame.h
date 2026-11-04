@@ -9,6 +9,9 @@ struct EISENSEELEN_API FEISavedClass
 	/** One entry per slot. Empty text is an empty slot. */
 	TArray<FString> Slots;
 
+	/** Name of an attribute and its points. */
+	TMap<FString, int32> Attributes;
+
 	FEISavedClass() { Slots.SetNum(EISlotCount); }
 };
 

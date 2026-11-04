@@ -69,6 +69,8 @@ struct EISENSEELEN_API FEIEnemyValues
 	float ShieldDamageFactor = 1.0f;
 	float ShieldAngleDegrees = 120.0f;
 	float ThrowSpeedMetersPerSecond = 0.0f;
+	float Experience = 1.0f;
+	float ItemChance = 0.0f;
 	float ChargeSpeedMetersPerSecond = 0.0f;
 	float ChargeDistanceMeters = 0.0f;
 	float ChargeFromMeters = 0.0f;

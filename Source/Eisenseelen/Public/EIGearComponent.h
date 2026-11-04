@@ -8,7 +8,7 @@
 class AEIHeroCharacter;
 
 /**
- * What a hero wears, and the sum of all bonuses: items, armour sets and omens land in the same numbers. Only the server
+ * What a hero wears, and the sum of all bonuses: items, armour sets, attributes and omens land in the same numbers. Only the server
  * changes what is worn. Everybody who needs a number asks here, so that all of them agree.
  */
 UCLASS()

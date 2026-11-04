@@ -70,6 +70,14 @@ public:
 	/** Owner only. In the test arena everything is free, and this says how good it is. */
 	void SetArenaQuality(int32 Quality);
 
+	/** Owner only. The level counts for both classes. In the test arena it is the highest. */
+	int32 GetLevel() const;
+
+	/** Owner only. Each class spends its points by itself, and a point can always move elsewhere. */
+	int32 GetFreePoints() const;
+	int32 GetAttributePoints(int32 Attribute) const;
+	void ChangeAttribute(int32 Attribute, int32 Change);
+
 	/** Owner only. What this run has brought so far. */
 	const TArray<FEILootLine>& GetLoot() const { return Loot; }
 	int32 GetRunExperience() const { return RunExperience; }
@@ -83,6 +91,9 @@ public:
 
 	/** Server only. The server chooses what this player gets, and prefers what the player does not have yet. */
 	void GrantReward(EEIRewardSource Source);
+
+	/** Server only. A fallen enemy brings a little experience, and very rarely an item. */
+	void GrantEnemyReward(float Experience, float ItemChance);
 
 	/** Server only. In the barge the loot is safe, without it it is gone. The experience stays either way. */
 	void EndRun(bool bEscaped);

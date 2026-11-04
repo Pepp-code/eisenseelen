@@ -230,6 +230,47 @@ namespace
 			return false;
 		}
 
+		const TSharedPtr<FJsonObject>* Experience = nullptr;
+		if (!Items.TryGetObjectField(TEXT("erfahrung"), Experience))
+		{
+			OutError = TEXT("Der Abschnitt erfahrung fehlt.");
+			return false;
+		}
+		if (!FEIDataFile::ReadNumber(**Experience, TEXT("level_max"), 1.0, 1000.0, Out.MaxLevel, OutError)
+			|| !FEIDataFile::ReadNumber(**Experience, TEXT("erste_stufe"), 1.0, 1000000.0, Out.FirstLevelExperience, OutError)
+			|| !FEIDataFile::ReadNumber(**Experience, TEXT("zuwachs_je_level"), 0.0, 1000000.0, Out.LevelExperienceGrowth, OutError))
+		{
+			return false;
+		}
+
+		const TArray<TSharedPtr<FJsonValue>>* Attributes = nullptr;
+		if (!Items.TryGetArrayField(TEXT("attribute"), Attributes))
+		{
+			OutError = TEXT("Die Liste attribute fehlt.");
+			return false;
+		}
+		for (const TSharedPtr<FJsonValue>& Value : *Attributes)
+		{
+			const TSharedPtr<FJsonObject>* Line = nullptr;
+			FEIAttribute Attribute;
+			FString StatText;
+			if (!Value->TryGetObject(Line) || !(*Line)->TryGetStringField(TEXT("name"), Attribute.Name))
+			{
+				OutError = TEXT("Einem Attribut fehlt der Name.");
+				return false;
+			}
+			if (!(*Line)->TryGetStringField(TEXT("wert"), StatText) || !EIStatFromKey(StatText, Attribute.Stat))
+			{
+				OutError = FString::Printf(TEXT("%s hat keinen bekannten Wert."), *Attribute.Name);
+				return false;
+			}
+			if (!FEIDataFile::ReadNumber(**Line, TEXT("je_punkt"), 0.0, 100000.0, Attribute.PerPoint, OutError))
+			{
+				return false;
+			}
+			Out.Attributes.Add(Attribute);
+		}
+
 		const TArray<TSharedPtr<FJsonValue>>* Sets = nullptr;
 		if (Items.TryGetArrayField(TEXT("arten"), Sets))
 		{
@@ -380,6 +421,22 @@ float FEIItemTable::GetQualityFactor(int32 Quality) const
 FString FEIItemTable::GetQualityName(int32 Quality) const
 {
 	return QualityNames.IsValidIndex(Quality) ? QualityNames[Quality] : FString();
+}
+
+int32 FEIItemTable::GetExperienceForLevel(int32 Level) const
+{
+	const int32 Steps = FMath::Max(Level - 1, 0);
+	return FMath::RoundToInt32(Steps * FirstLevelExperience + LevelExperienceGrowth * Steps * (Steps - 1) / 2.0f);
+}
+
+int32 FEIItemTable::GetLevel(int32 Experience) const
+{
+	int32 Level = 1;
+	while (Level < FMath::RoundToInt32(MaxLevel) && Experience >= GetExperienceForLevel(Level + 1))
+	{
+		++Level;
+	}
+	return Level;
 }
 
 int32 FEIItemTable::GetStartItem(EEISlot Slot, bool bArcanist) const

@@ -27,6 +27,12 @@ namespace
 		}
 		const TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
 		Object->SetObjectField(TEXT("plaetze"), Slots);
+		const TSharedRef<FJsonObject> Attributes = MakeShared<FJsonObject>();
+		for (const TPair<FString, int32>& Pair : Saved.Attributes)
+		{
+			Attributes->SetNumberField(Pair.Key, Pair.Value);
+		}
+		Object->SetObjectField(TEXT("attribute"), Attributes);
 		return Object;
 	}
 
@@ -42,6 +48,17 @@ namespace
 		{
 			FString Name;
 			Out.Slots[Index] = (*Slots)->TryGetStringField(EISlotKey(static_cast<EEISlot>(Index)), Name) ? Name : FString();
+		}
+		Out.Attributes.Reset();
+		const TSharedPtr<FJsonObject>* Attributes = nullptr;
+		if ((*Object)->TryGetObjectField(TEXT("attribute"), Attributes))
+		{
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Attributes)->Values)
+			{
+				double Points = 0.0;
+				Pair.Value->TryGetNumber(Points);
+				Out.Attributes.Add(Pair.Key, FMath::RoundToInt32(Points));
+			}
 		}
 	}
 }

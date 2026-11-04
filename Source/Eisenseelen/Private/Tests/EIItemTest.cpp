@@ -36,6 +36,8 @@ namespace
 		"qualitaeten": [{ "name": "Einfach", "faktor": 1 }, { "name": "Doppelt", "faktor": 2 }],
 		"tempo_bonus_max": 0.3, "ruestung_max": 0.6, "abklingzeit_abzug_max": 0.5, "manakosten_abzug_max": 0.6, "waffe_element_bonus": 0.2,
 		"start_items": ["Probeschwert", "Probestab"],
+		"erfahrung": { "level_max": 4, "erste_stufe": 100, "zuwachs_je_level": 50 },
+		"attribute": [{ "name": "Probekraft", "wert": "angriffskraft", "je_punkt": 0.03 }],
 		"belohnung": { "ritual_erfahrung": 11, "anfuehrer_erfahrung": 12, "schrein_erfahrung": 13, "doppelt_erfahrung": 14, "umkreis_m": 15, "verderbnis_erfahrung_je_stufe": 0.5, "geschmiedet_ab_stufe": 2 },
 		"arten": [{ "name": "Probeart", "je_zwei_teile": { "leben": 10 } }],
 		"items": [
@@ -158,6 +160,13 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A complete table loads"), FEIItemTable::LoadFromStrings(SmallItems, SmallWeapons, Small, Error));
 	TestEqual(TEXT("All lines are there"), Small.Items.Num(), 3);
 	TestEqual(TEXT("The rewards count"), Small.Rewards.ShrineExperience, 13.0f);
+	TestEqual(TEXT("The attributes count"), Small.Attributes[0].PerPoint, 0.03f);
+	TestEqual(TEXT("A new player is level 1"), Small.GetLevel(0), 1);
+	TestEqual(TEXT("Just before the first step still level 1"), Small.GetLevel(99), 1);
+	TestEqual(TEXT("The first step is level 2"), Small.GetLevel(100), 2);
+	TestEqual(TEXT("Each step takes more"), Small.GetExperienceForLevel(3), 250);
+	TestEqual(TEXT("The third step takes more still"), Small.GetExperienceForLevel(4), 450);
+	TestEqual(TEXT("The level ends at the top"), Small.GetLevel(1000000), 4);
 	const FEIItem& Sword = Small.Items[Small.FindItem(TEXT("Probeschwert"))];
 	TestTrue(TEXT("A sword is for the blade warden"), Sword.bForBladewarden && !Sword.bForArcanist);
 	TestEqual(TEXT("A weapon gives a bonus for its element"), Sword.Stats[0].Amount, 0.2f);
@@ -186,6 +195,7 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	Refuses(TEXT("An unknown set is refused"), TEXT("\"art\": \"Probeart\""), TEXT("\"art\": \"Keine\""), TEXT("Probehelm"));
 	Refuses(TEXT("An unknown class is refused"), TEXT("\"klasse\": \"arkanist\""), TEXT("\"klasse\": \"niemand\""), TEXT("Probehelm"));
 	Refuses(TEXT("The same name twice is refused"), TEXT("\"name\": \"Probehelm\""), TEXT("\"name\": \"Probestab\""), TEXT("Probestab"));
+	Refuses(TEXT("An attribute with an unknown value is refused"), TEXT("\"wert\": \"angriffskraft\""), TEXT("\"wert\": \"glueck\""), TEXT("Probekraft"));
 	Refuses(TEXT("An unknown start item is refused"), TEXT("[\"Probeschwert\", \"Probestab\"]"), TEXT("[\"Gibtsnicht\"]"), TEXT("Gibtsnicht"));
 	Refuses(TEXT("A class without a start weapon is refused"), TEXT("[\"Probeschwert\", \"Probestab\"]"), TEXT("[\"Probeschwert\"]"), TEXT("Start-Waffe"));
 	return true;
@@ -218,6 +228,8 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	Save.Experience = 340;
 	Save.Items.Add(TEXT("Sturmrune"), 2);
 	Save.Classes[0].Slots[RuneSlot] = TEXT("Sturmrune");
+	Save.Classes[0].Attributes.Add(TEXT("Kraft"), 3);
+	Save.ArenaClasses[1].Attributes.Add(TEXT("Geist"), 7);
 	Save.Classes[1].Slots[RuneSlot].Reset();
 	Save.ArenaClasses[1].Slots[WeaponSlot] = TEXT("Donnerzepter");
 	Save.ArenaQuality = 1;
@@ -227,6 +239,9 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("The experience stays"), Loaded.Experience, 340);
 	TestEqual(TEXT("The quality stays"), Loaded.Items.FindRef(TEXT("Sturmrune")), 2);
 	TestEqual(TEXT("What is on stays on"), Loaded.Classes[0].Slots[RuneSlot], FString(TEXT("Sturmrune")));
+	TestEqual(TEXT("The points stay"), Loaded.Classes[0].Attributes.FindRef(TEXT("Kraft")), 3);
+	TestEqual(TEXT("The arena has its own points"), Loaded.ArenaClasses[1].Attributes.FindRef(TEXT("Geist")), 7);
+	TestEqual(TEXT("The other class has none of them"), Loaded.Classes[1].Attributes.FindRef(TEXT("Kraft")), 0);
 	TestTrue(TEXT("An empty slot stays empty"), Loaded.Classes[1].Slots[RuneSlot].IsEmpty());
 	TestEqual(TEXT("The test arena keeps its own things"), Loaded.ArenaClasses[1].Slots[WeaponSlot], FString(TEXT("Donnerzepter")));
 	TestEqual(TEXT("The arena keeps its quality"), Loaded.ArenaQuality, 1);
@@ -727,6 +742,142 @@ bool FEIGearMenuTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestTrue(TEXT("Now the hero swings again"), Context.Hero->GetSword()->IsSwinging());
+	}));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIExperienceTest,
+	"Eisenseelen.Play.Run.Experience",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIExperienceTest::RunTest(const FString& Parameters)
+{
+	TArray<FEIPlayStep> Steps;
+
+	// A new player is level 1 and has no points to spend, whatever the page offers.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		Context.Hero->SetCanBeDamaged(false);
+		Context.Test->TestEqual(TEXT("A new player is level 1"), Player->GetLevel(), 1);
+		Context.Test->TestEqual(TEXT("A new player has no points"), Player->GetFreePoints(), 0);
+		Player->ChangeAttribute(0, 1);
+		Context.Test->TestEqual(TEXT("Without a point nothing rises"), Player->GetAttributePoints(0), 0);
+
+		// Experience brings levels, and each level a point.
+		Player->GetSave().Experience = Player->GetTable().GetExperienceForLevel(3);
+		Context.Test->TestEqual(TEXT("Experience brings levels"), Player->GetLevel(), 3);
+		Context.Test->TestEqual(TEXT("Each level brings a point"), Player->GetFreePoints(), 2);
+
+		const FEIAttribute& Might = Player->GetTable().Attributes[0];
+		Context.Test->TestTrue(TEXT("The first attribute raises the attack"), Might.Stat == EEIStat::AttackPower);
+		Player->ChangeAttribute(0, 1);
+		Player->ChangeAttribute(0, 1);
+		Player->ChangeAttribute(0, 1);
+		Context.Test->TestEqual(TEXT("Only as many points as there are"), Player->GetAttributePoints(0), 2);
+		Context.Test->TestEqual(TEXT("Now none is free"), Player->GetFreePoints(), 0);
+		Context.Test->TestNearlyEqual(TEXT("The points count on the hero"), Gear(Context)->GetStat(EEIStat::AttackPower), Might.PerPoint * 2.0f);
+
+		// A point can always move.
+		Player->ChangeAttribute(0, -1);
+		Player->ChangeAttribute(2, 1);
+		Context.Test->TestEqual(TEXT("A point comes back"), Player->GetAttributePoints(0), 1);
+		const FEIAttribute& Toughness = Player->GetTable().Attributes[2];
+		Context.Test->TestEqual(TEXT("And goes somewhere else"), Context.Hero->GetHealth()->GetMaxHealth(), Context.Hero->GetClassValues().Life + Toughness.PerPoint);
+		Player->ChangeAttribute(1, -1);
+		Context.Test->TestEqual(TEXT("Never below nothing"), Player->GetAttributePoints(1), 0);
+	}));
+
+	// Each class spends for itself, at the same level.
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("The level counts for both classes"), Profile(Context)->GetLevel(), 3);
+		Context.Test->TestEqual(TEXT("The other class spends its own points"), Profile(Context)->GetFreePoints(), 2);
+		Context.Test->TestEqual(TEXT("The other class has its own attributes"), Profile(Context)->GetAttributePoints(0), 0);
+	}));
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
+
+	// The page offers it too.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		FEIGearMenu& Menu = Context.Player->GetMenu();
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("The page shows the level"), Menu.Shows(TEXT("Level 3")));
+		const FEIMenuElement* Minus = Menu.FindButton(TEXT("- Kraft"));
+		Context.Test->TestNotNull(TEXT("The page has the button"), Minus);
+		Menu.Click(Minus->X + 1.0f, Minus->Y + 1.0f);
+		Context.Test->TestEqual(TEXT("The button takes a point away"), Player->GetAttributePoints(0), 0);
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		const FEIMenuElement* Plus = Menu.FindButton(TEXT("+ Geist"));
+		Context.Test->TestNotNull(TEXT("The page has that button too"), Plus);
+		Menu.Click(Plus->X + 1.0f, Plus->Y + 1.0f);
+		Context.Test->TestEqual(TEXT("The button gives a point"), Player->GetAttributePoints(1), 1);
+		Context.Test->TestNearlyEqual(TEXT("The spells follow"), Gear(Context)->GetStat(EEIStat::SpellPower), Player->GetTable().Attributes[1].PerPoint);
+	}));
+
+	// Enemies pay a little, but only to whoever stood near.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		Player->GetSave().Experience = 0;
+		AEIEnemy* Near = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(800.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+		const FEIEnemyValues Values = Near->GetValues();
+		Near->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		Context.Test->TestEqual(TEXT("A fallen enemy brings experience"), Player->GetSave().Experience, FMath::RoundToInt32(Values.Experience));
+		Context.Test->TestEqual(TEXT("An ordinary kill does not interrupt"), Player->GetRewardNote(), 0.0f);
+
+		const float Reach = Player->GetTable().Rewards.RadiusMeters * 100.0f;
+		AEIEnemy* Far = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(0.0f, Reach + 500.0f, 500.0f), FRotator::ZeroRotator);
+		if (Far != nullptr)
+		{
+			Far->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		}
+		Context.Test->TestEqual(TEXT("From afar it brings nothing"), Player->GetSave().Experience, FMath::RoundToInt32(Values.Experience));
+
+		// The rare item, made certain here.
+		AEIEnemy* Lucky = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(800.0f, 300.0f, 0.0f), FRotator::ZeroRotator);
+		FEIEnemyValues Certain = Lucky->GetValues();
+		Certain.ItemChance = 1.0f;
+		Lucky->ApplyValues(Certain);
+		Lucky->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		Context.Test->TestEqual(TEXT("A rare item lands in the bag"), Player->GetLoot().Num(), 1);
+		Context.Test->TestTrue(TEXT("Such a find gets a note"), Player->GetRewardNote() > 0.0f);
+
+		// Reaching a level gets a note, even from an ordinary kill.
+		Player->GetSave().Experience = Player->GetTable().GetExperienceForLevel(2) - 1;
+		AEIEnemy* Last = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(800.0f, -300.0f, 0.0f), FRotator::ZeroRotator);
+		Last->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		Context.Test->TestTrue(TEXT("A new level gets a note"), Player->GetRewardText().Contains(TEXT("Level 2")));
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIArenaExperienceTest,
+	"Eisenseelen.Play.ArenaAttributes",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIArenaExperienceTest::RunTest(const FString& Parameters)
+{
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		const int32 MaxLevel = FMath::RoundToInt32(Player->GetTable().MaxLevel);
+		Context.Test->TestEqual(TEXT("In the arena the level is the highest"), Player->GetLevel(), MaxLevel);
+		Context.Test->TestEqual(TEXT("So all points are there"), Player->GetFreePoints(), MaxLevel - 1);
+		Player->ChangeAttribute(0, 1);
+		Context.Test->TestNearlyEqual(TEXT("They count in the arena"), Gear(Context)->GetStat(EEIStat::AttackPower), Player->GetTable().Attributes[0].PerPoint);
+		Context.Test->TestTrue(TEXT("But not for a real run"), Player->GetSave().Classes[0].Attributes.IsEmpty());
+
+		AEIEnemy* Enemy = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(800.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+		Enemy->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		Context.Test->TestEqual(TEXT("In the arena no enemy pays"), Player->GetSave().Experience, 0);
 	}));
 	return RunInArena(this, MoveTemp(Steps));
 }

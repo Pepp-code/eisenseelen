@@ -117,7 +117,8 @@ void AEIHud::DrawHUD()
 	const FString ClassKeys = bArcanist ? FString::Printf(TEXT("Linke Maus Schuss   Rechte Maus halten: %s"), *SpellName) : FString(TEXT("Linke Maus Hieb (halten: schwerer Hieb)   Rechte Maus halten: blocken, kurz vor dem Treffer: Parade"));
 	// On the run map most enemies stand far away in their camps, so that number would say nothing.
 	const FString EnemyNote = bHasRun ? FString() : FString::Printf(TEXT("   %sGegner %d"), HordeNote, Enemies);
-	DrawLine(FString::Printf(TEXT("%s   %s   %s%s"), ClassName, Rune != nullptr ? *Rune->Name : TEXT("Keine Rune"), *ClassKeys, *EnemyNote), Margin, Margin + 24.0f, TextColor);
+	const int32 Level = Player != nullptr ? Player->GetProfile()->GetLevel() : 1;
+	DrawLine(FString::Printf(TEXT("%s, Level %d   %s   %s%s"), ClassName, Level, Rune != nullptr ? *Rune->Name : TEXT("Keine Rune"), *ClassKeys, *EnemyNote), Margin, Margin + 24.0f, TextColor);
 
 	if (Hero->GetHurtFlash() > 0.0f)
 	{
@@ -261,7 +262,7 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 	Y += 40.0f + PanelLine / 2.0f;
 	DrawLine(FString::Printf(TEXT("Laufzeit %s, %d Omen"), *Clock, Hero->GetOmens()->CountAll()), TextX, Y, TextColor);
 	Y += PanelLine;
-	DrawLine(FString::Printf(TEXT("Erfahrung: +%d, sie bleibt in jedem Fall"), Profile->GetRunExperience()), TextX, Y, TextColor);
+	DrawLine(FString::Printf(TEXT("Erfahrung: +%d, sie bleibt in jedem Fall. Du bist Level %d."), Profile->GetRunExperience(), Profile->GetLevel()), TextX, Y, TextColor);
 	Y += PanelLine;
 	DrawLine(Loot.IsEmpty() ? FString(TEXT("Keine Beute")) : FString(bEscaped ? TEXT("Beute:") : TEXT("Diese Beute ist verloren:")), TextX, Y, TextColor);
 	Y += PanelLine;

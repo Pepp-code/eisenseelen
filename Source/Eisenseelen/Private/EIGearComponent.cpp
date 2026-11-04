@@ -155,6 +155,10 @@ void UEIGearComponent::Recalculate()
 			}
 		}
 	}
+	for (int32 Index = 0; Index < Table.Attributes.Num() && Index < Setup.Attributes.Num(); ++Index)
+	{
+		Add(Table.Attributes[Index].Stat, Table.Attributes[Index].PerPoint * Setup.Attributes[Index]);
+	}
 	const UEIOmenComponent* Omens = GetHero()->GetOmens();
 	for (int32 Stat = 0; Stat < EIStatCount; ++Stat)
 	{

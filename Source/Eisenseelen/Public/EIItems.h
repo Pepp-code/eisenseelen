@@ -122,9 +122,21 @@ struct EISENSEELEN_API FEIRewardValues
 	float ForgedFromStage = 3.0f;
 };
 
+/** What a point of experience can buy, from the list attribute of Data/items.json. */
+struct EISENSEELEN_API FEIAttribute
+{
+	FString Name;
+	EEIStat Stat = EEIStat::Life;
+	float PerPoint = 0.0f;
+};
+
 struct EISENSEELEN_API FEIItemTable
 {
 	FEIRewardValues Rewards;
+	TArray<FEIAttribute> Attributes;
+	float MaxLevel = 20.0f;
+	float FirstLevelExperience = 100.0f;
+	float LevelExperienceGrowth = 50.0f;
 	TArray<FEIItem> Items;
 	TArray<FEIWeaponForm> Forms;
 	TArray<FEIArmorSet> Sets;
@@ -142,6 +154,10 @@ struct EISENSEELEN_API FEIItemTable
 	const FEIWeaponForm* GetForm(const FEIItem& Item) const;
 	float GetQualityFactor(int32 Quality) const;
 	FString GetQualityName(int32 Quality) const;
+
+	/** All the experience it takes to be this level. Level 1 takes none. */
+	int32 GetExperienceForLevel(int32 Level) const;
+	int32 GetLevel(int32 Experience) const;
 
 	/** What a new hero of this class has in this slot. INDEX_NONE if nothing. */
 	int32 GetStartItem(EEISlot Slot, bool bArcanist) const;
@@ -172,4 +188,8 @@ struct FEIHeroSetup
 	/** One entry per slot. */
 	UPROPERTY()
 	TArray<FEIWornItem> Slots;
+
+	/** The points in each attribute. */
+	UPROPERTY()
+	TArray<int32> Attributes;
 };

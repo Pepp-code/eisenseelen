@@ -220,6 +220,39 @@ void UEIProfileComponent::SetArenaQuality(int32 Quality)
 	SendSetups();
 }
 
+int32 UEIProfileComponent::GetLevel() const
+{
+	return IsFreeChoice() ? FMath::RoundToInt32(Table.MaxLevel) : Table.GetLevel(Save.Experience);
+}
+
+int32 UEIProfileComponent::GetAttributePoints(int32 Attribute) const
+{
+	const FEIHeroSetup Setup = BuildSetup(GetCurrentClass() == EEIHeroClass::Arcanist);
+	return Setup.Attributes.IsValidIndex(Attribute) ? Setup.Attributes[Attribute] : 0;
+}
+
+int32 UEIProfileComponent::GetFreePoints() const
+{
+	int32 Free = GetLevel() - 1;
+	for (int32 Index = 0; Index < Table.Attributes.Num(); ++Index)
+	{
+		Free -= GetAttributePoints(Index);
+	}
+	return Free;
+}
+
+void UEIProfileComponent::ChangeAttribute(int32 Attribute, int32 Change)
+{
+	if (!CanChangeGear() || !Table.Attributes.IsValidIndex(Attribute) || (Change > 0 && GetFreePoints() < Change))
+	{
+		return;
+	}
+	const int32 Points = FMath::Max(GetAttributePoints(Attribute) + Change, 0);
+	GetSavedClass(GetCurrentClass() == EEIHeroClass::Arcanist).Attributes.Add(Table.Attributes[Attribute].Name, Points);
+	WriteSave();
+	SendSetups();
+}
+
 FEIHeroSetup UEIProfileComponent::MakeStartSetup(bool bArcanist) const
 {
 	FEIHeroSetup Setup;
@@ -251,6 +284,14 @@ FEIHeroSetup UEIProfileComponent::BuildSetup(bool bArcanist) const
 		{
 			Setup.Slots[Slot].Item = INDEX_NONE;
 		}
+	}
+	// Never more points than the level gives, whatever the file says.
+	int32 PointsLeft = GetLevel() - 1;
+	Setup.Attributes.SetNum(Table.Attributes.Num());
+	for (int32 Index = 0; Index < Table.Attributes.Num(); ++Index)
+	{
+		Setup.Attributes[Index] = FMath::Clamp(Saved.Attributes.FindRef(Table.Attributes[Index].Name), 0, PointsLeft);
+		PointsLeft -= Setup.Attributes[Index];
 	}
 	return Setup;
 }
@@ -361,10 +402,32 @@ void UEIProfileComponent::GrantReward(EEIRewardSource Source)
 	ClientReceiveReward(RollItem(Source, Quality), Quality, ScaleExperience(Experience), Source);
 }
 
+void UEIProfileComponent::GrantEnemyReward(float Experience, float ItemChance)
+{
+	const int32 Quality = GetCorruptionStage() >= FMath::RoundToInt32(Table.Rewards.ForgedFromStage) ? 1 : 0;
+	const int32 Item = FMath::FRand() < ItemChance ? RollItem(EEIRewardSource::Enemy, Quality) : INDEX_NONE;
+	ClientReceiveReward(Item, Quality, ScaleExperience(Experience), EEIRewardSource::Enemy);
+}
+
 void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Item, int32 Quality, int32 Experience, EEIRewardSource Source)
 {
+	const int32 LevelBefore = Table.GetLevel(Save.Experience);
 	Save.Experience += Experience;
 	RunExperience += Experience;
+	const int32 LevelAfter = Table.GetLevel(Save.Experience);
+	const FString LevelNote = LevelAfter > LevelBefore ? FString::Printf(TEXT("Level %d! Einen neuen Punkt verteilst du in der Ausr\u00FCstung."), LevelAfter) : FString();
+
+	// An ordinary kill does not interrupt with a note every time.
+	if (Source == EEIRewardSource::Enemy && !Table.Items.IsValidIndex(Item))
+	{
+		if (!LevelNote.IsEmpty())
+		{
+			RewardText = LevelNote;
+			RewardNoteRemaining = RewardNoteSeconds;
+			EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
+		}
+		return;
+	}
 	if (Table.Items.IsValidIndex(Item))
 	{
 		FEILootLine Line;
@@ -377,6 +440,10 @@ void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Item, int32 Q
 	else
 	{
 		RewardText = FString::Printf(TEXT("%s: +%d Erfahrung"), RewardSourceName(Source), Experience);
+	}
+	if (!LevelNote.IsEmpty())
+	{
+		RewardText += TEXT("   ") + LevelNote;
 	}
 	RewardNoteRemaining = RewardNoteSeconds;
 	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));

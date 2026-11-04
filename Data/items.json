@@ -19,6 +19,17 @@
 		"verderbnis_erfahrung_je_stufe": 0.1,
 		"geschmiedet_ab_stufe": 3
 	},
+	"erfahrung": {
+		"level_max": 20,
+		"erste_stufe": 100,
+		"zuwachs_je_level": 50
+	},
+	"attribute": [
+		{ "name": "Kraft", "wert": "angriffskraft", "je_punkt": 0.02 },
+		{ "name": "Geist", "wert": "zaubermacht", "je_punkt": 0.02 },
+		{ "name": "Zähigkeit", "wert": "leben", "je_punkt": 5 },
+		{ "name": "Gewandtheit", "wert": "tempo", "je_punkt": 0.005 }
+	],
 	"arten": [
 		{ "name": "Eisenwacht", "je_zwei_teile": { "leben": 15 } },
 		{ "name": "Henkersgarde", "je_zwei_teile": { "aufladetempo": 0.1 } },

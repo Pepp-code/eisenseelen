@@ -30,6 +30,7 @@ namespace
 	constexpr float ChoicesShare = 0.33f;
 	constexpr float ColumnGap = 22.0f;
 	constexpr float NearlyNothing = 0.0001f;
+	constexpr float PointButtonWidth = 122.0f;
 
 	/** The values of an item at a quality, added to what stands in the array. */
 	void AddItemStats(const FEIItemTable& Table, int32 Item, int32 Quality, float Sign, float (&Sums)[EIStatCount])
@@ -118,6 +119,7 @@ void FEIGearMenu::Build(UEIProfileComponent& Profile, const AEIHeroCharacter& He
 	const int32 Hovered = BuildChoices(Profile, ChoicesX, ColumnsTop, ChoicesWidth, MouseX, MouseY);
 	BuildSums(Profile, Hero, SumsX, ColumnsTop);
 	BuildComparison(Profile, Hero, Hovered, Left, ColumnsTop + (RowHeight + RowGap) * EISlotCount + LineHeight * 2.0f);
+	BuildAttributes(Profile, SumsX, PageY + PageHeight - PagePadding, MouseX, MouseY);
 
 	if (Profile.IsFreeChoice())
 	{
@@ -254,6 +256,28 @@ void FEIGearMenu::BuildComparison(const UEIProfileComponent& Profile, const AEIH
 			AddText(X, LineY, EIDescribeStat(Stat, Change[Index]), (Change[Index] > 0.0f) != bLessIsMore ? BetterColor : WorseColor);
 			LineY += LineHeight;
 		}
+	}
+}
+
+void FEIGearMenu::BuildAttributes(UEIProfileComponent& Profile, float X, float Bottom, float MouseX, float MouseY)
+{
+	const FEIItemTable& Table = Profile.GetTable();
+	const int32 Rows = Table.Attributes.Num();
+	float RowY = Bottom - (RowHeight + RowGap) * Rows;
+	const int32 Level = Profile.GetLevel();
+	const FString Head = Profile.IsFreeChoice() || Level >= FMath::RoundToInt32(Table.MaxLevel)
+		? FString::Printf(TEXT("Level %d, noch %d Punkte frei"), Level, Profile.GetFreePoints())
+		: FString::Printf(TEXT("Level %d, %d von %d Erfahrung, noch %d Punkte frei"), Level, Profile.GetSave().Experience, Table.GetExperienceForLevel(Level + 1), Profile.GetFreePoints());
+	AddText(X, RowY - LineHeight * 1.25f, Head, TitleColor);
+	UEIProfileComponent* ProfilePointer = &Profile;
+	for (int32 Index = 0; Index < Rows; ++Index)
+	{
+		const FEIAttribute& Attribute = Table.Attributes[Index];
+		const int32 Points = Profile.GetAttributePoints(Index);
+		AddButton(X, RowY, PointButtonWidth, RowHeight, FString::Printf(TEXT("- %s"), *Attribute.Name), NormalColor, false, MouseX, MouseY, [ProfilePointer, Index]() { ProfilePointer->ChangeAttribute(Index, -1); });
+		AddButton(X + PointButtonWidth + RowGap, RowY, PointButtonWidth, RowHeight, FString::Printf(TEXT("+ %s"), *Attribute.Name), NormalColor, false, MouseX, MouseY, [ProfilePointer, Index]() { ProfilePointer->ChangeAttribute(Index, 1); });
+		AddText(X + (PointButtonWidth + RowGap) * 2.0f + TextInset, RowY + TextDrop, FString::Printf(TEXT("%d: %s"), Points, *EIDescribeStat(Attribute.Stat, Attribute.PerPoint * Points)), NormalColor);
+		RowY += RowHeight + RowGap;
 	}
 }
 

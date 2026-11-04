@@ -331,9 +331,23 @@ void UEIRunDirector::GrantNear(const FVector& Location, EEIRewardSource Source)
 
 void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
 {
+	// In the test arena nothing counts.
+	if (GetWorld()->GetGameState<AEIGameState>()->GetRunPhase() == EEIRunPhase::None)
+	{
+		return;
+	}
 	if (Enemy.IsLeader())
 	{
 		GrantNear(Enemy.GetActorLocation(), EEIRewardSource::Leader);
+	}
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get());
+		const AEIHeroCharacter* Hero = Player != nullptr ? Player->GetPawn<AEIHeroCharacter>() : nullptr;
+		if (Hero != nullptr && !Hero->IsDead() && FVector::Dist2D(Hero->GetActorLocation(), Enemy.GetActorLocation()) <= Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter)
+		{
+			Player->GetProfile()->GrantEnemyReward(Enemy.GetValues().Experience, Enemy.GetValues().ItemChance);
+		}
 	}
 }
 
