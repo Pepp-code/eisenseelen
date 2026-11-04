@@ -79,7 +79,7 @@ Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war
 
 **Als Nächstes:** Der Spieltest des Entwicklers für alles seit dem 3. November steht aus, danach kommt Stufe 3. Die Items sind nach den Empfehlungen im Plan-Reiter „Items und Builds“ gebaut, der Entwickler kann jede davon noch ändern.
 
-**Bewusst noch nicht dabei:** Herzkristalle (der Platz ist da, er bleibt leer), die Rute, vier weitere Rüstungsarten, der Auftrag Ruine säubern, Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Totenrufer, Klassen-Passive.
+**Bewusst noch nicht dabei:** das vierte Element Wind mit Windwaffen (seit dem 4. November im Plan eingeplant), Herzkristalle (der Platz ist da, er bleibt leer), die Rute, vier weitere Rüstungsarten, der Auftrag Ruine säubern, Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Totenrufer, Klassen-Passive.
 
 **Nicht geprüft:** Töne kann der Agent nicht hören, und die Klingenspur erscheint in keinem Standbild. Der echte Mauszeiger im Menü läuft ohne Fenster nicht, die Tests klicken das Menü direkt an. Viele Items, Erfahrung und Belohnungen sind erste Annahmen und nicht abgestimmt.
 
