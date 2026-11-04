@@ -24,6 +24,9 @@ private:
 	void DrawRun(const class AEIHeroCharacter* Hero, const class AEIGameState* State);
 	void DrawWorldMark(const FVector& Location, const FString& Label, const FLinearColor& Color);
 
+	/** The gear page, over everything else. */
+	void DrawMenu(class AEIPlayerController* Player, const class AEIHeroCharacter& Hero);
+
 	/** What a run has brought, once it is over. */
 	void DrawSettlement(const class AEIHeroCharacter* Hero, const class AEIGameState* State, const FString& Clock);
 

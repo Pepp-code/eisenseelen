@@ -19,8 +19,8 @@ namespace
 	const FLinearColor ShaftColor(0.12f, 0.07f, 0.03f);
 	const FVector BladeSizeCm(BladeLength, 2.0f, 7.0f);
 	const FVector BladeEdgeSizeCm(BladeLength * 0.96f, 2.4f, 1.4f);
-	constexpr float BladeEdgeGlow = 3.0f;
-	constexpr float StaffHeadGlow = 5.0f;
+	constexpr float BladeEdgeGlow = 1.2f;
+	constexpr float StaffHeadGlow = 1.2f;
 	constexpr float StaffLength = 120.0f;
 	constexpr float StaffBack = 35.0f;
 	constexpr float StaffHeadSize = 13.0f;

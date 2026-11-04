@@ -50,6 +50,54 @@ AEIPlayerController::AEIPlayerController()
 	Profile = CreateDefaultSubobject<UEIProfileComponent>(TEXT("Profile"));
 }
 
+void AEIPlayerController::SetMenuOpen(bool bOpen)
+{
+	if (bOpen == bMenuOpen || (bOpen && !Profile->CanChangeGear()))
+	{
+		return;
+	}
+	bMenuOpen = bOpen;
+	bShowMouseCursor = bOpen;
+	if (bOpen)
+	{
+		FInputModeGameAndUI Mode;
+		Mode.SetHideCursorDuringCapture(false);
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(Mode);
+	}
+	else
+	{
+		SetInputMode(FInputModeGameOnly());
+	}
+	if (AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
+	{
+		// What was held down when the page opened would never get its release.
+		Hero->SetSprintKey(false);
+		Hero->ReleasePrimary();
+		Hero->ReleaseSecondary();
+	}
+}
+
+void AEIPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+	// Somebody else may have jumped off the barge in the meantime.
+	if (bMenuOpen && !Profile->CanChangeGear())
+	{
+		SetMenuOpen(false);
+	}
+}
+
+void AEIPlayerController::HandleMenu()
+{
+	SetMenuOpen(!bMenuOpen);
+}
+
+void AEIPlayerController::PreviewMenuSlot(int32 Slot)
+{
+	Menu.SelectSlot(static_cast<EEISlot>(FMath::Clamp(Slot, 0, EISlotCount - 1)));
+}
+
 void AEIPlayerController::PreviewEquip(const FString& Name)
 {
 	Profile->EquipByName(Name);
@@ -134,7 +182,7 @@ void AEIPlayerController::SetupInputComponent()
 	SpellAction = MakeAction(this, EInputActionValueType::Boolean);
 	RuneSpellAction = MakeAction(this, EInputActionValueType::Boolean);
 	ClassAction = MakeAction(this, EInputActionValueType::Boolean);
-	NextRuneAction = MakeAction(this, EInputActionValueType::Boolean);
+	MenuAction = MakeAction(this, EInputActionValueType::Boolean);
 
 	Mapping = NewObject<UInputMappingContext>(this);
 	MapMoveKey(Mapping, MoveAction, EKeys::W, true, false);
@@ -152,7 +200,7 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(SpellAction, EKeys::Q);
 	Mapping->MapKey(RuneSpellAction, EKeys::E);
 	Mapping->MapKey(ClassAction, EKeys::C);
-	Mapping->MapKey(NextRuneAction, EKeys::T);
+	Mapping->MapKey(MenuAction, EKeys::I);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AEIPlayerController::HandleMove);
@@ -171,7 +219,7 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(SpellAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleSpell);
 	Input->BindAction(RuneSpellAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleRuneSpell);
 	Input->BindAction(ClassAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleClass);
-	Input->BindAction(NextRuneAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleNextRune);
+	Input->BindAction(MenuAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleMenu);
 
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 	Subsystem->AddMappingContext(Mapping, 0);
@@ -179,8 +227,9 @@ void AEIPlayerController::SetupInputComponent()
 
 AEIHeroCharacter* AEIPlayerController::GetLivingHero() const
 {
+	// While the page is open, the keys and the mouse belong to it.
 	AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>();
-	return Hero != nullptr && !Hero->IsDead() ? Hero : nullptr;
+	return Hero != nullptr && !Hero->IsDead() && !bMenuOpen ? Hero : nullptr;
 }
 
 void AEIPlayerController::HandleMove(const FInputActionValue& Value)
@@ -195,7 +244,10 @@ void AEIPlayerController::HandleMove(const FInputActionValue& Value)
 
 void AEIPlayerController::HandleLook(const FInputActionValue& Value)
 {
-	ApplyLookInput(Value.Get<FVector2D>());
+	if (!bMenuOpen)
+	{
+		ApplyLookInput(Value.Get<FVector2D>());
+	}
 }
 
 void AEIPlayerController::ApplyLookInput(const FVector2D& Input)
@@ -241,6 +293,12 @@ void AEIPlayerController::HandleSprintEnded()
 
 void AEIPlayerController::HandlePrimaryPressed()
 {
+	float MouseX = 0.0f;
+	float MouseY = 0.0f;
+	if (bMenuOpen && GetMousePosition(MouseX, MouseY))
+	{
+		Menu.Click(MouseX, MouseY);
+	}
 	if (AEIHeroCharacter* Hero = GetLivingHero())
 	{
 		Hero->PressPrimary();
@@ -273,7 +331,10 @@ void AEIPlayerController::HandleSecondaryReleased()
 
 void AEIPlayerController::HandleInteract()
 {
-	ServerInteract();
+	if (!bMenuOpen)
+	{
+		ServerInteract();
+	}
 }
 
 void AEIPlayerController::ServerInteract_Implementation()
@@ -293,6 +354,7 @@ void AEIPlayerController::HandleHorde()
 
 void AEIPlayerController::HandleRestart()
 {
+	SetMenuOpen(false);
 	ServerRestartRun();
 }
 
@@ -331,11 +393,6 @@ void AEIPlayerController::HandleRuneSpell()
 void AEIPlayerController::HandleClass()
 {
 	ServerToggleClass();
-}
-
-void AEIPlayerController::HandleNextRune()
-{
-	Profile->EquipNext(EEISlot::Rune);
 }
 
 void AEIPlayerController::ServerToggleClass_Implementation()

@@ -59,6 +59,8 @@ namespace
 	constexpr float PanelLine = 30.0f;
 	constexpr float PanelPadding = 26.0f;
 	constexpr float RewardNoteY = 230.0f;
+	constexpr float MenuTextInset = 10.0f;
+	constexpr float MenuTextDrop = 6.0f;
 	constexpr float CentimetersPerMeter = 100.0f;
 }
 
@@ -87,8 +89,14 @@ void AEIHud::DrawHUD()
 	const FEIRune* Rune = Hero != nullptr ? Hero->GetRunes()->GetRune() : nullptr;
 	const FString RuneKey = Rune != nullptr ? FString::Printf(TEXT("E %s   "), *Rune->SpellName) : FString();
 	const FString SpellName = Hero != nullptr ? Hero->GetCaster()->GetSpell().Name : FString();
-	const TCHAR* NextRuneKey = !bHasRun || State->GetRunPhase() == EEIRunPhase::OnBarge ? TEXT("T Rune   ") : TEXT("");
-	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   Q %s   %sF benutzen   C Klasse   %s%sR Neustart"), *SpellName, *RuneKey, NextRuneKey, bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
+	AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner);
+	if (Hero != nullptr && Player != nullptr && Player->IsMenuOpen())
+	{
+		DrawMenu(Player, *Hero);
+		return;
+	}
+	const TCHAR* GearKey = Player != nullptr && Player->GetProfile()->CanChangeGear() ? TEXT("I Ausr\u00FCstung   ") : TEXT("");
+	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   Q %s   %sF benutzen   C Klasse   %s%sR Neustart"), *SpellName, *RuneKey, GearKey, bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -209,6 +217,27 @@ void AEIHud::DrawOmens(const AEIHeroCharacter* Hero, float BottomY)
 	}
 }
 
+void AEIHud::DrawMenu(AEIPlayerController* Player, const AEIHeroCharacter& Hero)
+{
+	float MouseX = -1.0f;
+	float MouseY = -1.0f;
+	Player->GetMousePosition(MouseX, MouseY);
+	FEIGearMenu& Menu = Player->GetMenu();
+	Menu.Build(*Player->GetProfile(), Hero, Canvas->SizeX, Canvas->SizeY, MouseX, MouseY);
+	for (const FEIMenuElement& Element : Menu.GetElements())
+	{
+		if (Element.Width > 0.0f)
+		{
+			DrawRect(Element.BoxColor, Element.X, Element.Y, Element.Width, Element.Height);
+		}
+		if (!Element.Text.IsEmpty())
+		{
+			const bool bRow = Element.Width > 0.0f;
+			DrawLine(Element.Text, Element.X + (bRow ? MenuTextInset : 0.0f), Element.Y + (bRow ? MenuTextDrop : 0.0f), Element.TextColor, Element.TextScale);
+		}
+	}
+}
+
 void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* State, const FString& Clock)
 {
 	const AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner);
@@ -241,7 +270,7 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 		Y += PanelLine;
 	}
 	Y += PanelLine / 2.0f;
-	DrawLine(TEXT("R startet einen neuen Lauf"), TextX, Y, TextColor);
+	DrawLine(TEXT("I Ausr\u00FCstung   R startet einen neuen Lauf"), TextX, Y, TextColor);
 }
 
 void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
@@ -316,7 +345,7 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	switch (Phase)
 	{
 	case EEIRunPhase::OnBarge:
-		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse, mit T die Rune."), Margin, LineY, TextColor);
+		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse, mit I die Ausr\u00FCstung."), Margin, LineY, TextColor);
 		DrawActiveAltar();
 		break;
 

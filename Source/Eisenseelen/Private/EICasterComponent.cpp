@@ -23,6 +23,8 @@ namespace
 
 	constexpr float CentimetersPerMeter = 100.0f;
 	constexpr float SlowestChargeFactor = 0.1f;
+	// The flash starts at the hand, because straight ahead of the eye its end would fill the view.
+	const FVector ChainStartCm(100.0f, 24.0f, -30.0f);
 
 	bool ReadSpell(const FJsonObject& Spells, const TCHAR* Key, FEISpellValues& Out, TSharedPtr<FJsonObject>& OutObject, FString& OutError)
 	{
@@ -413,7 +415,7 @@ void UEICasterComponent::CastChain(const FVector& Target, float Damage)
 	}
 
 	TArray<FVector_NetQuantize> Points;
-	Points.Add(Eye + Hero->GetViewRotation().Vector() * MuzzleForwardCm);
+	Points.Add(Eye + Hero->GetViewRotation().RotateVector(ChainStartCm));
 	if (Current == nullptr)
 	{
 		Points.Add(Stop);

@@ -200,12 +200,14 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		GetGameMode(Context)->GetRun()->ApplyValues(Short);
 	}));
 
-	// During the run the rune stays.
+	// During the run the rune stays, and the gear page does not open.
 	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Player->GetProfile()->EquipByName(TEXT("Frostrune")); }));
+	AddTap(Steps, EKeys::I);
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestEqual(TEXT("During a run the gear stays"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
+		Context.Test->TestFalse(TEXT("During a run the gear page stays shut"), Context.Player->IsMenuOpen());
 	}));
 
 	// The use key does nothing far from a beacon.

@@ -6,6 +6,7 @@
 #include "EIEnemy.h"
 #include "EIGameMode.h"
 #include "EIGearComponent.h"
+#include "EIGearMenu.h"
 #include "EIHealthComponent.h"
 #include "EIItems.h"
 #include "EIProfileComponent.h"
@@ -567,6 +568,121 @@ bool FEILootTest::RunTest(const FString& Parameters)
 		}
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIGearMenuTest,
+	"Eisenseelen.Play.GearMenu",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIGearMenuTest::RunTest(const FString& Parameters)
+{
+	constexpr float ScreenWidth = 1600.0f;
+	constexpr float ScreenHeight = 900.0f;
+	const auto Page = [](const FEIPlayContext& Context) -> FEIGearMenu&
+	{
+		FEIGearMenu& Menu = Context.Player->GetMenu();
+		Menu.Build(*Profile(Context), *Context.Hero, ScreenWidth, ScreenHeight, -1.0f, -1.0f);
+		return Menu;
+	};
+	const auto ClickOn = [Page](const FEIPlayContext& Context, const TCHAR* Text)
+	{
+		FEIGearMenu& Menu = Page(Context);
+		const FEIMenuElement* Button = Menu.FindButton(Text);
+		Context.Test->TestNotNull(*FString::Printf(TEXT("The page has a button for %s"), Text), Button);
+		if (Button != nullptr)
+		{
+			Menu.Click(Button->X + Button->Width / 2.0f, Button->Y + Button->Height / 2.0f);
+		}
+	};
+
+	TArray<FEIPlayStep> Steps;
+
+	// I opens the page, and then the hero stands still.
+	AddTap(Steps, EKeys::I);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([Page](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("I opens the page"), Context.Player->IsMenuOpen());
+		Context.Test->TestTrue(TEXT("The mouse is a pointer now"), Context.Player->bShowMouseCursor);
+		FEIGearMenu& Menu = Page(Context);
+		Context.Test->TestTrue(TEXT("The page shows the class"), Menu.Shows(TEXT("Klingenwacht")));
+		Context.Test->TestTrue(TEXT("The page shows all slots"), Menu.Shows(TEXT("Waffe:")) && Menu.Shows(TEXT("Rune:")) && Menu.Shows(TEXT("Helm:")) && Menu.Shows(TEXT("Brustpanzer:")) && Menu.Shows(TEXT("Handschuhe:")) && Menu.Shows(TEXT("Schuhe:")) && Menu.Shows(TEXT("Herzkristall:")));
+		Context.Test->TestTrue(TEXT("It shows what is on"), Menu.Shows(TEXT("Waffe: Flammenschwert (Rostig)")));
+		Context.Test->TestTrue(TEXT("It shows the sum of the values"), Menu.Shows(TEXT("+10 % Feuerschaden")));
+		Context.Test->TestTrue(TEXT("It shows the spell on Q"), Menu.Shows(TEXT("Zauber auf Q: Feuerball")));
+		Context.Test->TestNotNull(TEXT("The arena has all weapons of the class"), Menu.FindButton(TEXT("Donnerbrecher")));
+		Context.Test->TestNull(TEXT("But none of the other class"), Menu.FindButton(TEXT("Feuerstab")));
+		for (const FEIMenuElement& Element : Menu.GetElements())
+		{
+			Context.Test->TestTrue(*FString::Printf(TEXT("%s fits on the screen"), *Element.Text), Element.X + Element.Width <= ScreenWidth && Element.Y + Element.Height <= ScreenHeight);
+		}
+	}));
+	Steps.Add(Press(EKeys::W));
+	Steps.Add(Wait(0.3));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("With the page open the hero does not walk"), Context.Hero->GetVelocity().Size2D() < 10.0);
+	}));
+	Steps.Add(Release(EKeys::W));
+	AddTap(Steps, EKeys::LeftMouseButton);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([ClickOn, Page](const FEIPlayContext& Context)
+	{
+		Context.Test->TestFalse(TEXT("With the page open the hero does not swing"), Context.Hero->GetSword()->IsSwinging());
+
+		// A click puts it on.
+		ClickOn(Context, TEXT("Donnerbrecher"));
+		Context.Test->TestEqual(TEXT("A click on an item puts it on"), Gear(Context)->GetWorn(EEISlot::Weapon)->Name, FString(TEXT("Donnerbrecher")));
+		Context.Test->TestTrue(TEXT("The page shows it"), Page(Context).Shows(TEXT("Waffe: Donnerbrecher")));
+		Context.Test->TestTrue(TEXT("The page shows its spell"), Page(Context).Shows(TEXT("Zauber auf Q: Kettenblitz")));
+
+		// Hovering compares it to what is on.
+		FEIGearMenu& Menu = Page(Context);
+		const FEIMenuElement* Other = Menu.FindButton(TEXT("Frostklinge"));
+		const float OverX = Other->X + 5.0f;
+		const float OverY = Other->Y + 5.0f;
+		Menu.Build(*Profile(Context), *Context.Hero, ScreenWidth, ScreenHeight, OverX, OverY);
+		Context.Test->TestTrue(TEXT("The page compares what the mouse is on"), Menu.Shows(TEXT("Frostklinge statt Donnerbrecher")));
+		Context.Test->TestTrue(TEXT("It says what is gained"), Menu.Shows(TEXT("+10 % Eisschaden")));
+		Context.Test->TestTrue(TEXT("It says what is lost"), Menu.Shows(TEXT("-10 % Blitzschaden")));
+
+		// Another slot, and something that can come off again.
+		ClickOn(Context, TEXT("Brustpanzer:"));
+		Context.Test->TestEqual(TEXT("A click on a slot chooses it"), Context.Player->GetMenu().GetSelectedSlot(), EEISlot::Chest);
+		ClickOn(Context, TEXT("Brustpanzer der Eisenwacht"));
+		Context.Test->TestEqual(TEXT("The armour is on"), Gear(Context)->GetWorn(EEISlot::Chest)->Name, FString(TEXT("Brustpanzer der Eisenwacht")));
+		Context.Test->TestTrue(TEXT("The sum of the values follows"), Page(Context).Shows(TEXT("+30 Leben")));
+		ClickOn(Context, TEXT("Ablegen"));
+		Context.Test->TestNull(TEXT("It can come off"), Gear(Context)->GetWorn(EEISlot::Chest));
+
+		// The weapon cannot come off.
+		ClickOn(Context, TEXT("Waffe:"));
+		Context.Test->TestNull(TEXT("A weapon has no button to take it off"), Page(Context).FindButton(TEXT("Ablegen")));
+
+		// In the arena the quality is free too.
+		ClickOn(Context, TEXT("Qualit\u00E4t:"));
+		Context.Test->TestEqual(TEXT("The button raises the quality"), Gear(Context)->GetWornQuality(EEISlot::Weapon), 1);
+		ClickOn(Context, TEXT("Qualit\u00E4t:"));
+		ClickOn(Context, TEXT("Qualit\u00E4t:"));
+		Context.Test->TestEqual(TEXT("After the best it starts over"), Gear(Context)->GetWornQuality(EEISlot::Weapon), 0);
+	}));
+
+	// I closes it, and the hero is free again.
+	AddTap(Steps, EKeys::I);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestFalse(TEXT("I closes the page"), Context.Player->IsMenuOpen());
+		Context.Test->TestFalse(TEXT("The mouse looks around again"), Context.Player->bShowMouseCursor);
+	}));
+	AddTap(Steps, EKeys::LeftMouseButton);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("Now the hero swings again"), Context.Hero->GetSword()->IsSwinging());
+	}));
+	return RunInArena(this, MoveTemp(Steps));
 }
 
 #endif

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EIGearMenu.h"
 #include "EIHeroCharacter.h"
 #include "GameFramework/PlayerController.h"
 #include "EIPlayerController.generated.h"
@@ -23,6 +24,11 @@ public:
 	EEIHeroClass GetSelectedClass() const { return SelectedClass; }
 
 	UEIProfileComponent* GetProfile() const { return Profile; }
+
+	/** The gear page. While it is open the hero stands still and the mouse is a pointer. */
+	bool IsMenuOpen() const { return bMenuOpen; }
+	FEIGearMenu& GetMenu() { return Menu; }
+	void SetMenuOpen(bool bOpen);
 
 	/** For preview pictures: puts on an item, by its name. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
@@ -52,8 +58,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewDefeatGuards();
 
+	/** For preview pictures: chooses the slot the gear page shows. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewMenuSlot(int32 Slot);
+
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);
+
+	virtual void PlayerTick(float DeltaTime) override;
 
 protected:
 	virtual void SetupInputComponent() override;
@@ -75,7 +87,7 @@ private:
 	void HandleSpell();
 	void HandleRuneSpell();
 	void HandleClass();
-	void HandleNextRune();
+	void HandleMenu();
 
 	UFUNCTION(Server, Reliable)
 	void ServerInteract();
@@ -134,7 +146,9 @@ private:
 	TObjectPtr<UInputAction> ClassAction;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UInputAction> NextRuneAction;
+	TObjectPtr<UInputAction> MenuAction;
 
 	EEIHeroClass SelectedClass = EEIHeroClass::Bladewarden;
+	FEIGearMenu Menu;
+	bool bMenuOpen = false;
 };

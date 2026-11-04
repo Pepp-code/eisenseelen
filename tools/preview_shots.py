@@ -108,25 +108,71 @@ def scenario():
     yield 0.15
     shot()
     yield AFTER_SHOT_SECONDS
-    yield from tap("T")
+    player().preview_equip("Sturmrune")
     yield 0.1
     yield from tap("E")
     yield 0.6
     shot()
     yield AFTER_SHOT_SECONDS
-    yield from tap("T")
+    player().preview_equip("Flammenrune")
     yield 0.1
     yield from tap("E")
     yield 0.6
     shot()
     yield AFTER_SHOT_SECONDS
-    yield from tap("T")
+    player().preview_equip("Frostrune")
+
+    # The other spells of the staff.
+    player().preview_equip("Funkenstab")
+    yield 0.2
+    yield 6.5
+    yield from tap("Q")
+    yield 0.08
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_equip("Froststab")
+    yield 0.2
+    yield 6.5
+    yield from tap("Q")
+    yield 0.15
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_equip("Feuerstab")
+    yield 0.1
 
     # The kinds of enemies, all in one group.
     yield from tap("C")
     stand_at((-1500, 0, 92))
     player().preview_invulnerable()
     yield 0.5
+
+    # The gear page, with a slot full of choices and with armour on.
+    player().preview_equip("Brustpanzer der Eisenwacht")
+    player().preview_equip("Helm der Eisenwacht")
+    yield 0.1
+    yield from tap("I")
+    yield 0.2
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_menu_slot(3)
+    yield 0.2
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("I")
+    yield 0.1
+
+    # How other swords lie in the hand.
+    player().preview_equip("Donnerbrecher")
+    yield 0.3
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_equip("Reifsäbel")
+    yield 0.3
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_equip("Flammenschwert")
+    yield 0.1
+
     player().preview_spawn_group("Kriegshaufen")
     yield 0.4
     shot()

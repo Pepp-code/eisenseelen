@@ -39,7 +39,7 @@ namespace
 	constexpr float MinLightRadiusCm = 150.0f;
 	constexpr float BeamSeconds = 0.25f;
 	constexpr float BeamThicknessCm = 7.0f;
-	constexpr float BeamGlow = 6.0f;
+	constexpr float BeamGlow = 1.2f;
 }
 
 AEIProjectile::AEIProjectile()
