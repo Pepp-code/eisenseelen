@@ -20,7 +20,11 @@
 		"geschmiedet_ab_stufe": 3
 	},
 	"arten": [
-		{ "name": "Eisenwacht", "je_zwei_teile": { "leben": 15 } }
+		{ "name": "Eisenwacht", "je_zwei_teile": { "leben": 15 } },
+		{ "name": "Henkersgarde", "je_zwei_teile": { "aufladetempo": 0.1 } },
+		{ "name": "Glutschmiede", "je_zwei_teile": { "zustandsdauer": 0.25 } },
+		{ "name": "Frostwacht", "je_zwei_teile": { "zustandsdauer": 0.25 } },
+		{ "name": "Quellwächter", "je_zwei_teile": { "angriffskraft": 0.1 } }
 	],
 	"items": [
 		{ "name": "Flammenschwert", "platz": "waffe", "grundform": "langschwert", "element": "feuer" },
@@ -46,6 +50,26 @@
 		{ "name": "Helm der Eisenwacht", "platz": "helm", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 15, "ruestung": 0.03 } },
 		{ "name": "Brustpanzer der Eisenwacht", "platz": "brustpanzer", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 30, "ruestung": 0.06, "tempo": -0.03 } },
 		{ "name": "Handschuhe der Eisenwacht", "platz": "handschuhe", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "blockstaerke": 0.1, "ruestung": 0.03 } },
-		{ "name": "Schuhe der Eisenwacht", "platz": "schuhe", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 15, "ruestung": 0.03, "tempo": -0.02 } }
+		{ "name": "Schuhe der Eisenwacht", "platz": "schuhe", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 15, "ruestung": 0.03, "tempo": -0.02 } },
+
+		{ "name": "Helm der Henkersgarde", "platz": "helm", "art": "Henkersgarde", "klasse": "klingenwacht", "werte": { "angriffskraft": 0.06 } },
+		{ "name": "Brustpanzer der Henkersgarde", "platz": "brustpanzer", "art": "Henkersgarde", "klasse": "klingenwacht", "werte": { "angriffskraft": 0.06, "leben": 15 } },
+		{ "name": "Handschuhe der Henkersgarde", "platz": "handschuhe", "art": "Henkersgarde", "klasse": "klingenwacht", "werte": { "angriffskraft": 0.12 } },
+		{ "name": "Schuhe der Henkersgarde", "platz": "schuhe", "art": "Henkersgarde", "klasse": "klingenwacht", "werte": { "angriffskraft": 0.06, "tempo": 0.03 } },
+
+		{ "name": "Helm der Glutschmiede", "platz": "helm", "art": "Glutschmiede", "werte": { "feuerschaden": 0.12 } },
+		{ "name": "Brustpanzer der Glutschmiede", "platz": "brustpanzer", "art": "Glutschmiede", "werte": { "feuerschaden": 0.06, "leben": 15 } },
+		{ "name": "Handschuhe der Glutschmiede", "platz": "handschuhe", "art": "Glutschmiede", "werte": { "feuerschaden": 0.06, "angriffskraft": 0.06 } },
+		{ "name": "Schuhe der Glutschmiede", "platz": "schuhe", "art": "Glutschmiede", "werte": { "feuerschaden": 0.06, "tempo": 0.03 } },
+
+		{ "name": "Helm der Frostwacht", "platz": "helm", "art": "Frostwacht", "werte": { "eisschaden": 0.12 } },
+		{ "name": "Brustpanzer der Frostwacht", "platz": "brustpanzer", "art": "Frostwacht", "werte": { "eisschaden": 0.06, "ruestung": 0.03 } },
+		{ "name": "Handschuhe der Frostwacht", "platz": "handschuhe", "art": "Frostwacht", "werte": { "eisschaden": 0.06, "angriffskraft": 0.06 } },
+		{ "name": "Schuhe der Frostwacht", "platz": "schuhe", "art": "Frostwacht", "werte": { "eisschaden": 0.06, "tempo": 0.03 } },
+
+		{ "name": "Helm des Quellwächters", "platz": "helm", "art": "Quellwächter", "klasse": "arkanist", "werte": { "mana": 25, "manarueckkehr": 0.1 } },
+		{ "name": "Brustpanzer des Quellwächters", "platz": "brustpanzer", "art": "Quellwächter", "klasse": "arkanist", "werte": { "leben": 15, "manarueckkehr": 0.1 } },
+		{ "name": "Handschuhe des Quellwächters", "platz": "handschuhe", "art": "Quellwächter", "klasse": "arkanist", "werte": { "manakosten": -0.15 } },
+		{ "name": "Schuhe des Quellwächters", "platz": "schuhe", "art": "Quellwächter", "klasse": "arkanist", "werte": { "manarueckkehr": 0.15, "tempo": 0.03 } }
 	]
 }

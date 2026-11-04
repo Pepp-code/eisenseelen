@@ -129,6 +129,19 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 		AddError(Error);
 	}
 	TestEqual(TEXT("There are three qualities"), Table.QualityFactors.Num(), 3);
+	TestEqual(TEXT("There are five arts of armour"), Table.Sets.Num(), 5);
+	for (const FEIArmorSet& Set : Table.Sets)
+	{
+		int32 Pieces[EISlotCount] = {};
+		for (const FEIItem& Item : Table.Items)
+		{
+			Pieces[static_cast<int32>(Item.Slot)] += Item.Set == Set.Name ? 1 : 0;
+		}
+		for (const EEISlot Slot : { EEISlot::Helmet, EEISlot::Chest, EEISlot::Gloves, EEISlot::Boots })
+		{
+			TestEqual(*FString::Printf(TEXT("%s has one piece for %s"), *Set.Name, EISlotName(Slot)), Pieces[static_cast<int32>(Slot)], 1);
+		}
+	}
 	TestEqual(TEXT("A forged item counts for more"), Table.GetQualityFactor(1), 1.25f);
 	TestEqual(TEXT("Each class starts with a weapon of its own"), Table.Items[Table.GetStartItem(EEISlot::Weapon, true)].Name, FString(TEXT("Feuerstab")));
 	TestEqual(TEXT("The blade warden starts with the flame sword"), Table.Items[Table.GetStartItem(EEISlot::Weapon, false)].Name, FString(TEXT("Flammenschwert")));
@@ -432,6 +445,39 @@ bool FEIGearTest::RunTest(const FString& Parameters)
 		Context.Test->TestNearlyEqual(TEXT("The first target takes the bolt"), LostLife(State->First), Expected, 0.01f);
 		Context.Test->TestNearlyEqual(TEXT("The bolt goes through to the second"), LostLife(State->Second), Expected, 0.01f);
 	}));
+
+	// What the arcanist's armour does: more mana, less cost, more damage from two pieces of an art.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const UEICasterComponent* Caster = Context.Hero->GetCaster();
+		const float ManaBefore = Caster->GetMaxMana();
+		Context.Test->TestNearlyEqual(TEXT("A scepter shot costs its mana at first"), Caster->GetValues().Bolt.ManaCost, 20.0f);
+		Profile(Context)->EquipByName(TEXT("Helm des Quellw\u00E4chters"));
+		Profile(Context)->EquipByName(TEXT("Handschuhe des Quellw\u00E4chters"));
+		Context.Test->TestEqual(TEXT("The helmet gives mana"), Caster->GetMaxMana(), ManaBefore + 25.0f);
+		Context.Test->TestNearlyEqual(TEXT("The gloves make it cheaper"), Gear(Context)->GetManaCostFactor(), 0.85f);
+		Context.Test->TestNearlyEqual(TEXT("Two pieces raise the attack"), Gear(Context)->GetStat(EEIStat::AttackPower), 0.1f);
+		Context.Test->TestNearlyEqual(TEXT("The shots follow"), Gear(Context)->GetShotFactor(), 1.2f);
+		Profile(Context)->EquipByName(TEXT("Helm der Glutschmiede"));
+		Profile(Context)->EquipByName(TEXT("Handschuhe der Glutschmiede"));
+		Context.Test->TestNearlyEqual(TEXT("An art for both classes fits the arcanist"), Gear(Context)->GetStat(EEIStat::StatusDuration), 0.25f);
+		Context.Test->TestNearlyEqual(TEXT("It makes conditions last longer"), Gear(Context)->GetStatusFactor(), 1.25f);
+		Profile(Context)->EquipByName(TEXT("Handschuhe der Henkersgarde"));
+		Context.Test->TestEqual(TEXT("An art of the other class stays off"), Gear(Context)->GetWorn(EEISlot::Gloves)->Name, FString(TEXT("Handschuhe der Glutschmiede")));
+	}));
+
+	// What the blade warden's art of attack does.
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const float Charge = Context.Hero->GetSword()->GetValues().ChargeSeconds;
+		Profile(Context)->EquipByName(TEXT("Helm der Henkersgarde"));
+		Profile(Context)->EquipByName(TEXT("Handschuhe der Henkersgarde"));
+		Context.Test->TestNearlyEqual(TEXT("Two pieces charge faster"), Context.Hero->GetSword()->GetValues().ChargeSeconds, Charge / 1.1f);
+	}));
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
 
 	// A new hero wears the same.
 	AddTap(Steps, EKeys::R);
