@@ -4,6 +4,7 @@
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHordeDirector.h"
+#include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
 #include "Engine/DamageEvents.h"
 #include "Engine/World.h"
@@ -42,6 +43,16 @@ namespace
 			KeyMapping.Modifiers.Add(NewObject<UInputModifierNegate>(Mapping));
 		}
 	}
+}
+
+AEIPlayerController::AEIPlayerController()
+{
+	Profile = CreateDefaultSubobject<UEIProfileComponent>(TEXT("Profile"));
+}
+
+void AEIPlayerController::PreviewEquip(const FString& Name)
+{
+	Profile->EquipByName(Name);
 }
 
 void AEIPlayerController::PreviewKey(FName KeyName, bool bPressed)
@@ -324,25 +335,7 @@ void AEIPlayerController::HandleClass()
 
 void AEIPlayerController::HandleNextRune()
 {
-	ServerNextRune();
-}
-
-void AEIPlayerController::ServerNextRune_Implementation()
-{
-	// A rune is part of what a hero flies out with, so during a run it stays.
-	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	const EEIRunPhase Phase = State != nullptr ? State->GetRunPhase() : EEIRunPhase::None;
-	AEIHeroCharacter* Hero = GetLivingHero();
-	if (Hero == nullptr || (Phase != EEIRunPhase::None && Phase != EEIRunPhase::OnBarge))
-	{
-		return;
-	}
-	const int32 Count = Hero->GetRunes()->GetTable().Runes.Num();
-	if (Count > 0)
-	{
-		SelectedRune = (SelectedRune + 1) % Count;
-		Hero->GetRunes()->SetRune(SelectedRune);
-	}
+	Profile->EquipNext(EEISlot::Rune);
 }
 
 void AEIPlayerController::ServerToggleClass_Implementation()

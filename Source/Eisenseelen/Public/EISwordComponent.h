@@ -5,6 +5,7 @@
 #include "EISwordComponent.generated.h"
 
 class AEIHeroCharacter;
+class UEIGearComponent;
 
 UENUM()
 enum class EEISwingKind : uint8
@@ -70,6 +71,9 @@ public:
 	void LoadValues();
 	const FEISwordValues& GetValues() const { return Values; }
 
+	/** Takes over how the weapon in the hand plays. */
+	void ApplyGear(const UEIGearComponent& Gear);
+
 	/** Owner only: the key went down or up. */
 	void PressPrimary();
 	void ReleasePrimary();
@@ -114,6 +118,7 @@ private:
 	void HitActor(AActor* Target, const FVector& Location);
 	void UpdateBlockAsOwner(float DeltaTime);
 
+	FEISwordValues BaseValues;
 	FEISwordValues Values;
 
 	bool bHolding = false;

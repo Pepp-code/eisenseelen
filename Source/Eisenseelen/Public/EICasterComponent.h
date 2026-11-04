@@ -5,16 +5,18 @@
 #include "EICasterComponent.generated.h"
 
 class AEIHeroCharacter;
+class UEIGearComponent;
+enum class EEIElement : uint8;
 
 UENUM()
 enum class EEICast : uint8
 {
 	Bolt,
-	ChargedFireball,
-	SpellFireball
+	ChargedSpell,
+	Spell
 };
 
-/** The numbers of one projectile from Data/waffen.json. */
+/** What flies. */
 struct FEIProjectileValues
 {
 	float Damage = 40.0f;
@@ -23,22 +25,39 @@ struct FEIProjectileValues
 	float ManaCost = 10.0f;
 };
 
+/** The numbers of one spell from the section zauber of Data/waffen.json. */
+struct FEISpellValues : public FEIProjectileValues
+{
+	FString Name;
+	float CooldownSeconds = 6.0f;
+	float SlowShare = 0.0f;
+	float StatusSeconds = 0.0f;
+	float FreezeSeconds = 0.0f;
+	float RangeMeters = 0.0f;
+	float Jumps = 0.0f;
+	float JumpMeters = 0.0f;
+	float JumpFalloff = 0.0f;
+};
+
 struct EISENSEELEN_API FEICasterValues
 {
 	FEIProjectileValues Bolt;
-	FEIProjectileValues Fireball;
-	float HoldForFireballSeconds = 0.4f;
-	float SpellCooldownSeconds = 6.0f;
+	bool bBoltPierces = false;
+	FEISpellValues Fireball;
+	FEISpellValues IceLance;
+	FEISpellValues ChainLightning;
+	float HoldForSpellSeconds = 0.4f;
 
 	FEICasterValues();
+	const FEISpellValues& GetSpell(EEIElement Element) const;
 	static bool LoadFromProjectFile(FEICasterValues& OutValues, FString& OutError);
 };
 
 /**
- * Fire magic. The arcanist's staff fires a bolt on every press of the attack key and a fireball after a full charge of
- * the second key, without any wait but for mana. Both classes also cast the fireball with the spell key, which needs
- * neither charge nor mana but has a cooldown. The owner sees it at once, the server spawns the real projectile and
- * checks cooldown and mana.
+ * Magic. The arcanist's staff fires a bolt on every press of the attack key and its spell after a full charge of the
+ * second key, without any wait but for mana. Both classes also cast the spell of their weapon with the spell key, which
+ * needs neither charge nor mana but has a cooldown. The element of the weapon decides which spell that is. The owner
+ * sees it at once, the server spawns the real thing and checks cooldown and mana.
  */
 UCLASS()
 class EISENSEELEN_API UEICasterComponent : public UActorComponent
@@ -51,11 +70,17 @@ public:
 	void LoadValues();
 	const FEICasterValues& GetValues() const { return Values; }
 
+	/** Takes over how the weapon in the hand plays. */
+	void ApplyGear(const UEIGearComponent& Gear);
+
+	/** The spell of the weapon in the hand. */
+	const FEISpellValues& GetSpell() const;
+
 	/** Owner only. */
 	void FireBolt();
 	void PressCharge();
 	void ReleaseCharge();
-	void CastFireball();
+	void CastSpell();
 	void Deactivate();
 
 	float GetChargeFraction() const;
@@ -67,7 +92,7 @@ public:
 	float GetMaxMana() const;
 	void SpendMana(float Amount);
 	void RefillMana();
-	bool CanAffordFireball() const;
+	bool CanAffordSpell() const;
 
 	/** How fast the mana comes back compared to the class's normal rate. */
 	void SetManaFactor(float Factor);
@@ -81,14 +106,19 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerFire(EEICast Kind, FVector_NetQuantize Target);
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastChain(const TArray<FVector_NetQuantize>& Points);
+
 	AEIHeroCharacter* GetHero() const;
-	const FEIProjectileValues& GetProjectile(EEICast Kind) const;
 	float GetManaCost(EEICast Kind) const;
 	bool CanAfford(float Cost) const;
 	void FireAsOwner(EEICast Kind);
 	void SpawnProjectile(EEICast Kind, const FVector& Target);
+	void CastChain(const FVector& Target, float Damage);
+	AActor* FindNextChainTarget(const FVector& From, const TArray<AActor*>& Struck) const;
 	FVector FindAimPoint() const;
 
+	FEICasterValues BaseValues;
 	FEICasterValues Values;
 
 	bool bHolding = false;

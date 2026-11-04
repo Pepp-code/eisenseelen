@@ -10,6 +10,7 @@
 #include "EIEnemyCamp.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
+#include "EIProfileComponent.h"
 #include "EIHealthComponent.h"
 #include "EIHordeDirector.h"
 #include "EIOmenComponent.h"
@@ -144,12 +145,19 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		Context.Test->TestTrue(TEXT("The hero stands on the deck"), Context.Movement->IsMovingOnGround());
 	}));
 
-	// On the barge the rune can still change.
-	AddTap(Steps, EKeys::T);
+	// On the barge the gear can still change, but only to what the player owns.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Profile->EquipByName(TEXT("Sturmrune"));
+		Context.Test->TestEqual(TEXT("What the player does not own stays off"), Context.Hero->GetRunes()->GetRuneIndex(), 0);
+		Profile->GetSave().Items.Add(TEXT("Sturmrune"), 0);
+		Profile->EquipByName(TEXT("Sturmrune"));
+	}));
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("On the barge T equips the next rune"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
+		Context.Test->TestEqual(TEXT("On the barge another rune can go on"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
 	}));
 
 	// Running off the deck begins the run, and the fall is a flight.
@@ -193,11 +201,11 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	}));
 
 	// During the run the rune stays.
-	AddTap(Steps, EKeys::T);
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Player->GetProfile()->EquipByName(TEXT("Frostrune")); }));
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("During a run T changes nothing"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
+		Context.Test->TestEqual(TEXT("During a run the gear stays"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
 	}));
 
 	// The use key does nothing far from a beacon.

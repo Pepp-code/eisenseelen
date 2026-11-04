@@ -5,10 +5,12 @@
 #include "Dom/JsonObject.h"
 #include "EICasterComponent.h"
 #include "EIDataFile.h"
+#include "EIGearComponent.h"
 #include "EIHealthComponent.h"
 #include "EIHeroMovementComponent.h"
 #include "EIOmenComponent.h"
 #include "EIPlayerController.h"
+#include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
 #include "EISkyBarge.h"
 #include "EISwordComponent.h"
@@ -79,6 +81,7 @@ AEIHeroCharacter::AEIHeroCharacter(const FObjectInitializer& ObjectInitializer)
 	Caster = CreateDefaultSubobject<UEICasterComponent>(TEXT("Caster"));
 	Omens = CreateDefaultSubobject<UEIOmenComponent>(TEXT("Omens"));
 	Runes = CreateDefaultSubobject<UEIRuneComponent>(TEXT("Runes"));
+	Gear = CreateDefaultSubobject<UEIGearComponent>(TEXT("Gear"));
 }
 
 void AEIHeroCharacter::BeginPlay()
@@ -104,11 +107,13 @@ void AEIHeroCharacter::BeginPlay()
 	Caster->LoadValues();
 	Omens->LoadValues();
 	Runes->LoadValues();
+	Gear->LoadValues();
 	LoadClassValues();
+	Gear->Recalculate();
 	Caster->RefillMana();
 	if (HasAuthority())
 	{
-		Health->Reset(ClassValues.Life);
+		Health->Reset(ClassValues.Life + Gear->GetStat(EEIStat::Life));
 		Health->OnDied.AddUObject(this, &AEIHeroCharacter::HandleDied);
 	}
 }
@@ -125,7 +130,6 @@ void AEIHeroCharacter::PossessedBy(AController* NewController)
 	if (const AEIPlayerController* Player = Cast<AEIPlayerController>(NewController))
 	{
 		SetHeroClass(Player->GetSelectedClass());
-		Runes->SetRune(Player->GetSelectedRune());
 	}
 }
 
@@ -140,13 +144,29 @@ void AEIHeroCharacter::LoadClassValues()
 
 void AEIHeroCharacter::SetHeroClass(EEIHeroClass NewClass)
 {
-	const float LifeShare = Health->GetHealth() / FMath::Max(Health->GetMaxHealth(), 1.0f);
 	HeroClass = NewClass;
 	LoadClassValues();
-	const float LifeWithOmens = ClassValues.Life + Omens->GetBonus(EEIOmenEffect::Life);
-	Health->Reset(LifeWithOmens);
-	Health->ApplyDamage(LifeWithOmens * (1.0f - LifeShare));
+	if (AEIPlayerController* Player = GetController<AEIPlayerController>())
+	{
+		Player->GetProfile()->ApplyTo(this);
+	}
+	else
+	{
+		RefreshLife();
+	}
 	OnRep_HeroClass();
+}
+
+void AEIHeroCharacter::RefreshLife()
+{
+	if (IsDead())
+	{
+		return;
+	}
+	const float LifeShare = Health->GetHealth() / FMath::Max(Health->GetMaxHealth(), 1.0f);
+	const float NewLife = ClassValues.Life + Gear->GetStat(EEIStat::Life);
+	Health->Reset(NewLife);
+	Health->ApplyDamage(NewLife * (1.0f - LifeShare));
 }
 
 void AEIHeroCharacter::OnRep_HeroClass()
@@ -163,6 +183,16 @@ void AEIHeroCharacter::ApplyClassToView()
 	if (GetViewModel() != nullptr)
 	{
 		GetViewModel()->ShowStaff(HeroClass == EEIHeroClass::Arcanist);
+	}
+	ApplyWeaponToView();
+}
+
+void AEIHeroCharacter::ApplyWeaponToView()
+{
+	if (GetViewModel() != nullptr)
+	{
+		const FEIWeaponForm* Form = Gear->GetWeaponForm();
+		GetViewModel()->SetWeaponLook(Form != nullptr ? Form->LengthFactor : 1.0f, EIElementColor(Gear->GetWeaponElement()));
 	}
 }
 
@@ -206,7 +236,7 @@ void AEIHeroCharacter::ReleaseSecondary()
 
 void AEIHeroCharacter::PressSpell()
 {
-	Caster->CastFireball();
+	Caster->CastSpell();
 }
 
 void AEIHeroCharacter::PressRuneSpell()
@@ -323,7 +353,7 @@ float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 	{
 		NoteCombat();
 	}
-	const float Applied = Health->ApplyDamage(Sword->BlockDamage(Incoming, DamageCauser));
+	const float Applied = Health->ApplyDamage(Sword->BlockDamage(Incoming, DamageCauser) * (1.0f - Gear->GetArmorShare()));
 	if (Applied > 0.0f)
 	{
 		ClientHurt();
@@ -334,13 +364,23 @@ float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 void AEIHeroCharacter::ApplyValues(const FEIHeroValues& NewValues)
 {
 	Values = NewValues;
-	GetHeroMovement()->ApplyValues(Values, Omens->GetFactor(EEIOmenEffect::Speed));
+	GetHeroMovement()->ApplyValues(Values, Gear->GetSpeedFactor());
 }
 
 void AEIHeroCharacter::OnOmensChanged()
 {
-	GetHeroMovement()->ApplyValues(Values, Omens->GetFactor(EEIOmenEffect::Speed));
-	Caster->SetManaFactor(Omens->GetFactor(EEIOmenEffect::ManaRegen));
+	Gear->Recalculate();
+}
+
+void AEIHeroCharacter::OnGearChanged()
+{
+	GetHeroMovement()->ApplyValues(Values, Gear->GetSpeedFactor());
+	Caster->SetManaFactor(1.0f + Gear->GetStat(EEIStat::ManaRegen));
+	Sword->ApplyGear(*Gear);
+	Caster->ApplyGear(*Gear);
+	const FEIItem* Rune = Gear->GetWorn(EEISlot::Rune);
+	Runes->SetRune(Rune != nullptr ? Runes->GetTable().FindByName(Rune->Name) : INDEX_NONE);
+	ApplyWeaponToView();
 }
 
 UEIHeroMovementComponent* AEIHeroCharacter::GetHeroMovement() const

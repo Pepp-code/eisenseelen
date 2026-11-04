@@ -1,9 +1,9 @@
 {
 	"omen": [
-		{ "name": "Omen der Klinge", "wirkung": "schwert_schaden", "wert": 0.25, "klasse": "klingenwacht" },
-		{ "name": "Omen der Glut", "wirkung": "feuer_schaden", "wert": 0.25, "klasse": "alle" },
+		{ "name": "Omen der Klinge", "wirkung": "angriffskraft", "wert": 0.25, "klasse": "klingenwacht" },
+		{ "name": "Omen der Glut", "wirkung": "feuerschaden", "wert": 0.25, "klasse": "alle" },
 		{ "name": "Omen des Sturms", "wirkung": "tempo", "wert": 0.1, "klasse": "alle" },
 		{ "name": "Omen des Eisens", "wirkung": "leben", "wert": 25, "klasse": "alle" },
-		{ "name": "Omen des Quells", "wirkung": "mana_rueckkehr", "wert": 0.5, "klasse": "arkanist" }
+		{ "name": "Omen des Quells", "wirkung": "manarueckkehr", "wert": 0.5, "klasse": "arkanist" }
 	]
 }

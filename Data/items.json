@@ -1,0 +1,42 @@
+{
+	"qualitaeten": [
+		{ "name": "Rostig", "faktor": 1 },
+		{ "name": "Geschmiedet", "faktor": 1.25 },
+		{ "name": "Meisterhaft", "faktor": 1.5 }
+	],
+	"tempo_bonus_max": 0.3,
+	"ruestung_max": 0.6,
+	"abklingzeit_abzug_max": 0.5,
+	"manakosten_abzug_max": 0.6,
+	"waffe_element_bonus": 0.1,
+	"start_items": ["Flammenschwert", "Feuerstab", "Frostrune"],
+	"arten": [
+		{ "name": "Eisenwacht", "je_zwei_teile": { "leben": 15 } }
+	],
+	"items": [
+		{ "name": "Flammenschwert", "platz": "waffe", "grundform": "langschwert", "element": "feuer" },
+		{ "name": "Frostklinge", "platz": "waffe", "grundform": "langschwert", "element": "eis" },
+		{ "name": "Sturmklinge", "platz": "waffe", "grundform": "langschwert", "element": "blitz" },
+		{ "name": "Aschenbrecher", "platz": "waffe", "grundform": "zweihaender", "element": "feuer" },
+		{ "name": "Gletscherbrecher", "platz": "waffe", "grundform": "zweihaender", "element": "eis" },
+		{ "name": "Donnerbrecher", "platz": "waffe", "grundform": "zweihaender", "element": "blitz" },
+		{ "name": "Glutsäbel", "platz": "waffe", "grundform": "kurzschwert", "element": "feuer" },
+		{ "name": "Reifsäbel", "platz": "waffe", "grundform": "kurzschwert", "element": "eis" },
+		{ "name": "Funkensäbel", "platz": "waffe", "grundform": "kurzschwert", "element": "blitz" },
+		{ "name": "Feuerstab", "platz": "waffe", "grundform": "stab", "element": "feuer" },
+		{ "name": "Froststab", "platz": "waffe", "grundform": "stab", "element": "eis" },
+		{ "name": "Funkenstab", "platz": "waffe", "grundform": "stab", "element": "blitz" },
+		{ "name": "Aschenzepter", "platz": "waffe", "grundform": "zepter", "element": "feuer" },
+		{ "name": "Gletscherzepter", "platz": "waffe", "grundform": "zepter", "element": "eis" },
+		{ "name": "Donnerzepter", "platz": "waffe", "grundform": "zepter", "element": "blitz" },
+
+		{ "name": "Frostrune", "platz": "rune" },
+		{ "name": "Sturmrune", "platz": "rune" },
+		{ "name": "Flammenrune", "platz": "rune" },
+
+		{ "name": "Helm der Eisenwacht", "platz": "helm", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 15, "ruestung": 0.03 } },
+		{ "name": "Brustpanzer der Eisenwacht", "platz": "brustpanzer", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 30, "ruestung": 0.06, "tempo": -0.03 } },
+		{ "name": "Handschuhe der Eisenwacht", "platz": "handschuhe", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "blockstaerke": 0.1, "ruestung": 0.03 } },
+		{ "name": "Schuhe der Eisenwacht", "platz": "schuhe", "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 15, "ruestung": 0.03, "tempo": -0.02 } }
+	]
+}

@@ -3,8 +3,8 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "EIDataFile.h"
+#include "EIGearComponent.h"
 #include "EIHeroCharacter.h"
-#include "EIOmenComponent.h"
 #include "EIProjectile.h"
 #include "EIRuneField.h"
 #include "EIViewModelComponent.h"
@@ -13,7 +13,6 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
-#include "Net/UnrealNetwork.h"
 
 namespace
 {
@@ -45,12 +44,11 @@ namespace
 			return false;
 		}
 		Out.bWall = Form == TEXT("wand");
-		if (!Line.TryGetStringField(TEXT("element"), Element) || (Element != TEXT("feuer") && Element != TEXT("eis") && Element != TEXT("blitz")))
+		if (!Line.TryGetStringField(TEXT("element"), Element) || !EIElementFromKey(Element, Out.Element))
 		{
 			OutError = FString::Printf(TEXT("%s braucht als element feuer, eis oder blitz."), *Out.Name);
 			return false;
 		}
-		Out.Element = Element == TEXT("feuer") ? EEIElement::Fire : (Element == TEXT("eis") ? EEIElement::Ice : EEIElement::Lightning);
 		return FEIDataFile::ReadNumber(Line, TEXT("schaden"), 0.0, 100000.0, Out.Damage, OutError)
 			&& FEIDataFile::ReadNumber(Line, TEXT("abklingzeit_s"), 0.0, 600.0, Out.CooldownSeconds, OutError)
 			&& FEIDataFile::ReadNumber(Line, TEXT("groesse_m"), 0.1, 200.0, Out.SizeMeters, OutError)
@@ -99,6 +97,11 @@ namespace
 	}
 }
 
+int32 FEIRuneTable::FindByName(const FString& Name) const
+{
+	return Runes.IndexOfByPredicate([&Name](const FEIRune& Rune) { return Rune.Name == Name; });
+}
+
 bool FEIRuneTable::LoadFromString(const FString& Json, FEIRuneTable& OutTable, FString& OutError)
 {
 	const TSharedPtr<FJsonObject> Root = FEIDataFile::Parse(Json, OutError);
@@ -129,12 +132,6 @@ UEIRuneComponent::UEIRuneComponent()
 	SetIsReplicatedByDefault(true);
 }
 
-void UEIRuneComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UEIRuneComponent, RuneIndex);
-}
-
 void UEIRuneComponent::LoadValues()
 {
 	FString Error;
@@ -156,19 +153,17 @@ const FEIRune* UEIRuneComponent::GetRune() const
 
 void UEIRuneComponent::SetRune(int32 Index)
 {
-	RuneIndex = Index;
-	OnRep_RuneIndex();
-}
-
-void UEIRuneComponent::OnRep_RuneIndex()
-{
-	ReadyAt = 0.0;
+	if (Index != RuneIndex)
+	{
+		RuneIndex = Index;
+		ReadyAt = 0.0;
+	}
 }
 
 float UEIRuneComponent::GetCooldownSeconds() const
 {
 	const FEIRune* Rune = GetRune();
-	return Rune != nullptr ? Rune->CooldownSeconds * GetHero()->GetClassValues().SpellCooldownFactor : 0.0f;
+	return Rune != nullptr ? Rune->CooldownSeconds * GetHero()->GetClassValues().SpellCooldownFactor * GetHero()->GetGear()->GetCooldownFactor() : 0.0f;
 }
 
 float UEIRuneComponent::GetCooldownFraction() const
@@ -247,8 +242,8 @@ void UEIRuneComponent::SpawnField(const FEIRune& Rune, const FVector& Location, 
 	AEIRuneField* Field = GetWorld()->SpawnActorDeferred<AEIRuneField>(AEIRuneField::StaticClass(), Spawn, Hero, Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (Field != nullptr)
 	{
-		const float Factor = Rune.Element == EEIElement::Fire ? Hero->GetOmens()->GetFactor(EEIOmenEffect::FireDamage) : 1.0f;
-		Field->Configure(Rune, Rune.Damage * Factor);
+		const UEIGearComponent* Gear = Hero->GetGear();
+		Field->Configure(Rune, Rune.Damage * Gear->GetRuneFactor(Rune.Element), Gear->GetStatusFactor());
 		Field->FinishSpawning(Spawn);
 	}
 }
@@ -294,7 +289,7 @@ void UEIRuneComponent::HurtAround(const FVector& Location, float RadiusCm, float
 void UEIRuneComponent::SteamExplosion(const AEIEnemy* Enemy)
 {
 	const FVector Location = Enemy->GetActorLocation();
-	HurtAround(Location, Table.SteamRadiusMeters * CentimetersPerMeter, Table.SteamDamage);
+	HurtAround(Location, Table.SteamRadiusMeters * CentimetersPerMeter, Table.SteamDamage * GetHero()->GetGear()->GetReactionFactor());
 	MulticastSteam(Location);
 }
 
@@ -303,7 +298,7 @@ void UEIRuneComponent::Shatter(AEIEnemy* Enemy)
 	const FVector Location = Enemy->GetActorLocation();
 	const float RadiusCm = Table.ShatterRadiusMeters * CentimetersPerMeter;
 	Enemy->Unfreeze();
-	HurtAround(Location, RadiusCm, Table.ShatterDamage);
+	HurtAround(Location, RadiusCm, Table.ShatterDamage * GetHero()->GetGear()->GetReactionFactor());
 	MulticastBurst(Location, RadiusCm, ShatterColor);
 }
 
@@ -327,8 +322,8 @@ void UEIRuneComponent::SparksFly(AEIEnemy* Enemy)
 	{
 		AEIEnemy* Target = Nearby[Index];
 		MulticastBurst(Target->GetActorLocation(), SparkBurstRadiusCm, SparkColor);
-		Target->ApplyBurn(Table.SparkBurnPerSecond, Table.SparkBurnSeconds);
-		UGameplayStatics::ApplyDamage(Target, Table.SparkDamage, Hero->GetController(), Hero, nullptr);
+		Target->ApplyBurn(Table.SparkBurnPerSecond, Table.SparkBurnSeconds * Hero->GetGear()->GetStatusFactor());
+		UGameplayStatics::ApplyDamage(Target, Table.SparkDamage * Hero->GetGear()->GetReactionFactor(), Hero->GetController(), Hero, nullptr);
 	}
 }
 

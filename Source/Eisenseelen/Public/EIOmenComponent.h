@@ -2,25 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "EIItems.h"
 #include "EIOmenComponent.generated.h"
 
 class AEIHeroCharacter;
-
-UENUM()
-enum class EEIOmenEffect : uint8
-{
-	SwordDamage,
-	FireDamage,
-	Speed,
-	Life,
-	ManaRegen
-};
 
 /** One line of Data/omen.json. */
 struct EISENSEELEN_API FEIOmen
 {
 	FString Name;
-	EEIOmenEffect Effect = EEIOmenEffect::Speed;
+	EEIStat Effect = EEIStat::Speed;
 	float Amount = 0.0f;
 	bool bForBladewarden = true;
 	bool bForArcanist = true;
@@ -63,10 +54,10 @@ public:
 	int32 CountAll() const { return Held.Num(); }
 
 	/** The sum of all held omens with this effect. */
-	float GetBonus(EEIOmenEffect Effect) const;
+	float GetBonus(EEIStat Effect) const;
 
 	/** The same as a factor: a bonus of 0.25 is 1.25. */
-	float GetFactor(EEIOmenEffect Effect) const { return 1.0f + GetBonus(Effect); }
+	float GetFactor(EEIStat Effect) const { return 1.0f + GetBonus(Effect); }
 
 	/** Seconds of the note left after finding an omen, and which one that was. For the HUD. */
 	float GetFoundNote() const { return FoundNoteRemaining; }

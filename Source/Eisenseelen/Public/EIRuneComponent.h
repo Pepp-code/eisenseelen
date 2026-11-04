@@ -47,14 +47,17 @@ struct EISENSEELEN_API FEIRuneTable
 	float SparkBurnPerSecond = 10.0f;
 	float SparkBurnSeconds = 3.0f;
 
+	/** INDEX_NONE if there is none of that name. */
+	int32 FindByName(const FString& Name) const;
+
 	/** OutTable only changes when the whole text is valid. */
 	static bool LoadFromString(const FString& Json, FEIRuneTable& OutTable, FString& OutError);
 	static bool LoadFromProjectFile(FEIRuneTable& OutTable, FString& OutError);
 };
 
 /**
- * The rune a hero has equipped, and with it the spell on the E key. It is chosen before a run. The owner sees the cast at
- * once, the server checks the cooldown and spawns the real spell.
+ * The rune a hero has equipped, and with it the spell on the E key. Which one that is follows from what the hero wears.
+ * The owner sees the cast at once, the server checks the cooldown and spawns the real spell.
  */
 UCLASS()
 class EISENSEELEN_API UEIRuneComponent : public UActorComponent
@@ -74,7 +77,7 @@ public:
 	const FEIRune* GetRune() const;
 	int32 GetRuneIndex() const { return RuneIndex; }
 
-	/** Server only. A new rune is ready at once. */
+	/** A new rune is ready at once. INDEX_NONE means none at all. */
 	void SetRune(int32 Index);
 
 	/** Owner only. */
@@ -89,8 +92,6 @@ public:
 	/** Server only. A frozen enemy breaks, and the splinters hit those around it. */
 	void Shatter(AEIEnemy* Enemy);
 
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerCast(FVector_NetQuantize Location, float Yaw);
@@ -101,9 +102,6 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastBurst(FVector_NetQuantize Location, float RadiusCm, FLinearColor Color);
 
-	UFUNCTION()
-	void OnRep_RuneIndex();
-
 	AEIHeroCharacter* GetHero() const;
 	void FindPlace(const FEIRune& Rune, FVector& OutLocation, float& OutYaw) const;
 	void SpawnField(const FEIRune& Rune, const FVector& Location, float Yaw);
@@ -113,8 +111,7 @@ private:
 
 	FEIRuneTable Table;
 
-	UPROPERTY(ReplicatedUsing = OnRep_RuneIndex)
-	int32 RuneIndex = 0;
+	int32 RuneIndex = INDEX_NONE;
 
 	// Each side keeps its own cooldown: the owner to answer at once, the server to have the last word.
 	double ReadyAt = 0.0;

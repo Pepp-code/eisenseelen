@@ -1,0 +1,162 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "EIEnemy.h"
+#include "EIItems.generated.h"
+
+/** All values that items, omens and attributes can raise. They add up on the hero. */
+enum class EEIStat : uint8
+{
+	AttackPower,
+	AttackSpeed,
+	ChargeSpeed,
+	SpellPower,
+	FireDamage,
+	IceDamage,
+	LightningDamage,
+	Cooldown,
+	StatusDuration,
+	ReactionDamage,
+	Life,
+	Armor,
+	BlockStrength,
+	Speed,
+	Mana,
+	ManaRegen,
+	ManaCost
+};
+
+constexpr int32 EIStatCount = 17;
+
+/** The places on a hero that can hold an item. */
+enum class EEISlot : uint8
+{
+	Weapon,
+	Rune,
+	Helmet,
+	Chest,
+	Gloves,
+	Boots,
+	Crystal
+};
+
+constexpr int32 EISlotCount = 7;
+
+/** The name of a value in the data files. */
+EISENSEELEN_API const TCHAR* EIStatKey(EEIStat Stat);
+EISENSEELEN_API bool EIStatFromKey(const FString& Key, EEIStat& OutStat);
+
+/** Words for the player. */
+EISENSEELEN_API const TCHAR* EIStatName(EEIStat Stat);
+EISENSEELEN_API const TCHAR* EISlotName(EEISlot Slot);
+
+/** The name of a slot in the data files and the save file. */
+EISENSEELEN_API const TCHAR* EISlotKey(EEISlot Slot);
+
+/** For example "+12 % Zaubermacht" or "+30 Leben". */
+EISENSEELEN_API FString EIDescribeStat(EEIStat Stat, float Amount);
+
+struct FEIStatLine
+{
+	EEIStat Stat = EEIStat::Life;
+	float Amount = 0.0f;
+};
+
+/** How a kind of weapon plays, from the section grundformen of Data/waffen.json. */
+struct EISENSEELEN_API FEIWeaponForm
+{
+	FString Key;
+	FString Name;
+	bool bStaff = false;
+
+	float LightDamage = 35.0f;
+	float LightSeconds = 0.45f;
+	float HeavyDamage = 110.0f;
+	float HeavySeconds = 0.55f;
+	float ChargeSeconds = 0.6f;
+	float StaggerSeconds = 1.0f;
+	float LengthFactor = 1.0f;
+
+	float BoltDamage = 40.0f;
+	float BoltRadiusMeters = 1.5f;
+	float BoltSpeedMetersPerSecond = 60.0f;
+	float BoltMana = 10.0f;
+	bool bBoltPierces = false;
+};
+
+/** One line of Data/items.json. */
+struct EISENSEELEN_API FEIItem
+{
+	FString Name;
+	EEISlot Slot = EEISlot::Helmet;
+	bool bForBladewarden = true;
+	bool bForArcanist = true;
+
+	/** The art of armour it belongs to. Empty for everything else. */
+	FString Set;
+	TArray<FEIStatLine> Stats;
+
+	/** Only for weapons. */
+	int32 Form = INDEX_NONE;
+	EEIElement Element = EEIElement::Fire;
+
+	bool FitsClass(bool bArcanist) const { return bArcanist ? bForArcanist : bForBladewarden; }
+};
+
+/** An art of armour: 2 pieces give this bonus, 4 pieces give it twice. */
+struct EISENSEELEN_API FEIArmorSet
+{
+	FString Name;
+	TArray<FEIStatLine> PerTwoPieces;
+};
+
+struct EISENSEELEN_API FEIItemTable
+{
+	TArray<FEIItem> Items;
+	TArray<FEIWeaponForm> Forms;
+	TArray<FEIArmorSet> Sets;
+	TArray<FString> QualityNames;
+	TArray<float> QualityFactors;
+	TArray<FString> StartItems;
+	float MaxSpeedBonus = 0.3f;
+	float MaxArmor = 0.6f;
+	float MaxCooldownCut = 0.5f;
+	float MaxManaCostCut = 0.6f;
+	float WeaponElementBonus = 0.1f;
+
+	int32 FindItem(const FString& Name) const;
+	const FEIArmorSet* FindSet(const FString& Name) const;
+	const FEIWeaponForm* GetForm(const FEIItem& Item) const;
+	float GetQualityFactor(int32 Quality) const;
+	FString GetQualityName(int32 Quality) const;
+
+	/** What a new hero of this class has in this slot. INDEX_NONE if nothing. */
+	int32 GetStartItem(EEISlot Slot, bool bArcanist) const;
+
+	/** OutTable only changes when both texts are valid. */
+	static bool LoadFromStrings(const FString& ItemsJson, const FString& WeaponsJson, FEIItemTable& OutTable, FString& OutError);
+	static bool LoadFromProjectFiles(FEIItemTable& OutTable, FString& OutError);
+};
+
+USTRUCT()
+struct FEIWornItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 Item = INDEX_NONE;
+
+	UPROPERTY()
+	int32 Quality = 0;
+};
+
+/** What a hero of one class wears. It travels over the net by the position of the items in the table. */
+USTRUCT()
+struct FEIHeroSetup
+{
+	GENERATED_BODY()
+
+	/** One entry per slot. */
+	UPROPERTY()
+	TArray<FEIWornItem> Slots;
+};

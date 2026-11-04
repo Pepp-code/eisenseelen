@@ -24,9 +24,6 @@ namespace
 	constexpr float WallStrength = 0.45f;
 	constexpr float WallCheckHeightCm = 100.0f;
 	constexpr float LookAboveFloorCm = 5.0f;
-	const FLinearColor IceColor(0.35f, 0.7f, 1.0f);
-	const FLinearColor FireColor(1.0f, 0.38f, 0.06f);
-	const FLinearColor LightningColor(0.95f, 0.9f, 0.35f);
 }
 
 AEIRuneField::AEIRuneField()
@@ -55,18 +52,18 @@ void AEIRuneField::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIRuneField, Color);
 }
 
-void AEIRuneField::Configure(const FEIRune& Rune, float InDamage)
+void AEIRuneField::Configure(const FEIRune& Rune, float InDamage, float StatusFactor)
 {
 	bWall = Rune.bWall;
 	SizeCm = Rune.SizeMeters * CentimetersPerMeter * (Rune.bWall ? 1.0f : 2.0f);
 	DurationSeconds = Rune.DurationSeconds;
-	Color = Rune.Element == EEIElement::Fire ? FireColor : (Rune.Element == EEIElement::Ice ? IceColor : LightningColor);
+	Color = EIElementColor(Rune.Element);
 	Damage = InDamage;
 	TickSeconds = Rune.TickSeconds;
-	FreezeSeconds = Rune.FreezeSeconds;
+	FreezeSeconds = Rune.FreezeSeconds * StatusFactor;
 	SlowShare = Rune.SlowShare;
 	BurnPerSecond = Rune.BurnPerSecond;
-	StatusSeconds = Rune.StatusSeconds;
+	StatusSeconds = Rune.StatusSeconds * StatusFactor;
 	Element = Rune.Element;
 }
 

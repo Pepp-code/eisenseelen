@@ -5,7 +5,7 @@
 #include "EIEnemy.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
-#include "EIOmenComponent.h"
+#include "EIGearComponent.h"
 #include "EIRuneComponent.h"
 #include "EIPoses.h"
 #include "EIViewModelComponent.h"
@@ -18,7 +18,7 @@ namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
 	constexpr float DegreesPerSweepStep = 10.0f;
-	constexpr double MaxDamage = 10000.0;
+	constexpr float SlowestSwingFactor = 0.1f;
 	constexpr float BlockLiftPerSecond = 10.0f;
 	constexpr float BlockFlashSeconds = 0.5f;
 
@@ -40,9 +40,7 @@ namespace
 			OutError = FString::Printf(TEXT("Der Abschnitt %s fehlt."), Name);
 			return false;
 		}
-		return FEIDataFile::ReadNumber(**Swing, TEXT("dauer_s"), 0.05, 5.0, Out.DurationSeconds, OutError)
-			&& FEIDataFile::ReadNumber(**Swing, TEXT("schaden"), 0.0, MaxDamage, Out.Damage, OutError)
-			&& FEIDataFile::ReadNumber(**Swing, TEXT("reichweite_m"), 0.5, 20.0, Out.ReachMeters, OutError)
+		return FEIDataFile::ReadNumber(**Swing, TEXT("reichweite_m"), 0.5, 20.0, Out.ReachMeters, OutError)
 			&& FEIDataFile::ReadNumber(**Swing, TEXT("klingenbreite_m"), 0.01, 5.0, Out.BladeWidthMeters, OutError)
 			&& FEIDataFile::ReadNumber(**Swing, TEXT("treffer_von_0_bis_1"), 0.0, 1.0, Out.HitFrom, OutError)
 			&& FEIDataFile::ReadNumber(**Swing, TEXT("treffer_bis_0_bis_1"), 0.0, 1.0, Out.HitTo, OutError)
@@ -93,8 +91,6 @@ bool FEISwordValues::LoadFromProjectFile(FEISwordValues& OutValues, FString& Out
 	if (!ReadSwing(**Sword, TEXT("leichter_hieb"), Loaded.Light, OutError)
 		|| !ReadSwing(**Sword, TEXT("schwerer_hieb"), Loaded.Heavy, OutError)
 		|| !ReadBlock(**Sword, Loaded.Block, OutError)
-		|| !FEIDataFile::ReadNumber(**Sword, TEXT("aufladen_s"), 0.1, 5.0, Loaded.ChargeSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Sword, TEXT("schwerer_hieb_taumeln_s"), 0.0, 30.0, Loaded.HeavyStaggerSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("ketten_fenster_s"), 0.0, 5.0, Loaded.ChainWindowSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("treff_stopp_s"), 0.0, 0.5, Loaded.HitStopSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(**Sword, TEXT("kamera_stoss_grad"), 0.0, 30.0, Loaded.CameraKickDegrees, OutError)
@@ -115,10 +111,30 @@ UEISwordComponent::UEISwordComponent()
 void UEISwordComponent::LoadValues()
 {
 	FString Error;
-	if (!FEISwordValues::LoadFromProjectFile(Values, Error))
+	if (!FEISwordValues::LoadFromProjectFile(BaseValues, Error))
 	{
 		FEIDataFile::ReportError(TEXT("waffen.json"), Error);
 	}
+	Values = BaseValues;
+}
+
+void UEISwordComponent::ApplyGear(const UEIGearComponent& Gear)
+{
+	Values = BaseValues;
+	const FEIWeaponForm* Form = Gear.GetWeaponForm();
+	if (Form == nullptr || Form->bStaff)
+	{
+		return;
+	}
+	const float SwingFactor = FMath::Max(SlowestSwingFactor, 1.0f + Gear.GetStat(EEIStat::AttackSpeed));
+	Values.Light.Damage = Form->LightDamage;
+	Values.Light.DurationSeconds = Form->LightSeconds / SwingFactor;
+	Values.Light.ReachMeters *= Form->LengthFactor;
+	Values.Heavy.Damage = Form->HeavyDamage;
+	Values.Heavy.DurationSeconds = Form->HeavySeconds / SwingFactor;
+	Values.Heavy.ReachMeters *= Form->LengthFactor;
+	Values.ChargeSeconds = Form->ChargeSeconds / FMath::Max(SlowestSwingFactor, 1.0f + Gear.GetStat(EEIStat::ChargeSpeed));
+	Values.HeavyStaggerSeconds = Form->StaggerSeconds;
 }
 
 AEIHeroCharacter* UEISwordComponent::GetHero() const
@@ -231,7 +247,8 @@ float UEISwordComponent::BlockDamage(float Damage, AActor* Causer)
 		Enemy->Stagger(Values.Block.StaggerSeconds);
 	}
 	MulticastBlockFeedback(bParry);
-	return Damage * (1.0f - (bParry ? Values.Block.ParryDamageReduction : Values.Block.DamageReduction));
+	const float Blocked = bParry ? Values.Block.ParryDamageReduction : Values.Block.DamageReduction + Hero->GetGear()->GetStat(EEIStat::BlockStrength);
+	return Damage * (1.0f - FMath::Min(Blocked, 1.0f));
 }
 
 void UEISwordComponent::MulticastBlockFeedback_Implementation(bool bParry)
@@ -450,7 +467,7 @@ void UEISwordComponent::HitActor(AActor* Target, const FVector& Location)
 		return;
 	}
 
-	const float Damage = Swing.Damage * FMath::Max(0.0f, 1.0f - Swing.TargetFalloff * HitThisSwing.Num()) * Hero->GetOmens()->GetFactor(EEIOmenEffect::SwordDamage);
+	const float Damage = Swing.Damage * FMath::Max(0.0f, 1.0f - Swing.TargetFalloff * HitThisSwing.Num()) * Hero->GetGear()->GetSwordFactor();
 	HitThisSwing.Add(Target);
 	AEIEnemy* Enemy = SwingKind == EEISwingKind::Heavy ? Cast<AEIEnemy>(Target) : nullptr;
 	if (Enemy != nullptr)

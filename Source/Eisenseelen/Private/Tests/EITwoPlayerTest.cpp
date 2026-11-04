@@ -6,12 +6,14 @@
 #include "EICasterComponent.h"
 #include "EIChest.h"
 #include "EIEnemy.h"
+#include "EIGearComponent.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIOmenComponent.h"
+#include "EIProfileComponent.h"
 #include "EISwordComponent.h"
 #include "EIProjectile.h"
 #include "EIRunDirector.h"
@@ -349,7 +351,7 @@ public:
 				return false;
 			}
 			Test->AddInfo(FString::Printf(TEXT("The guest's charged fireball: %d hits for %.0f damage at 180 cm"), ServerDummy->GetHitCount(), ServerDummy->GetLastDamage()));
-			Test->TestEqual(TEXT("The guest's fireball counts on the server"), ServerDummy->GetLastDamage(), Session.ClientHero->GetCaster()->GetValues().Fireball.Damage);
+			Test->TestEqual(TEXT("The guest's fireball counts on the server"), ServerDummy->GetLastDamage(), Session.ClientHero->GetCaster()->GetValues().Fireball.Damage * Session.ClientHero->GetGear()->GetShotFactor());
 			ServerDummy->ResetHits();
 			// Only the server's mana runs out, so the guest still fires and the server has to refuse.
 			Session.ServerCopyOfClientHero->GetCaster()->SpendMana(Session.ServerCopyOfClientHero->GetCaster()->GetMaxMana());
@@ -543,7 +545,7 @@ public:
 			UEIOmenComponent* ServerOmens = Session.ServerCopyOfClientHero->GetOmens();
 			for (int32 Index = 0; Index < ServerOmens->GetTable().Omens.Num(); ++Index)
 			{
-				if (ServerOmens->GetTable().Omens[Index].Effect == EEIOmenEffect::Speed)
+				if (ServerOmens->GetTable().Omens[Index].Effect == EEIStat::Speed)
 				{
 					ServerOmens->AddOmen(Index);
 				}
@@ -827,18 +829,10 @@ public:
 				Enemy->GetHealth()->Reset(100000.0f);
 				Target = Enemy;
 			}
-			EISendTestKey(Session.ClientPlayer, EKeys::T, IE_Pressed);
-			EnterStep(1);
-			return false;
-		}
-		case 1:
-			if (Now - StepAt < 0.05)
-			{
-				return false;
-			}
-			EISendTestKey(Session.ClientPlayer, EKeys::T, IE_Released);
+			Session.ClientPlayer->GetProfile()->EquipNext(EEISlot::Rune);
 			EnterStep(2);
 			return false;
+		}
 		case 2:
 			if (Now - StepAt < 0.3)
 			{
@@ -884,6 +878,17 @@ public:
 				return false;
 			}
 			Test->TestEqual(TEXT("During the cooldown no second spell comes"), CountFields(ServerWorld), 1);
+			// Another weapon: both sides have to agree on how it plays.
+			Session.ClientPlayer->GetProfile()->EquipByName(TEXT("Aschenbrecher"));
+			EnterStep(7);
+			return false;
+		case 7:
+			if (Now - StepAt < 0.3)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("The guest holds the new weapon"), Session.ClientHero->GetSword()->GetValues().Light.Damage, 50.0f);
+			Test->TestEqual(TEXT("The server knows the new weapon"), Session.ServerCopyOfClientHero->GetSword()->GetValues().Light.Damage, 50.0f);
 			return true;
 		default:
 			return true;

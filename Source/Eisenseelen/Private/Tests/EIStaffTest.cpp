@@ -4,6 +4,7 @@
 
 #include "EICasterComponent.h"
 #include "EIEnemy.h"
+#include "EIGearComponent.h"
 #include "EIHealthComponent.h"
 #include "EIProjectile.h"
 #include "EISwordComponent.h"
@@ -115,7 +116,7 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([LifeBefore](const FEIPlayContext& Context)
 	{
 		const AEITrainingDummy* Middle = SortedDummies(Context.World)[1];
-		const float Expected = Context.Hero->GetCaster()->GetValues().Bolt.Damage;
+		const float Expected = Context.Hero->GetCaster()->GetValues().Bolt.Damage * Context.Hero->GetGear()->GetShotFactor();
 		Context.Test->AddInfo(FString::Printf(TEXT("Two quick bolts from 1000 cm: %d hits for %.0f damage each, expected %.0f"), Middle->GetHitCount(), Middle->GetLastDamage(), Expected));
 		Context.Test->TestEqual(TEXT("A bolt does its damage"), Middle->GetLastDamage(), Expected);
 		Context.Test->TestEqual(TEXT("Fire does not hurt heroes"), Context.Hero->GetHealth()->GetHealth(), *LifeBefore);
@@ -138,7 +139,7 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	{
 		const AEITrainingDummy* Middle = SortedDummies(Context.World)[1];
 		Context.Test->TestEqual(TEXT("A long press is still one bolt"), Middle->GetHitCount(), 1);
-		Context.Test->TestEqual(TEXT("A long press does a bolt's damage"), Middle->GetLastDamage(), Context.Hero->GetCaster()->GetValues().Bolt.Damage);
+		Context.Test->TestEqual(TEXT("A long press does a bolt's damage"), Middle->GetLastDamage(), Context.Hero->GetCaster()->GetValues().Bolt.Damage * Context.Hero->GetGear()->GetShotFactor());
 	}));
 
 	// Letting go of the second key too early fires nothing.
@@ -165,7 +166,7 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	Steps.Add(WaitForNoProjectiles());
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		const float Expected = Context.Hero->GetCaster()->GetValues().Fireball.Damage;
+		const float Expected = Context.Hero->GetCaster()->GetValues().Fireball.Damage * Context.Hero->GetGear()->GetShotFactor();
 		for (const AEITrainingDummy* Dummy : SortedDummies(Context.World))
 		{
 			Context.Test->TestEqual(TEXT("Both fireballs reach every dummy"), Dummy->GetHitCount(), 2);
@@ -207,7 +208,7 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 		const UEICasterComponent* Caster = Context.Hero->GetCaster();
 		Context.Test->AddInfo(FString::Printf(TEXT("The arcanist's Q cools down in %.1f s"), Caster->GetSpellCooldownSeconds()));
 		Context.Test->TestTrue(TEXT("Q starts its cooldown"), Caster->GetSpellCooldownFraction() > 0.5f);
-		Context.Test->TestTrue(TEXT("The arcanist casts faster"), Caster->GetSpellCooldownSeconds() < Caster->GetValues().SpellCooldownSeconds);
+		Context.Test->TestTrue(TEXT("The arcanist casts faster"), Caster->GetSpellCooldownSeconds() < Caster->GetValues().Fireball.CooldownSeconds);
 		Context.Test->TestEqual(TEXT("Q costs no mana"), Caster->GetMana(), Caster->GetMaxMana());
 	}));
 	AddTap(Steps, EKeys::Q);
@@ -272,7 +273,7 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		const UEICasterComponent* Caster = Context.Hero->GetCaster();
-		Context.Test->TestEqual(TEXT("The blade warden casts at the normal pace"), Caster->GetSpellCooldownSeconds(), Caster->GetValues().SpellCooldownSeconds);
+		Context.Test->TestEqual(TEXT("The blade warden casts at the normal pace"), Caster->GetSpellCooldownSeconds(), Caster->GetValues().Fireball.CooldownSeconds);
 		Context.Test->TestEqual(TEXT("The blade warden has no mana to pay"), Caster->GetMaxMana(), 0.0f);
 	}));
 	return RunInArena(this, MoveTemp(Steps));

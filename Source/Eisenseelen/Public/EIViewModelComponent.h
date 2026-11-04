@@ -24,6 +24,9 @@ public:
 	void Build();
 
 	void ShowStaff(bool bStaff);
+
+	/** How long the blade is, compared to the long sword, and what its edge and the head of the staff glow in. */
+	void SetWeaponLook(float LengthFactor, const FLinearColor& Color);
 	void PlayPose(FName Curve, float Seconds, float TrailFrom = 2.0f, float TrailTo = 2.0f);
 
 	/** For a gesture nothing depends on: it does not interrupt a swing or a block. */
@@ -67,6 +70,15 @@ private:
 	TObjectPtr<USceneComponent> StaffParts;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> Blade;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> BladeEdge;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> StaffHead;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UProceduralMeshComponent> Trail;
 
 	TArray<FTrailSample> TrailSamples;
@@ -77,6 +89,8 @@ private:
 	float PlayingSeconds = 1.0f;
 	float TrailFromT = 2.0f;
 	float TrailToT = 2.0f;
+	float BladeLengthFactor = 1.0f;
+	FLinearColor WeaponColor = FLinearColor::Black;
 
 	FName HeldCurve = NAME_None;
 	float HeldT = 0.0f;

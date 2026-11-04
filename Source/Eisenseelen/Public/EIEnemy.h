@@ -23,6 +23,7 @@ enum class EEIEnemyKind : uint8
 constexpr int32 EIEnemyKindCount = 4;
 
 /** What a spell is made of. Two elements on one target can react. */
+UENUM()
 enum class EEIElement : uint8
 {
 	Fire,
@@ -40,6 +41,12 @@ enum class EEIReaction : uint8
 
 /** The name of a kind in the data files. */
 EISENSEELEN_API const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind);
+
+/** The name of an element in the data files. False if the text is none. */
+EISENSEELEN_API bool EIElementFromKey(const FString& Key, EEIElement& OutElement);
+
+/** The color everything of this element glows in. */
+EISENSEELEN_API FLinearColor EIElementColor(EEIElement Element);
 
 /** The numbers of one kind of enemy from Data/gegner.json. */
 struct EISENSEELEN_API FEIEnemyValues

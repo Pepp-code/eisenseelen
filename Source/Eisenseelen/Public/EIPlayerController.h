@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "EIPlayerController.generated.h"
 
+class UEIProfileComponent;
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
@@ -16,11 +17,16 @@ class EISENSEELEN_API AEIPlayerController : public APlayerController
 	GENERATED_BODY()
 
 public:
+	AEIPlayerController();
+
 	/** The class a new hero of this player starts as. It survives a restart. */
 	EEIHeroClass GetSelectedClass() const { return SelectedClass; }
 
-	/** The rune a new hero of this player has equipped. It survives a restart too. */
-	int32 GetSelectedRune() const { return SelectedRune; }
+	UEIProfileComponent* GetProfile() const { return Profile; }
+
+	/** For preview pictures: puts on an item, by its name. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewEquip(const FString& Name);
 
 	/** For preview pictures: presses or releases a key through the real controls. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
@@ -78,15 +84,15 @@ private:
 	void ServerToggleClass();
 
 	UFUNCTION(Server, Reliable)
-	void ServerNextRune();
-
-	UFUNCTION(Server, Reliable)
 	void ServerToggleHorde();
 
 	UFUNCTION(Server, Reliable)
 	void ServerRestartRun();
 
 	AEIHeroCharacter* GetLivingHero() const;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEIProfileComponent> Profile;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> Mapping;
@@ -131,5 +137,4 @@ private:
 	TObjectPtr<UInputAction> NextRuneAction;
 
 	EEIHeroClass SelectedClass = EEIHeroClass::Bladewarden;
-	int32 SelectedRune = 0;
 };

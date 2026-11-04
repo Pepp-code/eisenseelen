@@ -23,7 +23,6 @@ namespace
 	constexpr float CentimetersPerMeter = 100.0f;
 	constexpr float LifeSeconds = 5.0f;
 	constexpr float CollisionRadiusCm = 10.0f;
-	const FLinearColor FireColor(1.0f, 0.38f, 0.06f);
 	constexpr float SphereMeshRadiusCm = 50.0f;
 	constexpr float BoltVisualRadiusCm = 12.0f;
 	constexpr float FireballVisualRadiusCm = 38.0f;
@@ -35,6 +34,12 @@ namespace
 	constexpr float BurstGlow = 5.0f;
 	constexpr float BurstLightPerRadius = 200.0f;
 	constexpr float CloudFadeSeconds = 0.8f;
+	const FVector LanceSizeCm(140.0f, 16.0f, 16.0f);
+	const FVector PiercingBoltSizeCm(70.0f, 14.0f, 14.0f);
+	constexpr float MinLightRadiusCm = 150.0f;
+	constexpr float BeamSeconds = 0.25f;
+	constexpr float BeamThicknessCm = 7.0f;
+	constexpr float BeamGlow = 6.0f;
 }
 
 AEIProjectile::AEIProjectile()
@@ -63,7 +68,6 @@ AEIProjectile::AEIProjectile()
 
 	Light = CreateDefaultSubobject<UPointLightComponent>(TEXT("Light"));
 	Light->SetupAttachment(Collision);
-	Light->SetLightColor(FireColor);
 	Light->SetCastShadows(false);
 
 	Flight = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Flight"));
@@ -77,26 +81,38 @@ void AEIProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AEIProjectile, RadiusCm);
 	DOREPLIFETIME(AEIProjectile, bBig);
+	DOREPLIFETIME(AEIProjectile, bPierces);
+	DOREPLIFETIME(AEIProjectile, Element);
 }
 
-void AEIProjectile::Configure(const FEIProjectileValues& Values, bool bInBig)
+void AEIProjectile::Configure(const FEIProjectileSetup& Setup)
 {
-	Damage = Values.Damage;
-	RadiusCm = Values.RadiusMeters * CentimetersPerMeter;
-	bBig = bInBig;
-	Flight->InitialSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter;
-	Flight->MaxSpeed = Flight->InitialSpeed;
+	Damage = Setup.Damage;
+	RadiusCm = Setup.RadiusCm;
+	bBig = Setup.bBig;
+	bPierces = Setup.bPierces;
+	bCarriesElement = Setup.bCarriesElement;
+	Element = Setup.Element;
+	SlowShare = Setup.SlowShare;
+	SlowSeconds = Setup.SlowSeconds;
+	FreezeSeconds = Setup.FreezeSeconds;
+	Flight->InitialSpeed = Setup.SpeedCm;
+	Flight->MaxSpeed = Setup.SpeedCm;
 }
 
 void AEIProjectile::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// What goes through people is long and thin, what bursts is round.
 	const float VisualRadius = bBig ? FireballVisualRadiusCm : BoltVisualRadiusCm;
-	Ball->SetRelativeScale3D(FVector(VisualRadius / SphereMeshRadiusCm));
-	EIVisuals::SetColor(Ball, FireColor, BallGlow);
+	const FVector RoundSizeCm(VisualRadius * 2.0f);
+	Ball->SetRelativeScale3D((bPierces ? (bBig ? LanceSizeCm : PiercingBoltSizeCm) : RoundSizeCm) / (SphereMeshRadiusCm * 2.0f));
+	const FLinearColor Color = EIElementColor(Element);
+	EIVisuals::SetColor(Ball, Color, BallGlow);
+	Light->SetLightColor(Color);
 	Light->SetIntensity(bBig ? FireballLight : BoltLight);
-	Light->SetAttenuationRadius(RadiusCm * 2.0f);
+	Light->SetAttenuationRadius(FMath::Max(RadiusCm, MinLightRadiusCm) * 2.0f);
 
 	// Heroes never get in the way of fire, not even their own.
 	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
@@ -106,6 +122,44 @@ void AEIProjectile::BeginPlay()
 	if (HasAuthority())
 	{
 		Flight->OnProjectileStop.AddDynamic(this, &AEIProjectile::HandleStop);
+	}
+	if (bPierces)
+	{
+		Collision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+		Collision->SetGenerateOverlapEvents(true);
+		if (HasAuthority())
+		{
+			Collision->OnComponentBeginOverlap.AddDynamic(this, &AEIProjectile::HandlePierce);
+		}
+	}
+}
+
+void AEIProjectile::HandlePierce(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor != nullptr && !OtherActor->IsA<AEIHeroCharacter>() && OtherActor->CanBeDamaged() && !Pierced.Contains(OtherActor))
+	{
+		Pierced.Add(OtherActor);
+		HitTarget(OtherActor);
+	}
+}
+
+void AEIProjectile::HitTarget(AActor* Target)
+{
+	AActor* Caster = GetOwner();
+	const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(Caster);
+	AEIEnemy* Enemy = Cast<AEIEnemy>(Target);
+	if (bCarriesElement && Hero != nullptr && Enemy != nullptr)
+	{
+		Hero->GetRunes()->HitWithElement(Enemy, Element);
+	}
+	UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Caster, nullptr);
+	if (Enemy != nullptr && SlowSeconds > 0.0f)
+	{
+		if (Enemy->IsSlowed() && FreezeSeconds > 0.0f)
+		{
+			Enemy->Freeze(FreezeSeconds);
+		}
+		Enemy->ApplySlow(SlowShare, SlowSeconds);
 	}
 }
 
@@ -134,30 +188,25 @@ void AEIProjectile::Burst(const FVector& Location)
 	}
 	bBurst = true;
 
-	AActor* Caster = GetOwner();
-	AController* CasterController = GetInstigatorController();
-	TArray<FOverlapResult> Overlaps;
-	GetWorld()->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, FCollisionObjectQueryParams(ECC_Pawn), FCollisionShape::MakeSphere(RadiusCm));
-	TSet<AActor*> Done;
-	for (const FOverlapResult& Overlap : Overlaps)
+	// What went through people has done its work on the way.
+	if (!bPierces)
 	{
-		AActor* Target = Overlap.GetActor();
-		if (Target == nullptr || Done.Contains(Target) || Target->IsA<AEIHeroCharacter>() || !Target->CanBeDamaged())
+		TArray<FOverlapResult> Overlaps;
+		GetWorld()->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, FCollisionObjectQueryParams(ECC_Pawn), FCollisionShape::MakeSphere(RadiusCm));
+		TSet<AActor*> Done;
+		for (const FOverlapResult& Overlap : Overlaps)
 		{
-			continue;
-		}
-		Done.Add(Target);
-		FCollisionQueryParams WallQuery(SCENE_QUERY_STAT(EIBurstWall), false, Target);
-		if (!GetWorld()->LineTraceTestByObjectType(Location, Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), WallQuery))
-		{
-			// Only a real fireball carries the element, not the small bolts of the staff.
-			const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(Caster);
-			AEIEnemy* Enemy = Cast<AEIEnemy>(Target);
-			if (bBig && Hero != nullptr && Enemy != nullptr)
+			AActor* Target = Overlap.GetActor();
+			if (Target == nullptr || Done.Contains(Target) || Target->IsA<AEIHeroCharacter>() || !Target->CanBeDamaged())
 			{
-				Hero->GetRunes()->HitWithElement(Enemy, EEIElement::Fire);
+				continue;
 			}
-			UGameplayStatics::ApplyDamage(Target, Damage, CasterController, Caster, nullptr);
+			Done.Add(Target);
+			FCollisionQueryParams WallQuery(SCENE_QUERY_STAT(EIBurstWall), false, Target);
+			if (!GetWorld()->LineTraceTestByObjectType(Location, Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), WallQuery))
+			{
+				HitTarget(Target);
+			}
 		}
 	}
 	MulticastBurst(Location);
@@ -166,12 +215,12 @@ void AEIProjectile::Burst(const FVector& Location)
 
 void AEIProjectile::MulticastBurst_Implementation(FVector_NetQuantize Location)
 {
-	EIVisuals::PlaySoundAt(this, bBig ? TEXT("ExplosionGross") : TEXT("ExplosionKlein"), Location);
+	EIVisuals::PlaySoundAt(this, bBig && !bPierces ? TEXT("ExplosionGross") : TEXT("ExplosionKlein"), Location);
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
 	{
-		FX->Setup(RadiusCm);
+		FX->Setup(RadiusCm, EIElementColor(Element));
 	}
 }
 
@@ -189,13 +238,12 @@ AEIExplosionFX::AEIExplosionFX()
 
 	Light = CreateDefaultSubobject<UPointLightComponent>(TEXT("Light"));
 	Light->SetupAttachment(Ball);
-	Light->SetLightColor(FireColor);
 	Light->SetCastShadows(false);
 }
 
 void AEIExplosionFX::Setup(float InRadiusCm)
 {
-	Setup(InRadiusCm, FireColor);
+	Setup(InRadiusCm, EIElementColor(EEIElement::Fire));
 }
 
 void AEIExplosionFX::Setup(float InRadiusCm, const FLinearColor& Color)
@@ -241,4 +289,34 @@ void AEIExplosionFX::Tick(float DeltaSeconds)
 		Material->SetScalarParameterValue(TEXT("Deckkraft"), 1.0f - T);
 	}
 	Light->SetIntensity(RadiusCm * BurstLightPerRadius * (1.0f - T));
+}
+
+AEIBeamFX::AEIBeamFX()
+{
+	PrimaryActorTick.bCanEverTick = true;
+	InitialLifeSpan = BeamSeconds;
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	Beam = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Beam"));
+	SetRootComponent(Beam);
+	Beam->SetStaticMesh(Cube.Object);
+	Beam->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Beam->SetCastShadow(false);
+}
+
+void AEIBeamFX::Setup(const FVector& From, const FVector& To, const FLinearColor& Color)
+{
+	SetActorLocationAndRotation((From + To) / 2.0, (To - From).Rotation());
+	Beam->SetWorldScale3D(FVector(FVector::Dist(From, To), BeamThicknessCm, BeamThicknessCm) / 100.0f);
+	Material = EIVisuals::SetGlow(Beam, Color, BeamGlow);
+}
+
+void AEIBeamFX::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	Age += DeltaSeconds;
+	if (Material != nullptr)
+	{
+		Material->SetScalarParameterValue(TEXT("Deckkraft"), FMath::Clamp(1.0f - Age / BeamSeconds, 0.0f, 1.0f));
+	}
 }

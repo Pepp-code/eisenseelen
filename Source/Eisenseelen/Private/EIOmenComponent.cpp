@@ -12,16 +12,6 @@ namespace
 {
 	constexpr float FoundNoteSeconds = 4.0f;
 
-	bool ReadEffect(const FString& Text, EEIOmenEffect& OutEffect)
-	{
-		if (Text == TEXT("schwert_schaden")) { OutEffect = EEIOmenEffect::SwordDamage; return true; }
-		if (Text == TEXT("feuer_schaden")) { OutEffect = EEIOmenEffect::FireDamage; return true; }
-		if (Text == TEXT("tempo")) { OutEffect = EEIOmenEffect::Speed; return true; }
-		if (Text == TEXT("leben")) { OutEffect = EEIOmenEffect::Life; return true; }
-		if (Text == TEXT("mana_rueckkehr")) { OutEffect = EEIOmenEffect::ManaRegen; return true; }
-		return false;
-	}
-
 	bool ReadTable(const FJsonObject& Root, FEIOmenTable& OutTable, FString& OutError)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* Lines = nullptr;
@@ -41,7 +31,7 @@ namespace
 				OutError = TEXT("Einem Omen fehlt der Name.");
 				return false;
 			}
-			if (!(*Object)->TryGetStringField(TEXT("wirkung"), EffectText) || !ReadEffect(EffectText, Omen.Effect))
+			if (!(*Object)->TryGetStringField(TEXT("wirkung"), EffectText) || !EIStatFromKey(EffectText, Omen.Effect))
 			{
 				OutError = FString::Printf(TEXT("%s hat keine bekannte Wirkung."), *Omen.Name);
 				return false;
@@ -65,15 +55,7 @@ namespace
 
 FString FEIOmen::Describe() const
 {
-	switch (Effect)
-	{
-	case EEIOmenEffect::SwordDamage: return FString::Printf(TEXT("+%.0f %% Schwertschaden"), Amount * 100.0f);
-	case EEIOmenEffect::FireDamage: return FString::Printf(TEXT("+%.0f %% Feuerschaden"), Amount * 100.0f);
-	case EEIOmenEffect::Speed: return FString::Printf(TEXT("+%.0f %% Tempo"), Amount * 100.0f);
-	case EEIOmenEffect::Life: return FString::Printf(TEXT("+%.0f Leben"), Amount);
-	case EEIOmenEffect::ManaRegen: return FString::Printf(TEXT("+%.0f %% Mana-Rückkehr"), Amount * 100.0f);
-	default: return FString();
-	}
+	return EIDescribeStat(Effect, Amount);
 }
 
 bool FEIOmenTable::LoadFromString(const FString& Json, FEIOmenTable& OutTable, FString& OutError)
@@ -136,7 +118,7 @@ int32 UEIOmenComponent::CountOf(int32 Index) const
 	return Count;
 }
 
-float UEIOmenComponent::GetBonus(EEIOmenEffect Effect) const
+float UEIOmenComponent::GetBonus(EEIStat Effect) const
 {
 	float Bonus = 0.0f;
 	for (const int32 Index : Held)
@@ -179,7 +161,7 @@ void UEIOmenComponent::AddOmen(int32 Index)
 		return;
 	}
 	Held.Add(Index);
-	if (Table.Omens[Index].Effect == EEIOmenEffect::Life)
+	if (Table.Omens[Index].Effect == EEIStat::Life)
 	{
 		GetHero()->GetHealth()->AddMaxHealth(Table.Omens[Index].Amount);
 	}

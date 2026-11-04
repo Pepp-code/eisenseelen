@@ -17,7 +17,9 @@ namespace
 	const FLinearColor GauntletColor(0.09f, 0.1f, 0.13f);
 	const FLinearColor GuardColor(0.3f, 0.22f, 0.06f);
 	const FLinearColor ShaftColor(0.12f, 0.07f, 0.03f);
-	const FLinearColor StaffHeadColor(1.0f, 0.38f, 0.06f);
+	const FVector BladeSizeCm(BladeLength, 2.0f, 7.0f);
+	const FVector BladeEdgeSizeCm(BladeLength * 0.96f, 2.4f, 1.4f);
+	constexpr float BladeEdgeGlow = 3.0f;
 	constexpr float StaffHeadGlow = 5.0f;
 	constexpr float StaffLength = 120.0f;
 	constexpr float StaffBack = 35.0f;
@@ -26,7 +28,6 @@ namespace
 	constexpr int32 MaxTrailSamples = 24;
 	constexpr float TrailLifeSeconds = 0.16f;
 	constexpr float TrailBaseFraction = 0.45f;
-	const FLinearColor TrailColor(0.6f, 0.75f, 1.0f);
 	constexpr float TrailStrength = 1.2f;
 	constexpr float CancelBlendSeconds = 0.08f;
 
@@ -77,14 +78,15 @@ void UEIViewModelComponent::Build()
 	SwordParts = NewObject<USceneComponent>(GetOwner());
 	SwordParts->SetupAttachment(Hand);
 	SwordParts->RegisterComponent();
-	AddPart(SwordParts, Cube, FVector(BladeStart + BladeLength / 2.0f, 0.0f, 0.0f), FVector(BladeLength, 2.0f, 7.0f), BladeColor);
+	Blade = AddPart(SwordParts, Cube, FVector(BladeStart + BladeLength / 2.0f, 0.0f, 0.0f), BladeSizeCm, BladeColor);
+	BladeEdge = AddPart(SwordParts, Cube, FVector(BladeStart + BladeLength / 2.0f, 0.0f, 0.0f), BladeEdgeSizeCm, BladeColor);
 	AddPart(SwordParts, Cube, FVector(BladeStart - 1.0f, 0.0f, 0.0f), FVector(2.5f, 4.0f, 16.0f), GuardColor);
 
 	StaffParts = NewObject<USceneComponent>(GetOwner());
 	StaffParts->SetupAttachment(Hand);
 	StaffParts->RegisterComponent();
 	AddPart(StaffParts, Cube, FVector(StaffLength / 2.0f - StaffBack, 0.0f, 0.0f), FVector(StaffLength, 3.5f, 3.5f), ShaftColor);
-	AddPart(StaffParts, EIVisuals::GetSphere(), FVector(StaffLength - StaffBack + StaffHeadSize / 2.0f, 0.0f, 0.0f), FVector(StaffHeadSize), StaffHeadColor, StaffHeadGlow);
+	StaffHead = AddPart(StaffParts, EIVisuals::GetSphere(), FVector(StaffLength - StaffBack + StaffHeadSize / 2.0f, 0.0f, 0.0f), FVector(StaffHeadSize), BladeColor);
 	StaffParts->SetVisibility(false, true);
 
 	Trail = NewObject<UProceduralMeshComponent>(GetOwner());
@@ -93,7 +95,6 @@ void UEIViewModelComponent::Build()
 	Trail->SetCastShadow(false);
 	Trail->SetOnlyOwnerSee(true);
 	Trail->RegisterComponent();
-	EIVisuals::SetGlow(Trail, TrailColor, TrailStrength);
 
 	Hand->SetRelativeTransform(CurrentPose());
 	SetComponentTickEnabled(true);
@@ -106,6 +107,25 @@ void UEIViewModelComponent::ShowStaff(bool bStaff)
 	RestCurve = bStaff ? TEXT("stab_ruhe") : TEXT("ruhe");
 	PlayingCurve = NAME_None;
 	HeldCurve = NAME_None;
+}
+
+void UEIViewModelComponent::SetWeaponLook(float LengthFactor, const FLinearColor& Color)
+{
+	if (Hand == nullptr || (LengthFactor == BladeLengthFactor && Color == WeaponColor))
+	{
+		return;
+	}
+	BladeLengthFactor = LengthFactor;
+	WeaponColor = Color;
+	const FVector Middle(BladeStart + BladeLength * LengthFactor / 2.0f, 0.0f, 0.0f);
+	const FVector Stretch(LengthFactor, 1.0f, 1.0f);
+	Blade->SetRelativeLocation(Middle);
+	Blade->SetRelativeScale3D(BladeSizeCm * Stretch / 100.0f);
+	BladeEdge->SetRelativeLocation(Middle);
+	BladeEdge->SetRelativeScale3D(BladeEdgeSizeCm * Stretch / 100.0f);
+	EIVisuals::SetColor(BladeEdge, Color, BladeEdgeGlow);
+	EIVisuals::SetColor(StaffHead, Color, StaffHeadGlow);
+	EIVisuals::SetGlow(Trail, Color, TrailStrength);
 }
 
 void UEIViewModelComponent::PlayPose(FName Curve, float Seconds, float TrailFrom, float TrailTo)
@@ -288,7 +308,7 @@ void UEIViewModelComponent::UpdateTrail(float DeltaTime, bool bAddSample)
 	{
 		const FTransform Pose = Hand->GetRelativeTransform();
 		FTrailSample Sample;
-		const float TipX = BladeStart + BladeLength;
+		const float TipX = BladeStart + BladeLength * BladeLengthFactor;
 		Sample.Tip = Pose.TransformPosition(FVector(TipX, 0.0f, 0.0f));
 		Sample.Base = Pose.TransformPosition(FVector(TipX * TrailBaseFraction, 0.0f, 0.0f));
 		TrailSamples.Add(Sample);

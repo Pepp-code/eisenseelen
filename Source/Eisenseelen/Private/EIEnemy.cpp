@@ -119,6 +119,36 @@ const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind)
 	}
 }
 
+bool EIElementFromKey(const FString& Key, EEIElement& OutElement)
+{
+	if (Key == TEXT("feuer"))
+	{
+		OutElement = EEIElement::Fire;
+		return true;
+	}
+	if (Key == TEXT("eis"))
+	{
+		OutElement = EEIElement::Ice;
+		return true;
+	}
+	if (Key == TEXT("blitz"))
+	{
+		OutElement = EEIElement::Lightning;
+		return true;
+	}
+	return false;
+}
+
+FLinearColor EIElementColor(EEIElement Element)
+{
+	switch (Element)
+	{
+	case EEIElement::Ice: return FLinearColor(0.35f, 0.7f, 1.0f);
+	case EEIElement::Lightning: return FLinearColor(0.95f, 0.9f, 0.35f);
+	default: return FLinearColor(1.0f, 0.38f, 0.06f);
+	}
+}
+
 bool FEIEnemyValues::LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutValues, FString& OutError)
 {
 	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("gegner.json"), OutError);

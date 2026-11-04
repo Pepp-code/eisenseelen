@@ -78,8 +78,9 @@ void AEIHud::DrawHUD()
 	const bool bHasRun = State != nullptr && State->GetRunPhase() != EEIRunPhase::None;
 	const FEIRune* Rune = Hero != nullptr ? Hero->GetRunes()->GetRune() : nullptr;
 	const FString RuneKey = Rune != nullptr ? FString::Printf(TEXT("E %s   "), *Rune->SpellName) : FString();
+	const FString SpellName = Hero != nullptr ? Hero->GetCaster()->GetSpell().Name : FString();
 	const TCHAR* NextRuneKey = !bHasRun || State->GetRunPhase() == EEIRunPhase::OnBarge ? TEXT("T Rune   ") : TEXT("");
-	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   Q Feuerball   %sF benutzen   C Klasse   %s%sR Neustart"), *RuneKey, NextRuneKey, bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
+	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   Q %s   %sF benutzen   C Klasse   %s%sR Neustart"), *SpellName, *RuneKey, NextRuneKey, bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -94,10 +95,10 @@ void AEIHud::DrawHUD()
 	const bool bArcanist = Hero->GetHeroClass() == EEIHeroClass::Arcanist;
 	const TCHAR* ClassName = bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht");
 	const TCHAR* HordeNote = bHasRun ? TEXT("") : (bHorde ? TEXT("Horde an   ") : TEXT("Horde aus   "));
-	const TCHAR* ClassKeys = bArcanist ? TEXT("Linke Maus Schuss   Rechte Maus halten: Feuerball") : TEXT("Linke Maus Hieb (halten: schwerer Hieb)   Rechte Maus halten: blocken, kurz vor dem Treffer: Parade");
+	const FString ClassKeys = bArcanist ? FString::Printf(TEXT("Linke Maus Schuss   Rechte Maus halten: %s"), *SpellName) : FString(TEXT("Linke Maus Hieb (halten: schwerer Hieb)   Rechte Maus halten: blocken, kurz vor dem Treffer: Parade"));
 	// On the run map most enemies stand far away in their camps, so that number would say nothing.
 	const FString EnemyNote = bHasRun ? FString() : FString::Printf(TEXT("   %sGegner %d"), HordeNote, Enemies);
-	DrawLine(FString::Printf(TEXT("%s   %s   %s%s"), ClassName, Rune != nullptr ? *Rune->Name : TEXT("Keine Rune"), ClassKeys, *EnemyNote), Margin, Margin + 24.0f, TextColor);
+	DrawLine(FString::Printf(TEXT("%s   %s   %s%s"), ClassName, Rune != nullptr ? *Rune->Name : TEXT("Keine Rune"), *ClassKeys, *EnemyNote), Margin, Margin + 24.0f, TextColor);
 
 	if (Hero->GetHurtFlash() > 0.0f)
 	{
@@ -137,7 +138,7 @@ void AEIHud::DrawHUD()
 	const float SpellX = Margin + BarWidth + Margin;
 	const float SpellY = LifeY - 56.0f;
 	DrawBar(SpellX, SpellY, BarWidth / 2.0f, BarHeight, 1.0f - Caster->GetSpellCooldownFraction(), SpellColor);
-	DrawLine(TEXT("Q Feuerball"), SpellX, SpellY - 24.0f, TextColor);
+	DrawLine(FString::Printf(TEXT("Q %s"), *SpellName), SpellX, SpellY - 24.0f, TextColor);
 	if (Rune != nullptr)
 	{
 		const float RuneX = SpellX + BarWidth / 2.0f + Margin;
@@ -159,7 +160,7 @@ void AEIHud::DrawHUD()
 	const float Charge = bArcanist ? Caster->GetChargeFraction() : Hero->GetSword()->GetChargeFraction();
 	if (Charge > 0.25f)
 	{
-		const FLinearColor ChargeBarColor = bArcanist && !Caster->CanAffordFireball() ? NoManaColor : (Charge >= 1.0f ? FLinearColor::White : ChargeColor);
+		const FLinearColor ChargeBarColor = bArcanist && !Caster->CanAffordSpell() ? NoManaColor : (Charge >= 1.0f ? FLinearColor::White : ChargeColor);
 		DrawBar(Width / 2.0f - 60.0f, Height / 2.0f + 40.0f, 120.0f, 8.0f, Charge, ChargeBarColor);
 	}
 }

@@ -22,7 +22,7 @@ public:
 	AEIRuneField();
 
 	/** Between the deferred spawn and FinishSpawning. */
-	void Configure(const FEIRune& Rune, float InDamage);
+	void Configure(const FEIRune& Rune, float InDamage, float StatusFactor);
 
 	bool IsWall() const { return bWall; }
 

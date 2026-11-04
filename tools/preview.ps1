@@ -25,7 +25,7 @@ $Map = if ($Szene -eq 'lauf') { '/Game/Maps/L_ErsterLauf' } else { '/Game/Maps/L
 $Script = (Join-Path $PSScriptRoot $ScriptName) -replace '\\', '/'
 $Arguments = @(
 	"`"$(Join-Path $Root 'Eisenseelen.uproject')`"", $Map, '-game', '-RenderOffscreen', '-ResX=1600', '-ResY=900',
-	'-nosound', '-nosplash', '-unattended', "-ExecCmds=`"py $Script`""
+	'-nosound', '-nosplash', '-unattended', '-KeinSpielstand', "-ExecCmds=`"py $Script`""
 )
 $Game = Start-Process -FilePath "$Engine\Binaries\Win64\UnrealEditor.exe" -ArgumentList $Arguments -PassThru
 $Finished = $Game.WaitForExit($TimeoutSeconds * 1000)

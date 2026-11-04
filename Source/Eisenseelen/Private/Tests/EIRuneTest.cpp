@@ -4,7 +4,9 @@
 
 #include "EICasterComponent.h"
 #include "EIEnemy.h"
+#include "EIGearComponent.h"
 #include "EIHealthComponent.h"
+#include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
 #include "EISwordComponent.h"
 #include "EIRuneField.h"
@@ -47,6 +49,11 @@ namespace
 	{
 		const float Pitch = -FMath::RadiansToDegrees(FMath::Atan2(156.0f, TargetDistanceCm));
 		Context.Player->SetControlRotation(FRotator(Pitch, 0.0f, 0.0f));
+	}
+
+	FEIPlayStep NextRune()
+	{
+		return Do([](const FEIPlayContext& Context) { Context.Player->GetProfile()->EquipNext(EEISlot::Rune); });
 	}
 
 	const FEIRune& CurrentRune(const FEIPlayContext& Context)
@@ -153,7 +160,7 @@ bool FEIRuneSpellsTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.5));
 	Steps.Add(Do([State, Lost](const FEIPlayContext& Context)
 	{
-		const float Expected = Context.Hero->GetCaster()->GetValues().Fireball.Damage + Context.Hero->GetRunes()->GetTable().SteamDamage;
+		const float Expected = Context.Hero->GetCaster()->GetValues().Fireball.Damage * Context.Hero->GetGear()->GetSpellFactor() + Context.Hero->GetRunes()->GetTable().SteamDamage;
 		Context.Test->AddInfo(FString::Printf(TEXT("A fireball on frost: %.0f damage, expected %.0f at 400 cm"), Lost(), Expected));
 		Context.Test->TestNearlyEqual(TEXT("Fire on ice brings the steam explosion"), Lost(), Expected, 0.01f);
 
@@ -178,12 +185,12 @@ bool FEIRuneSpellsTest::RunTest(const FString& Parameters)
 		Context.Hero->GetRunes()->GetTable().Runes[2].DurationSeconds = 0.8f;
 	}));
 
-	// T: the next rune, with another spell, and it is ready at once. A field on the floor that hits again and again.
-	AddTap(Steps, EKeys::T);
+	// The next rune, with another spell, and it is ready at once. A field on the floor that hits again and again.
+	Steps.Add(NextRune());
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("T equips the next rune"), CurrentRune(Context).Name, FString(TEXT("Sturmrune")));
+		Context.Test->TestEqual(TEXT("The next rune is on"), CurrentRune(Context).Name, FString(TEXT("Sturmrune")));
 		Context.Test->TestEqual(TEXT("A new rune is ready at once"), Context.Hero->GetRunes()->GetCooldownFraction(), 0.0f);
 		State->Life = State->Target->GetHealth()->GetHealth();
 	}));
@@ -207,11 +214,11 @@ bool FEIRuneSpellsTest::RunTest(const FString& Parameters)
 	Steps.Add(WaitUntil(TEXT("the field is over"), 2.0, [](const FEIPlayContext& Context) { return CountFields(Context) == 0; }));
 
 	// The third rune: a wall in the way, and whoever touches it keeps burning.
-	AddTap(Steps, EKeys::T);
+	Steps.Add(NextRune());
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("T equips the third rune"), CurrentRune(Context).Name, FString(TEXT("Flammenrune")));
+		Context.Test->TestEqual(TEXT("The third rune is on"), CurrentRune(Context).Name, FString(TEXT("Flammenrune")));
 		State->Life = State->Target->GetHealth()->GetHealth();
 	}));
 	AddTap(Steps, EKeys::E);
@@ -233,14 +240,14 @@ bool FEIRuneSpellsTest::RunTest(const FString& Parameters)
 	}));
 	Steps.Add(WaitUntil(TEXT("the fire goes out"), 4.0, [State](const FEIPlayContext& Context) { return !State->Target->IsBurning(); }));
 
-	// T goes round, and the choice survives a restart.
-	AddTap(Steps, EKeys::T);
+	// The choice goes round, and the choice survives a restart.
+	Steps.Add(NextRune());
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestEqual(TEXT("After the last rune comes the first"), Context.Hero->GetRunes()->GetRuneIndex(), 0);
 	}));
-	AddTap(Steps, EKeys::T);
+	Steps.Add(NextRune());
 	Steps.Add(Wait(0.05));
 	AddTap(Steps, EKeys::R);
 	Steps.Add(WaitUntil(TEXT("a fresh hero stands"), 3.0, [](const FEIPlayContext& Context) { return Context.Movement->IsMovingOnGround() && Context.Hero->GetRunes()->GetRune() != nullptr; }));

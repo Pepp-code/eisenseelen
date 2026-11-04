@@ -1,8 +1,59 @@
 {
+	"grundformen": {
+		"langschwert": {
+			"name": "Langschwert",
+			"klasse": "klingenwacht",
+			"leichter_hieb_schaden": 35,
+			"leichter_hieb_s": 0.45,
+			"schwerer_hieb_schaden": 110,
+			"schwerer_hieb_s": 0.55,
+			"aufladen_s": 0.6,
+			"taumeln_s": 1.0,
+			"laenge_faktor": 1.0
+		},
+		"zweihaender": {
+			"name": "Zweihänder",
+			"klasse": "klingenwacht",
+			"leichter_hieb_schaden": 50,
+			"leichter_hieb_s": 0.65,
+			"schwerer_hieb_schaden": 160,
+			"schwerer_hieb_s": 0.8,
+			"aufladen_s": 0.8,
+			"taumeln_s": 1.6,
+			"laenge_faktor": 1.25
+		},
+		"kurzschwert": {
+			"name": "Kurzschwert",
+			"klasse": "klingenwacht",
+			"leichter_hieb_schaden": 24,
+			"leichter_hieb_s": 0.3,
+			"schwerer_hieb_schaden": 75,
+			"schwerer_hieb_s": 0.37,
+			"aufladen_s": 0.45,
+			"taumeln_s": 0.7,
+			"laenge_faktor": 0.75
+		},
+		"stab": {
+			"name": "Stab",
+			"klasse": "arkanist",
+			"schuss_schaden": 40,
+			"schuss_radius_m": 1.5,
+			"schuss_tempo_m_pro_s": 60,
+			"schuss_mana": 10,
+			"durchschlag_0_oder_1": 0
+		},
+		"zepter": {
+			"name": "Zepter",
+			"klasse": "arkanist",
+			"schuss_schaden": 70,
+			"schuss_radius_m": 0.5,
+			"schuss_tempo_m_pro_s": 45,
+			"schuss_mana": 20,
+			"durchschlag_0_oder_1": 1
+		}
+	},
 	"schwert": {
 		"leichter_hieb": {
-			"dauer_s": 0.45,
-			"schaden": 35,
 			"reichweite_m": 2.8,
 			"klingenbreite_m": 0.25,
 			"treffer_von_0_bis_1": 0.2,
@@ -11,8 +62,6 @@
 			"abzug_je_ziel_0_bis_1": 0.15
 		},
 		"schwerer_hieb": {
-			"dauer_s": 0.55,
-			"schaden": 110,
 			"reichweite_m": 3.2,
 			"klingenbreite_m": 0.6,
 			"treffer_von_0_bis_1": 0.25,
@@ -27,27 +76,44 @@
 			"parade_schaden_abzug_0_bis_1": 1.0,
 			"taumeln_s": 1.0
 		},
-		"aufladen_s": 0.6,
-		"schwerer_hieb_taumeln_s": 1.0,
 		"ketten_fenster_s": 0.5,
 		"treff_stopp_s": 0.05,
 		"kamera_stoss_grad": 1.2,
 		"schwerer_kamera_stoss_grad": 3.0
 	},
-	"feuerstab": {
-		"schuss": {
-			"schaden": 40,
-			"radius_m": 1.5,
-			"tempo_m_pro_s": 60,
-			"mana_kosten": 10
-		},
+	"stab": {
+		"halten_fuer_zauber_s": 0.4
+	},
+	"zauber": {
 		"feuerball": {
+			"name": "Feuerball",
 			"schaden": 120,
 			"radius_m": 4,
 			"tempo_m_pro_s": 30,
-			"mana_kosten": 40
+			"mana_kosten": 40,
+			"abklingzeit_s": 6
 		},
-		"halten_fuer_feuerball_s": 0.4,
-		"abklingzeit_taste_q_s": 6
+		"eislanze": {
+			"name": "Eislanze",
+			"schaden": 90,
+			"radius_m": 0.5,
+			"tempo_m_pro_s": 70,
+			"mana_kosten": 40,
+			"abklingzeit_s": 6,
+			"verlangsamen_0_bis_1": 0.5,
+			"zustand_s": 7,
+			"gefrieren_s": 1.5
+		},
+		"kettenblitz": {
+			"name": "Kettenblitz",
+			"schaden": 70,
+			"zielhilfe_m": 1.5,
+			"mana_kosten": 40,
+			"abklingzeit_s": 7,
+			"reichweite_m": 30,
+			"spruenge": 4,
+			"sprung_m": 8,
+			"abzug_je_sprung_0_bis_1": 0.2
+		}
 	}
 }

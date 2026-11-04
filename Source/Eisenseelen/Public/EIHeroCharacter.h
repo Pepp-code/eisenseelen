@@ -8,6 +8,7 @@
 
 class UCameraComponent;
 class UEICasterComponent;
+class UEIGearComponent;
 class UEIHealthComponent;
 class UEIHeroMovementComponent;
 class UEIOmenComponent;
@@ -59,9 +60,16 @@ public:
 	UEICasterComponent* GetCaster() const { return Caster; }
 	UEIOmenComponent* GetOmens() const { return Omens; }
 	UEIRuneComponent* GetRunes() const { return Runes; }
+	UEIGearComponent* GetGear() const { return Gear; }
 
 	/** Called on the server and the owner when the set of omens changed. */
 	void OnOmensChanged();
+
+	/** Passes the sum of all bonuses on to whoever needs it. */
+	void OnGearChanged();
+
+	/** Server only. Fits the life to the class and the gear, and keeps the share the hero has left. */
+	void RefreshLife();
 
 	EEIHeroClass GetHeroClass() const { return HeroClass; }
 	const FEIClassValues& GetClassValues() const { return ClassValues; }
@@ -110,6 +118,7 @@ private:
 	void OnRep_HeroClass();
 
 	void ApplyClassToView();
+	void ApplyWeaponToView();
 	void LoadClassValues();
 
 	UFUNCTION(Client, Unreliable)
@@ -147,6 +156,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIRuneComponent> Runes;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEIGearComponent> Gear;
 
 	UPROPERTY(ReplicatedUsing = OnRep_HeroClass)
 	EEIHeroClass HeroClass = EEIHeroClass::Bladewarden;

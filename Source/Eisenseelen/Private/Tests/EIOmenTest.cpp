@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #include "EICasterComponent.h"
+#include "EIGearComponent.h"
 #include "EIHealthComponent.h"
 #include "EIOmenComponent.h"
 #include "EIProjectile.h"
@@ -21,7 +22,7 @@ namespace
 	const FVector OpenFloor(-500.0f, 0.0f, HeroHeight);
 	constexpr float BackwardsYaw = 180.0f;
 
-	const FEIOmen* FindOmen(const FEIPlayContext& Context, EEIOmenEffect Effect, int32* OutIndex = nullptr)
+	const FEIOmen* FindOmen(const FEIPlayContext& Context, EEIStat Effect, int32* OutIndex = nullptr)
 	{
 		const TArray<FEIOmen>& Omens = Context.Hero->GetOmens()->GetTable().Omens;
 		for (int32 Index = 0; Index < Omens.Num(); ++Index)
@@ -38,7 +39,7 @@ namespace
 		return nullptr;
 	}
 
-	void GiveOmen(const FEIPlayContext& Context, EEIOmenEffect Effect)
+	void GiveOmen(const FEIPlayContext& Context, EEIStat Effect)
 	{
 		int32 Index = INDEX_NONE;
 		FindOmen(Context, Effect, &Index);
@@ -117,7 +118,7 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	// Sword: the first target takes the full damage of a light swing, and the omen raises it.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		GiveOmen(Context, EEIOmenEffect::SwordDamage);
+		GiveOmen(Context, EEIStat::AttackPower);
 		StandBeforeDummies(Context, 180.0f);
 	}));
 	AddTap(Steps, EKeys::LeftMouseButton);
@@ -129,7 +130,7 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	{
 		const TArray<AEITrainingDummy*> Dummies = SortedDummies(Context.World);
 		const float Highest = FMath::Max3(Dummies[0]->GetLastDamage(), Dummies[1]->GetLastDamage(), Dummies[2]->GetLastDamage());
-		const float Expected = Context.Hero->GetSword()->GetValues().Light.Damage * (1.0f + FindOmen(Context, EEIOmenEffect::SwordDamage)->Amount);
+		const float Expected = Context.Hero->GetSword()->GetValues().Light.Damage * (1.0f + FindOmen(Context, EEIStat::AttackPower)->Amount);
 		Context.Test->AddInfo(FString::Printf(TEXT("With the omen a swing at 180 cm does %.1f damage, expected %.1f"), Highest, Expected));
 		Context.Test->TestNearlyEqual(TEXT("The omen raises the sword's damage"), Highest, Expected, 0.01f);
 	}));
@@ -139,8 +140,8 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	{
 		const UEIHealthComponent* Health = Context.Hero->GetHealth();
 		const float Before = Health->GetMaxHealth();
-		GiveOmen(Context, EEIOmenEffect::Life);
-		const float Bonus = FindOmen(Context, EEIOmenEffect::Life)->Amount;
+		GiveOmen(Context, EEIStat::Life);
+		const float Bonus = FindOmen(Context, EEIStat::Life)->Amount;
 		Context.Test->TestEqual(TEXT("The omen raises the maximum life"), Health->GetMaxHealth(), Before + Bonus);
 		Context.Test->TestEqual(TEXT("The omen fills up what it adds"), Health->GetHealth(), Before + Bonus);
 	}));
@@ -148,7 +149,7 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	// Speed: running and sprinting both get faster.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		GiveOmen(Context, EEIOmenEffect::Speed);
+		GiveOmen(Context, EEIStat::Speed);
 		Teleport(Context, OpenFloor, BackwardsYaw);
 	}));
 	Steps.Add(Wait(0.3));
@@ -156,7 +157,7 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.5));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		const float Factor = Context.Hero->GetOmens()->GetFactor(EEIOmenEffect::Speed);
+		const float Factor = Context.Hero->GetOmens()->GetFactor(EEIStat::Speed);
 		const float Expected = Context.Hero->GetValues().RunSpeedMetersPerSecond * CentimetersPerMeter * Factor;
 		Context.Test->AddInfo(FString::Printf(TEXT("With the omen W runs at %.0f cm/s, expected %.0f"), HorizontalSpeed(Context), Expected));
 		Context.Test->TestNearlyEqual(TEXT("The omen raises the run speed"), HorizontalSpeed(Context), Expected, SpeedToleranceCm);
@@ -165,7 +166,7 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.5));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		const float Factor = Context.Hero->GetOmens()->GetFactor(EEIOmenEffect::Speed);
+		const float Factor = Context.Hero->GetOmens()->GetFactor(EEIStat::Speed);
 		const float Expected = Context.Hero->GetValues().SprintSpeedMetersPerSecond * CentimetersPerMeter * Factor;
 		Context.Test->TestNearlyEqual(TEXT("The omen raises the sprint speed"), HorizontalSpeed(Context), Expected, SpeedToleranceCm);
 	}));
@@ -177,18 +178,18 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.1));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		const float LifeBonus = FindOmen(Context, EEIOmenEffect::Life)->Amount;
+		const float LifeBonus = FindOmen(Context, EEIStat::Life)->Amount;
 		Context.Test->TestEqual(TEXT("The class keeps the life from the omen"), Context.Hero->GetHealth()->GetMaxHealth(), Context.Hero->GetClassValues().Life + LifeBonus);
 		UEICasterComponent* Caster = Context.Hero->GetCaster();
 		Caster->SpendMana(Caster->GetMaxMana());
 		Context.Test->TestTrue(TEXT("The omen takes no mana away"), Caster->GetMana() < 1.0f);
-		GiveOmen(Context, EEIOmenEffect::ManaRegen);
+		GiveOmen(Context, EEIStat::ManaRegen);
 		Context.Test->TestTrue(TEXT("The omen gives no mana at once"), Caster->GetMana() < 1.0f);
 	}));
 	Steps.Add(Wait(0.5));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		const float Factor = Context.Hero->GetOmens()->GetFactor(EEIOmenEffect::ManaRegen);
+		const float Factor = Context.Hero->GetOmens()->GetFactor(EEIStat::ManaRegen);
 		const float Expected = Context.Hero->GetClassValues().ManaPerSecond * Factor * 0.5f;
 		const float Mana = Context.Hero->GetCaster()->GetMana();
 		Context.Test->AddInfo(FString::Printf(TEXT("With the omen 0.5 s bring %.1f mana, expected about %.1f at 1000 cm"), Mana, Expected));
@@ -202,7 +203,7 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	// Fire: a bolt does more damage.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		GiveOmen(Context, EEIOmenEffect::FireDamage);
+		GiveOmen(Context, EEIStat::FireDamage);
 		StandBeforeDummies(Context, 1000.0f);
 		const float Pitch = -FMath::RadiansToDegrees(FMath::Atan2(64.0f, 1000.0f));
 		Context.Player->SetControlRotation(FRotator(Pitch, 0.0f, 0.0f));
@@ -212,7 +213,9 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 	Steps.Add(WaitUntil(TEXT("the bolt bursts"), 2.0, [](const FEIPlayContext& Context) { return SortedDummies(Context.World)[1]->GetHitCount() > 0; }));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		const float Expected = Context.Hero->GetCaster()->GetValues().Bolt.Damage * (1.0f + FindOmen(Context, EEIOmenEffect::FireDamage)->Amount);
+		// All bonuses add up: this omen, the staff's own for its element, and the omen of the blade from the start of this test.
+		const float Bonus = FindOmen(Context, EEIStat::FireDamage)->Amount + Context.Hero->GetGear()->GetTable().WeaponElementBonus + FindOmen(Context, EEIStat::AttackPower)->Amount;
+		const float Expected = Context.Hero->GetCaster()->GetValues().Bolt.Damage * (1.0f + Bonus);
 		Context.Test->TestNearlyEqual(TEXT("The omen raises the fire damage"), SortedDummies(Context.World)[1]->GetLastDamage(), Expected, 0.01f);
 	}));
 
@@ -233,7 +236,7 @@ bool FEIOmenEffectsTest::RunTest(const FString& Parameters)
 			Omens->GrantRandomOmen();
 		}
 		int32 SwordIndex = INDEX_NONE;
-		FindOmen(Context, EEIOmenEffect::SwordDamage, &SwordIndex);
+		FindOmen(Context, EEIStat::AttackPower, &SwordIndex);
 		Context.Test->TestEqual(TEXT("An omen for the sword does not come to the arcanist"), Omens->CountOf(SwordIndex), 0);
 		for (int32 Index = 0; Index < Omens->GetTable().Omens.Num(); ++Index)
 		{
