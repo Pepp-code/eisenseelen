@@ -63,6 +63,9 @@ public:
 	TArray<AEIEnemy*> SpawnGroup(const FEIEnemyGroup& Group, float CountFactor, const FVector& Center, float RadiusCm);
 
 	/** Spawns a group out of sight around a random hero. Empty if no place worked out this time. */
+	/** Server only. One enemy of this kind at this place, if there is ground. */
+	AEIEnemy* SpawnKind(EEIEnemyKind Kind, const FVector& Center);
+
 	TArray<AEIEnemy*> SpawnReinforcement(const FEIEnemyGroup& Group, float CountFactor);
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;

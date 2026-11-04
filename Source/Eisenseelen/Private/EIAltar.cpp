@@ -19,7 +19,9 @@ namespace
 	const FLinearColor DormantColor(0.1f, 0.08f, 0.12f);
 	const FLinearColor ActiveColor(0.55f, 0.1f, 1.0f);
 	const FLinearColor BrokenColor(0.03f, 0.03f, 0.03f);
+	const FLinearColor ShrineColor(0.1f, 0.85f, 0.65f);
 	constexpr float ActiveGlow = 10.0f;
+	constexpr float ShrineGlow = 1.5f;
 	constexpr float ZoneStrength = 0.14f;
 }
 
@@ -68,10 +70,6 @@ void AEIAltar::BeginPlay()
 	}
 	EIVisuals::SetColor(Stone, StoneColor);
 	CrystalMaterial = EIVisuals::SetColor(Crystal, DormantColor);
-	EIVisuals::SetGlow(ZoneDisc, ActiveColor, ZoneStrength);
-	// The engine's cylinder is 1 m wide, so its scale is its width in metres.
-	const float ZoneWidth = Values.AltarZoneMeters * 2.0f;
-	ZoneDisc->SetRelativeScale3D(FVector(ZoneWidth, ZoneWidth, 0.02f));
 	OnRep_State();
 }
 
@@ -79,6 +77,8 @@ void AEIAltar::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AEIAltar, State);
+	DOREPLIFETIME(AEIAltar, ShrineLeft);
+	DOREPLIFETIME(AEIAltar, bShrineHeld);
 }
 
 void AEIAltar::SetState(EEIAltarState NewState)
@@ -87,15 +87,29 @@ void AEIAltar::SetState(EEIAltarState NewState)
 	OnRep_State();
 }
 
+void AEIAltar::SetShrineHold(float SecondsLeft, bool bHeld)
+{
+	ShrineLeft = SecondsLeft;
+	bShrineHeld = bHeld;
+}
+
 void AEIAltar::OnRep_State()
 {
 	const bool bActive = State == EEIAltarState::Active;
-	ZoneDisc->SetVisibility(bActive);
+	const bool bShrine = State == EEIAltarState::Shrine;
+	ZoneDisc->SetVisibility(bActive || bShrine);
+	if (bActive || bShrine)
+	{
+		EIVisuals::SetGlow(ZoneDisc, bShrine ? ShrineColor : ActiveColor, ZoneStrength);
+		// The engine's cylinder is 1 m wide, so its scale is its width in metres.
+		const float ZoneWidth = (bShrine ? Values.ShrineZoneMeters : Values.AltarZoneMeters) * 2.0f;
+		ZoneDisc->SetRelativeScale3D(FVector(ZoneWidth, ZoneWidth, 0.02f));
+	}
 	if (CrystalMaterial != nullptr)
 	{
-		const FLinearColor Color = bActive ? ActiveColor : (State == EEIAltarState::Broken ? BrokenColor : DormantColor);
+		const FLinearColor Color = bActive ? ActiveColor : (bShrine ? ShrineColor : (State == EEIAltarState::Broken ? BrokenColor : DormantColor));
 		CrystalMaterial->SetVectorParameterValue(TEXT("Farbe"), Color);
-		CrystalMaterial->SetScalarParameterValue(TEXT("Leuchten"), bActive ? ActiveGlow : 0.0f);
+		CrystalMaterial->SetScalarParameterValue(TEXT("Leuchten"), bActive ? ActiveGlow : (bShrine ? ShrineGlow : 0.0f));
 	}
 	if (State == EEIAltarState::Broken)
 	{
@@ -105,7 +119,8 @@ void AEIAltar::OnRep_State()
 
 bool AEIAltar::IsInZone(const AActor* Actor) const
 {
-	return FVector::Dist2D(Actor->GetActorLocation(), GetActorLocation()) <= Values.AltarZoneMeters * CentimetersPerMeter;
+	const float ZoneMeters = IsShrine() ? Values.ShrineZoneMeters : Values.AltarZoneMeters;
+	return FVector::Dist2D(Actor->GetActorLocation(), GetActorLocation()) <= ZoneMeters * CentimetersPerMeter;
 }
 
 FVector AEIAltar::GetCrystalLocation() const

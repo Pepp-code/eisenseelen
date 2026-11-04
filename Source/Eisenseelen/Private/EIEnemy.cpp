@@ -6,8 +6,10 @@
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
+#include "EIGameMode.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
+#include "EIRunDirector.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -34,6 +36,7 @@ namespace
 	const FVector HeldBoneSize(0.1f, 0.1f, 0.6f);
 	const FLinearColor SlowedColor(0.35f, 0.65f, 1.0f);
 	const FLinearColor FrozenColor(0.7f, 0.9f, 1.0f);
+	const FLinearColor LeaderColor(0.75f, 0.55f, 0.1f);
 	constexpr float FrozenGlow = 2.0f;
 	const FLinearColor ChargeMarkColor(1.0f, 0.1f, 0.03f);
 	constexpr float ChargeMarkStrength = 0.8f;
@@ -457,6 +460,20 @@ void AEIEnemy::EndCharge()
 	StateTime = 0.0f;
 }
 
+void AEIEnemy::MakeLeader(float LifeFactor, float DamageFactor, float ScaleFactor)
+{
+	Values.Damage *= DamageFactor;
+	Health->Reset(Health->GetMaxHealth() * LifeFactor);
+	LeaderScale = ScaleFactor;
+	OnRep_LeaderScale();
+}
+
+void AEIEnemy::OnRep_LeaderScale()
+{
+	BaseColor = LeaderColor;
+	SetActorScale3D(FVector(Values.Scale * LeaderScale));
+}
+
 void AEIEnemy::OnRep_ChargeMarked()
 {
 	ChargeMark->SetVisibility(bChargeMarked);
@@ -578,6 +595,7 @@ void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(AEIEnemy, bBurning);
 	DOREPLIFETIME(AEIEnemy, bFrozen);
 	DOREPLIFETIME(AEIEnemy, bChargeMarked);
+	DOREPLIFETIME(AEIEnemy, LeaderScale);
 }
 
 bool AEIEnemy::IsDead() const
@@ -926,6 +944,10 @@ float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, 
 
 void AEIEnemy::HandleDied()
 {
+	if (const AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
+	{
+		GameMode->GetRun()->NoteEnemyDied(*this);
+	}
 	MulticastDie();
 	GetCharacterMovement()->DisableMovement();
 	SetLifeSpan(0.2f);

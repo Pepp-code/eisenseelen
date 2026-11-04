@@ -13,7 +13,8 @@ enum class EEIAltarState : uint8
 {
 	Dormant,
 	Active,
-	Broken
+	Broken,
+	Shrine
 };
 
 /** A stone with a glowing crystal at a place on the map. The ritual is disturbed by holding the zone of the active altars. */
@@ -29,6 +30,16 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
 	bool IsActive() const { return State == EEIAltarState::Active; }
+
+	/** A small job on the side: whoever holds its zone for a short while gets a reward. */
+	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
+	bool IsShrine() const { return State == EEIAltarState::Shrine; }
+
+	float GetShrineLeft() const { return ShrineLeft; }
+	bool IsShrineHeld() const { return bShrineHeld; }
+
+	/** Server only. */
+	void SetShrineHold(float SecondsLeft, bool bHeld);
 
 	/** Server only. */
 	void SetState(EEIAltarState NewState);
@@ -59,6 +70,12 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_State)
 	EEIAltarState State = EEIAltarState::Dormant;
+
+	UPROPERTY(Replicated)
+	float ShrineLeft = 0.0f;
+
+	UPROPERTY(Replicated)
+	bool bShrineHeld = false;
 
 	FEIRunValues Values;
 };

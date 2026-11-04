@@ -83,12 +83,13 @@ namespace
 		}
 	}
 
-	/** The camps stay empty. It only counts for a run that has not left the barge yet. */
+	/** The camps stay empty, leaders included. It only counts for a run that has not left the barge yet. */
 	void EmptyCamps(const FEIPlayContext& Context)
 	{
 		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
 		FEIRunValues Values = Run->GetValues();
 		Values.CampFactor = 0.0f;
+		Values.LeadersPerRun = 0.0f;
 		Run->ApplyValues(Values);
 	}
 
@@ -1068,6 +1069,147 @@ bool FEIRunFailedTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestFalse(TEXT("The fresh hero lives"), Context.Hero->IsDead());
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEISideJobsTest,
+	"Eisenseelen.Play.Run.SideJobs",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEISideJobsTest::RunTest(const FString& Parameters)
+{
+	const auto Leaders = [](const FEIPlayContext& Context)
+	{
+		TArray<AEIEnemy*> Found;
+		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
+		{
+			if (It->IsLeader())
+			{
+				Found.Add(*It);
+			}
+		}
+		return Found;
+	};
+	const auto Shrines = [](const FEIPlayContext& Context)
+	{
+		TArray<AEIAltar*> Found;
+		for (TActorIterator<AEIAltar> It(Context.World); It; ++It)
+		{
+			if (It->IsShrine())
+			{
+				Found.Add(*It);
+			}
+		}
+		return Found;
+	};
+	const TSharedRef<float> ShrineLeft = MakeShared<float>(0.0f);
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(WaitUntil(TEXT("the paths are built"), 30.0, [](const FEIPlayContext& Context)
+	{
+		const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
+		return Navigation != nullptr && Navigation->GetDefaultNavDataInstance() != nullptr && !Navigation->IsNavigationBeingBuilt(Context.World);
+	}));
+	Steps.Add(Do([Leaders, Shrines](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		SwitchOffReinforcements(Context);
+		FEIRunValues NoCamps = GetGameMode(Context)->GetRun()->GetValues();
+		NoCamps.CampFactor = 0.0f;
+		GetGameMode(Context)->GetRun()->ApplyValues(NoCamps);
+		const FEIRunValues& Values = GetGameMode(Context)->GetRun()->GetValues();
+		Context.Test->TestEqual(TEXT("On the barge no leader stands yet"), Leaders(Context).Num(), 0);
+		Context.Test->TestEqual(TEXT("The shrines are waiting"), Shrines(Context).Num(), FMath::RoundToInt(Values.ShrinesPerRun));
+		for (const AEIAltar* Shrine : Shrines(Context))
+		{
+			Context.Test->TestFalse(TEXT("A shrine is not an altar of the ritual"), Shrine->IsActive());
+			Context.Test->TestEqual(TEXT("A shrine has its time"), Shrine->GetShrineLeft(), Values.ShrineHoldSeconds);
+		}
+		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
+	}));
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 3.0, EEIRunPhase::Exploring));
+	Steps.Add(Do([Leaders](const FEIPlayContext& Context)
+	{
+		const FEIRunValues& Values = GetGameMode(Context)->GetRun()->GetValues();
+		const TArray<AEIEnemy*> Found = Leaders(Context);
+		Context.Test->TestEqual(TEXT("The leaders stand at their camps"), Found.Num(), FMath::RoundToInt(Values.LeadersPerRun));
+		FEIEnemyValues Normal;
+		FString Error;
+		FEIEnemyValues::LoadFromProjectFile(Values.LeaderKind, Normal, Error);
+		for (const AEIEnemy* Leader : Found)
+		{
+			Context.Test->TestEqual(TEXT("A leader has more life"), Leader->GetHealth()->GetMaxHealth(), Normal.Life * Values.LeaderLifeFactor);
+			Context.Test->TestEqual(TEXT("A leader hits harder"), Leader->GetValues().Damage, Normal.Damage * Values.LeaderDamageFactor);
+			Context.Test->TestEqual(TEXT("A leader is of the wanted kind"), Leader->GetKind(), Values.LeaderKind);
+			Context.Test->TestTrue(TEXT("A leader waits at home"), Leader->HasHome());
+			Context.Test->TestNearlyEqual(TEXT("A leader is bigger"), static_cast<float>(Leader->GetActorScale3D().X), Normal.Scale * Values.LeaderScaleFactor, 0.001f);
+		}
+
+		// A leader falling far away from the hero brings nothing.
+		const FVector Far = Found[0]->GetActorLocation() + FVector(0.0f, Context.Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter + 1000.0f, 0.0f);
+		Context.Hero->SetActorLocation(FVector(Far.X, Far.Y, 500.0f), false, nullptr, ETeleportType::TeleportPhysics);
+		Found[0]->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		Context.Test->TestEqual(TEXT("From afar a leader brings no experience"), Context.Player->GetProfile()->GetRunExperience(), 0);
+
+		// Whoever stands near gets armour and experience.
+		const FVector Near = Found[1]->GetActorLocation() + FVector(500.0f, 0.0f, 300.0f);
+		Context.Hero->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
+		Found[1]->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Context.Test->TestEqual(TEXT("A leader brings a reward"), Profile->GetLoot().Num(), 1);
+		const EEISlot Slot = Profile->GetTable().Items[Profile->GetLoot()[0].Item].Slot;
+		Context.Test->TestTrue(TEXT("A leader brings armour"), Slot == EEISlot::Helmet || Slot == EEISlot::Chest || Slot == EEISlot::Gloves || Slot == EEISlot::Boots);
+		Context.Test->TestEqual(TEXT("A leader brings experience"), Profile->GetRunExperience(), FMath::RoundToInt32(Profile->GetTable().Rewards.LeaderExperience));
+	}));
+
+	// Standing in the zone of a shrine runs its time, and only there.
+	Steps.Add(Do([Shrines](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetActorLocation(Shrines(Context)[0]->GetActorLocation() + FVector(300.0f, 0.0f, 150.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	}));
+	Steps.Add(Wait(0.3));
+	Steps.Add(Do([Shrines, ShrineLeft](const FEIPlayContext& Context)
+	{
+		AEIAltar* Shrine = Shrines(Context)[0];
+		Context.Test->TestTrue(TEXT("The hero holds the shrine"), Shrine->IsShrineHeld());
+		Context.Test->TestTrue(TEXT("Its time runs"), Shrine->GetShrineLeft() < GetGameMode(Context)->GetRun()->GetValues().ShrineHoldSeconds);
+		Context.Test->TestEqual(TEXT("The other shrine waits"), Shrines(Context)[1]->GetShrineLeft(), GetGameMode(Context)->GetRun()->GetValues().ShrineHoldSeconds);
+		Context.Hero->SetActorLocation(Shrine->GetActorLocation() + FVector(5000.0f, 0.0f, 500.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([Shrines, ShrineLeft](const FEIPlayContext& Context)
+	{
+		*ShrineLeft = Shrines(Context)[0]->GetShrineLeft();
+	}));
+	Steps.Add(Wait(0.2));
+	Steps.Add(Do([Shrines, ShrineLeft](const FEIPlayContext& Context)
+	{
+		AEIAltar* Shrine = Shrines(Context)[0];
+		Context.Test->TestFalse(TEXT("Away from the shrine nobody holds it"), Shrine->IsShrineHeld());
+		Context.Test->TestEqual(TEXT("Away from it the time stands still"), Shrine->GetShrineLeft(), *ShrineLeft);
+
+		// The rest of the time, shortened here.
+		Shrine->SetShrineHold(0.2f, false);
+		Context.Hero->SetActorLocation(Shrine->GetActorLocation() + FVector(300.0f, 0.0f, 150.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	}));
+	Steps.Add(WaitUntil(TEXT("the shrine is done"), 2.0, [Shrines](const FEIPlayContext& Context) { return Shrines(Context).Num() == 1; }));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Context.Test->TestEqual(TEXT("The shrine brings a reward"), Profile->GetLoot().Num(), 2);
+		Context.Test->TestEqual(TEXT("The shrine brings experience"), Profile->GetRunExperience(), FMath::RoundToInt32(Profile->GetTable().Rewards.LeaderExperience + Profile->GetTable().Rewards.ShrineExperience));
+		Context.Test->TestTrue(TEXT("It says so"), Profile->GetRewardText().Contains(TEXT("Schrein")));
+	}));
+
+	// A new run has all of it anew.
+	AddTap(Steps, EKeys::R);
+	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::OnBarge));
+	Steps.Add(Do([Leaders, Shrines](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("All leaders are gone"), Leaders(Context).Num(), 0);
+		Context.Test->TestEqual(TEXT("The shrines are back"), Shrines(Context).Num(), FMath::RoundToInt(GetGameMode(Context)->GetRun()->GetValues().ShrinesPerRun));
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

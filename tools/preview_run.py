@@ -109,6 +109,24 @@ def scenario():
     shot()
     yield AFTER_SHOT_SECONDS
 
+    # The jobs on the side: a shrine from afar and from inside its zone, and a leader in its camp.
+    shrine = next(a for a in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar) if a.is_shrine())
+    spot = shrine.get_actor_location()
+    stand_looking_at((spot.x + 1500, spot.y + 300), (spot.x, spot.y, 200))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    stand_looking_at((spot.x + 350, spot.y), (spot.x, spot.y, 200))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    leader = next(e for e in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIEnemy) if e.is_leader())
+    spot = leader.get_actor_location()
+    stand_looking_at((spot.x + 1600, spot.y), (spot.x, spot.y, 150))
+    yield 0.4
+    shot()
+    yield AFTER_SHOT_SECONDS
+
     # The ritual: the first altar from afar and from inside its zone, and all of them broken after that.
     altars = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar)
     first = True
@@ -169,6 +187,12 @@ def scenario():
     yield 3.0
     player().set_control_rotation(unreal.Rotator(0, -35, 0))
     yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+
+    # After the flight the gear page shows what the run has brought.
+    yield from tap("I")
+    yield 0.2
     shot()
     yield AFTER_SHOT_SECONDS
 

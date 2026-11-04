@@ -46,6 +46,9 @@ namespace
 	const FLinearColor AltarMarkColor(0.7f, 0.3f, 1.0f);
 	const FLinearColor TextShadowColor(0.0f, 0.0f, 0.0f, 0.75f);
 	constexpr float TextShadowOffset = 1.5f;
+	const FLinearColor QuestMarkColor(0.3f, 0.95f, 0.75f);
+	constexpr float QuestMarkRangeCm = 12000.0f;
+	constexpr float LeaderMarkAboveCm = 170.0f;
 	const FLinearColor ChestMarkColor(1.0f, 0.8f, 0.25f);
 	const FLinearColor GuardedChestMarkColor(1.0f, 0.3f, 0.15f);
 	const FLinearColor OmenColor(1.0f, 0.85f, 0.45f);
@@ -334,6 +337,29 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 			else
 			{
 				DrawLine(TEXT("Besiege erst die W\u00E4chter!"), CenterX - 150.0f, PromptY - 40.0f, WarningTextColor, 1.5f);
+			}
+		}
+		// The small jobs on the side show from afar what they bring.
+		for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
+		{
+			if (It->IsLeader() && !It->IsDead() && FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) <= QuestMarkRangeCm)
+			{
+				DrawWorldMark(It->GetActorLocation() + FVector(0.0f, 0.0f, LeaderMarkAboveCm), DistanceLabel(TEXT("Anf\u00FChrer"), It->GetActorLocation()) + TEXT(": R\u00FCstung"), QuestMarkColor);
+			}
+		}
+		for (TActorIterator<AEIAltar> It(GetWorld()); It; ++It)
+		{
+			if (!It->IsShrine())
+			{
+				continue;
+			}
+			if (It->IsShrineHeld())
+			{
+				DrawLine(FString::Printf(TEXT("Schrein: noch %.0f s halten"), It->GetShrineLeft()), CenterX - 130.0f, PromptY - 80.0f, QuestMarkColor, 1.5f);
+			}
+			else if (FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) <= QuestMarkRangeCm)
+			{
+				DrawWorldMark(It->GetCrystalLocation(), DistanceLabel(TEXT("Schrein"), It->GetActorLocation()) + TEXT(": R\u00FCstung"), QuestMarkColor);
 			}
 		}
 		if (GuardsLeft > 0)

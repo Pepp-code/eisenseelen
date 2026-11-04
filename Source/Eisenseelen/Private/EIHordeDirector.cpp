@@ -173,6 +173,12 @@ TArray<AEIEnemy*> UEIHordeDirector::SpawnGroup(const FEIEnemyGroup& Group, float
 	return Spawned;
 }
 
+AEIEnemy* UEIHordeDirector::SpawnKind(EEIEnemyKind Kind, const FVector& Center)
+{
+	FVector Location;
+	return FindStandingPlace(FVector(Center.X, Center.Y, 0.0f), Location) ? SpawnAt(Location, Kind) : nullptr;
+}
+
 TArray<AEIHeroCharacter*> UEIHordeDirector::GetLivingHeroes() const
 {
 	TArray<AEIHeroCharacter*> Heroes;

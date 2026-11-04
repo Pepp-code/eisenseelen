@@ -46,10 +46,33 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_zone_m"), 1.0, 200.0, Loaded.BeaconZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abstand_m"), 1.0, 100.0, Loaded.BargeDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abflug_tempo_m_pro_s"), 0.1, 100.0, Loaded.BargeDepartMetersPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_pro_lauf"), 0.0, 100.0, Loaded.LeadersPerRun, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_leben_faktor"), 0.1, 100.0, Loaded.LeaderLifeFactor, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_schaden_faktor"), 0.1, 100.0, Loaded.LeaderDamageFactor, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_groesse_faktor"), 0.1, 10.0, Loaded.LeaderScaleFactor, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("schreine_pro_lauf"), 0.0, 100.0, Loaded.ShrinesPerRun, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("schrein_halten_s"), 0.1, 3600.0, Loaded.ShrineHoldSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("schrein_zone_m"), 1.0, 100.0, Loaded.ShrineZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_alle_s"), 0.1, 3600.0, Loaded.CorruptionEverySeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_stufen"), 1.0, 100.0, Loaded.CorruptionMaxStage, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_gegner_staerke_je_stufe"), 0.0, 10.0, Loaded.CorruptionStrengthPerStage, OutError))
 	{
+		return false;
+	}
+	FString LeaderKind;
+	Root->TryGetStringField(TEXT("anfuehrer_art"), LeaderKind);
+	bool bKnownKind = false;
+	for (int32 Index = 0; Index < EIEnemyKindCount; ++Index)
+	{
+		if (LeaderKind == EIEnemyKindKey(static_cast<EEIEnemyKind>(Index)))
+		{
+			Loaded.LeaderKind = static_cast<EEIEnemyKind>(Index);
+			bKnownKind = true;
+		}
+	}
+	if (!bKnownKind)
+	{
+		OutError = FString::Printf(TEXT("Die Gegnerart %s als anfuehrer_art gibt es nicht."), *LeaderKind);
 		return false;
 	}
 	OutValues = Loaded;
@@ -103,6 +126,15 @@ void UEIRunDirector::ResetRun()
 		AltarOrder.Insert(*It, FMath::RandRange(0, AltarOrder.Num()));
 	}
 	const int32 AltarsThisRun = FMath::Min(FMath::RoundToInt(Values.RitualAltars), AltarOrder.Num());
+
+	// The places the ritual does not use this time hold the shrines.
+	Shrines.Reset();
+	for (int32 Index = AltarsThisRun; Index < AltarOrder.Num() && Shrines.Num() < FMath::RoundToInt(Values.ShrinesPerRun); ++Index)
+	{
+		AltarOrder[Index]->SetState(EEIAltarState::Shrine);
+		AltarOrder[Index]->SetShrineHold(Values.ShrineHoldSeconds, false);
+		Shrines.Add(AltarOrder[Index]);
+	}
 	AltarOrder.SetNum(AltarsThisRun);
 	State->SetAltarProgress(0, AltarsThisRun);
 	AltarHoldLeft = Values.AltarHoldSeconds;
@@ -264,6 +296,71 @@ void UEIRunDirector::HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, fl
 	}
 }
 
+void UEIRunDirector::PrepareLeaders()
+{
+	TArray<AEIEnemyCamp*> Camps;
+	for (TActorIterator<AEIEnemyCamp> It(GetWorld()); It; ++It)
+	{
+		Camps.Insert(*It, FMath::RandRange(0, Camps.Num()));
+	}
+	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
+	const int32 Count = FMath::Min(FMath::RoundToInt(Values.LeadersPerRun), Camps.Num());
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		if (AEIEnemy* Leader = Horde->SpawnKind(Values.LeaderKind, Camps[Index]->GetActorLocation()))
+		{
+			Leader->MakeLeader(Values.LeaderLifeFactor, Values.LeaderDamageFactor, Values.LeaderScaleFactor);
+			Leader->StandWatch(Leader->GetActorLocation());
+			Camps[Index]->AddMember(Leader);
+		}
+	}
+}
+
+void UEIRunDirector::GrantNear(const FVector& Location, EEIRewardSource Source)
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get());
+		const AEIHeroCharacter* Hero = Player != nullptr ? Player->GetPawn<AEIHeroCharacter>() : nullptr;
+		if (Hero != nullptr && !Hero->IsDead() && FVector::Dist2D(Hero->GetActorLocation(), Location) <= Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter)
+		{
+			Player->GetProfile()->GrantReward(Source);
+		}
+	}
+}
+
+void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
+{
+	if (Enemy.IsLeader())
+	{
+		GrantNear(Enemy.GetActorLocation(), EEIRewardSource::Leader);
+	}
+}
+
+bool UEIRunDirector::IsShrineHeld() const
+{
+	return Shrines.ContainsByPredicate([](const AEIAltar* Shrine) { return Shrine->IsShrine() && Shrine->IsShrineHeld(); });
+}
+
+void UEIRunDirector::UpdateShrines(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+{
+	for (AEIAltar* Shrine : Shrines)
+	{
+		if (!Shrine->IsShrine())
+		{
+			continue;
+		}
+		const bool bHeld = LivingHeroes.ContainsByPredicate([Shrine](const AEIHeroCharacter* Hero) { return Shrine->IsInZone(Hero); });
+		const float Left = Shrine->GetShrineLeft() - (bHeld ? DeltaTime : 0.0f);
+		Shrine->SetShrineHold(Left, bHeld);
+		if (Left <= 0.0f)
+		{
+			Shrine->SetState(EEIAltarState::Broken);
+			GrantNear(Shrine->GetActorLocation(), EEIRewardSource::Shrine);
+		}
+	}
+}
+
 void UEIRunDirector::EndRunForAll(bool bEscaped)
 {
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
@@ -370,7 +467,7 @@ void UEIRunDirector::UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCh
 	}
 
 	// Waves attack whoever holds an altar or the fire. Whoever comes back gets the next one at once.
-	const bool bAtAltar = Phase == EEIRunPhase::Ritual && State->IsAltarHeld();
+	const bool bAtAltar = (Phase == EEIRunPhase::Ritual && State->IsAltarHeld()) || IsShrineHeld();
 	const bool bAtFire = Phase == EEIRunPhase::BeaconLit && State->IsBeaconHeld();
 	if (!bAtAltar && !bAtFire)
 	{
@@ -458,6 +555,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		UpdateCorruption();
 		UpdateEnemyGroups(Phase, LivingHeroes, DeltaTime);
 		UpdateChests(LivingHeroes);
+		UpdateShrines(LivingHeroes, DeltaTime);
 	}
 
 	switch (Phase)
@@ -473,6 +571,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 				{
 					FillCamp(*Camp, Camp->GetStartSize(), LivingHeroes.Num());
 				}
+				PrepareLeaders();
 				CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(true);
 				break;
 			}

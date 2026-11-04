@@ -8,9 +8,11 @@
 class AEIAltar;
 class AEIBeacon;
 class AEIChest;
+class AEIEnemy;
 class AEIEnemyCamp;
 class AEIHeroCharacter;
 class AEISkyBarge;
+enum class EEIRewardSource : uint8;
 enum class EEIRunPhase : uint8;
 
 /** The numbers of a run from Data/lauf.json. */
@@ -31,6 +33,14 @@ struct EISENSEELEN_API FEIRunValues
 	float BeaconZoneMeters = 15.0f;
 	float BargeDistanceMeters = 12.0f;
 	float BargeDepartMetersPerSecond = 6.0f;
+	float LeadersPerRun = 2.0f;
+	EEIEnemyKind LeaderKind = EEIEnemyKind::ShieldBearer;
+	float LeaderLifeFactor = 2.5f;
+	float LeaderDamageFactor = 1.5f;
+	float LeaderScaleFactor = 1.25f;
+	float ShrinesPerRun = 2.0f;
+	float ShrineHoldSeconds = 15.0f;
+	float ShrineZoneMeters = 6.0f;
 	float CorruptionEverySeconds = 120.0f;
 	float CorruptionMaxStage = 6.0f;
 	float CorruptionStrengthPerStage = 0.1f;
@@ -63,6 +73,9 @@ public:
 	/** A hero pressed the use key. */
 	void Interact(AEIHeroCharacter* Hero);
 
+	/** Whoever stood near when a leader fell has earned the reward. */
+	void NoteEnemyDied(const AEIEnemy& Enemy);
+
 	AEISkyBarge* GetBarge() const { return Barge; }
 	AEIAltar* GetActiveAltar() const;
 
@@ -89,6 +102,10 @@ private:
 	bool SendGroup(const FString& Size, int32 HeroCount);
 	float GetPlayerFactor(int32 HeroCount) const;
 	void EndRunForAll(bool bEscaped);
+	void PrepareLeaders();
+	void UpdateShrines(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	bool IsShrineHeld() const;
+	void GrantNear(const FVector& Location, EEIRewardSource Source);
 
 	UPROPERTY(Transient)
 	TObjectPtr<AEISkyBarge> Barge;
@@ -102,6 +119,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AEIChest>> ChestsInUse;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AEIAltar>> Shrines;
 
 	FEIRunValues Values;
 	FEIEnemyGroups Groups;

@@ -23,6 +23,7 @@ public:
 
 	/** Server only. */
 	void SetMembers(const TArray<AEIEnemy*>& Enemies);
+	void AddMember(AEIEnemy* Enemy) { Members.Add(Enemy); }
 	int32 CountMembers() const;
 
 protected:

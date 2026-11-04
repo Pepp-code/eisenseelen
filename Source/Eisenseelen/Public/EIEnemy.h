@@ -112,6 +112,12 @@ public:
 
 	bool IsDead() const;
 
+	/** Server only. It gets stronger and bigger, stands out by its color, and brings a reward when it falls. */
+	void MakeLeader(float LifeFactor, float DamageFactor, float ScaleFactor);
+
+	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
+	bool IsLeader() const { return LeaderScale > 0.0f; }
+
 	/** Server only. A guard stays on the heroes' heels, however far they run. */
 	void MarkAsGuard() { bGuard = true; }
 	bool IsGuard() const { return bGuard; }
@@ -179,6 +185,9 @@ private:
 
 	UFUNCTION()
 	void OnRep_ChargeMarked();
+
+	UFUNCTION()
+	void OnRep_LeaderScale();
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHurt();
@@ -255,6 +264,10 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_ChargeMarked)
 	bool bChargeMarked = false;
+
+	/** Above 0 only for a leader. */
+	UPROPERTY(ReplicatedUsing = OnRep_LeaderScale)
+	float LeaderScale = 0.0f;
 
 	FEIEnemyValues Values;
 	FLinearColor BaseColor = FLinearColor::Gray;
