@@ -3,17 +3,17 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #include "AIController.h"
+#include "Algo/Count.h"
 #include "EIAltar.h"
-#include "EIBeacon.h"
 #include "EIChest.h"
 #include "EIEnemy.h"
 #include "EIEnemyCamp.h"
+#include "EIFlare.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIProfileComponent.h"
 #include "EIHealthComponent.h"
 #include "EIHordeDirector.h"
-#include "EIOmenComponent.h"
 #include "EIRunDirector.h"
 #include "EIRuneComponent.h"
 #include "EISkyBarge.h"
@@ -34,12 +34,15 @@ namespace
 	constexpr float HeroHeight = 92.0f;
 	constexpr float SpeedToleranceCm = 40.0f;
 
+	// One of the open spaces of the run map, with room for the barge.
+	const FVector OpenPlace(-10500.0f, 9500.0f, HeroHeight);
+
 	AEIGameMode* GetGameMode(const FEIPlayContext& Context)
 	{
 		return Context.World->GetAuthGameMode<AEIGameMode>();
 	}
 
-	const AEIGameState* GetState(const FEIPlayContext& Context)
+	AEIGameState* GetState(const FEIPlayContext& Context)
 	{
 		return Context.World->GetGameState<AEIGameState>();
 	}
@@ -49,14 +52,9 @@ namespace
 		return GetGameMode(Context)->GetRun()->GetBarge();
 	}
 
-	TArray<AEIBeacon*> GetBeacons(const FEIPlayContext& Context)
+	const AEIFlare* GetFlare(const FEIPlayContext& Context)
 	{
-		TArray<AEIBeacon*> Beacons;
-		for (TActorIterator<AEIBeacon> It(Context.World); It; ++It)
-		{
-			Beacons.Add(*It);
-		}
-		return Beacons;
+		return GetGameMode(Context)->GetRun()->GetFlare();
 	}
 
 	FEIPlayStep WaitForPhase(const TCHAR* What, double MaxSeconds, EEIRunPhase Phase)
@@ -71,7 +69,7 @@ namespace
 		{
 			Stage.Reinforcement.Empty();
 			Stage.AltarWave.Empty();
-			Stage.BeaconWave.Empty();
+			Stage.FlareWave.Empty();
 		}
 	}
 
@@ -83,14 +81,23 @@ namespace
 		}
 	}
 
-	/** The camps stay empty, leaders included. It only counts for a run that has not left the barge yet. */
+	/** The run offers only contracts of this kind. It only works for a run that has not left the barge yet. */
+	void OnlyContracts(const FEIPlayContext& Context, EEIContractKind Kind)
+	{
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		Run->GetContractTable().Tasks.RemoveAll([Kind](const FEIContractTask& Task) { return Task.Kind != Kind; });
+		Run->ResetRun();
+	}
+
+	/** The camps stay empty, and no contract asks for a leader. It only works for a run that has not left the barge yet. */
 	void EmptyCamps(const FEIPlayContext& Context)
 	{
 		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
 		FEIRunValues Values = Run->GetValues();
 		Values.CampFactor = 0.0f;
-		Values.LeadersPerRun = 0.0f;
 		Run->ApplyValues(Values);
+		Run->GetContractTable().Tasks.RemoveAll([](const FEIContractTask& Task) { return Task.Kind == EEIContractKind::Leader; });
+		Run->ResetRun();
 	}
 
 	/** No enemies at all, for a test that looks at something else. */
@@ -100,21 +107,12 @@ namespace
 		EmptyCamps(Context);
 	}
 
-	/** No ritual, for a test that looks at what comes after it. It only counts for the run that starts next. */
-	void SkipRitual(const FEIPlayContext& Context)
+	/** The flare works without any contract, for a test that looks at what comes after them. */
+	void FlareAtOnce(const FEIPlayContext& Context)
 	{
 		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
-		FEIRunValues Values = Run->GetValues();
-		Values.RitualAltars = 0.0f;
-		Run->ApplyValues(Values);
+		Run->GetContractTable().ContractsToFlare = 0.0f;
 		Run->ResetRun();
-	}
-
-	/** Stands next to the beacon, far enough from the fire to look at it. */
-	void StandAtBeacon(const FEIPlayContext& Context, const AEIBeacon* Beacon, float DistanceCm)
-	{
-		const FVector Location = Beacon->GetActorLocation();
-		Teleport(Context, FVector(Location.X + DistanceCm, Location.Y, HeroHeight), 180.0f);
 	}
 }
 
@@ -131,6 +129,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		float HoldLeft = 0.0f;
 		float RunSeconds = 0.0f;
 		double Height = 0.0;
+		float BargeDistanceMeters = 0.0f;
 	};
 	const TSharedRef<FState> State = MakeShared<FState>();
 
@@ -140,7 +139,6 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		SwitchOffDirector(Context);
-		SkipRitual(Context);
 		Context.Test->TestEqual(TEXT("The run starts on the barge"), GetState(Context)->GetRunPhase(), EEIRunPhase::OnBarge);
 		Context.Test->TestTrue(TEXT("The barge flies high"), Context.Hero->GetActorLocation().Z > GetBarge(Context)->GetDeckHeight());
 		Context.Test->TestTrue(TEXT("The hero stands on the deck"), Context.Movement->IsMovingOnGround());
@@ -163,7 +161,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 
 	// Running off the deck begins the run, and the fall is a flight.
 	Steps.Add(Press(EKeys::W));
-	Steps.Add(WaitForPhase(TEXT("the hero leaves the barge"), 6.0, EEIRunPhase::RitualDone));
+	Steps.Add(WaitForPhase(TEXT("the hero leaves the barge"), 6.0, EEIRunPhase::Contracts));
 	Steps.Add(Wait(1.5));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -188,7 +186,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	Steps.Add(WaitUntil(TEXT("the hero lands"), 15.0, [](const FEIPlayContext& Context) { return Context.Movement->IsMovingOnGround(); }));
 	Steps.Add(Release(EKeys::W));
 	Steps.Add(Wait(0.6));
-	Steps.Add(Do([](const FEIPlayContext& Context)
+	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
 		const UEIHealthComponent* Health = Context.Hero->GetHealth();
 		Context.Test->TestEqual(TEXT("The fall does no damage"), Health->GetHealth(), Health->GetMaxHealth());
@@ -197,7 +195,8 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		Context.Hero->SetCanBeDamaged(false);
 
 		FEIRunValues Short = GetGameMode(Context)->GetRun()->GetValues();
-		Short.BeaconHoldSeconds = ShortHoldSeconds;
+		Short.FlareHoldSeconds = ShortHoldSeconds;
+		State->BargeDistanceMeters = Short.BargeDistanceMeters;
 		GetGameMode(Context)->GetRun()->ApplyValues(Short);
 	}));
 
@@ -209,54 +208,93 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	{
 		Context.Test->TestEqual(TEXT("During a run the gear stays"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
 		Context.Test->TestFalse(TEXT("During a run the gear page stays shut"), Context.Player->IsMenuOpen());
+		Teleport(Context, OpenPlace, 180.0f);
 	}));
+	Steps.Add(Wait(0.1));
 
-	// The use key does nothing far from a beacon.
-	AddTap(Steps, EKeys::F);
+	// Without enough contracts the flare key only says what is missing.
+	AddTap(Steps, EKeys::G);
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("Far from a beacon the use key does nothing"), GetState(Context)->GetRunPhase(), EEIRunPhase::RitualDone);
-		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
+		const int32 Needed = GetState(Context)->GetContractsToFlare();
+		Context.Test->TestEqual(TEXT("A run needs four contracts for the flare"), Needed, 4);
+		Context.Test->TestEqual(TEXT("Without contracts the flare stays down"), GetState(Context)->GetRunPhase(), EEIRunPhase::Contracts);
+		Context.Test->TestNull(TEXT("There is no flare yet"), GetFlare(Context));
+		Context.Test->TestTrue(TEXT("The note says why"), Context.Player->GetProfile()->GetRewardText().Contains(TEXT("Vertr")));
+		GetGameMode(Context)->GetRun()->SkipContracts(Needed - 1);
 	}));
-	Steps.Add(Wait(0.1));
-
-	// At a beacon it lights the fire, calls the barge and brings the last wave.
-	AddTap(Steps, EKeys::F);
-	Steps.Add(WaitForPhase(TEXT("the beacon burns"), 1.0, EEIRunPhase::BeaconLit));
+	AddTap(Steps, EKeys::G);
+	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		const TArray<AEIBeacon*> Beacons = GetBeacons(Context);
-		Context.Test->TestEqual(TEXT("There are two beacons on the map"), Beacons.Num(), 2);
-		Context.Test->TestTrue(TEXT("The beacon burns"), Beacons[0]->IsLit());
-		Context.Test->TestFalse(TEXT("The other one does not"), Beacons[1]->IsLit());
+		Context.Test->TestEqual(TEXT("One contract short the flare stays down"), GetState(Context)->GetRunPhase(), EEIRunPhase::Contracts);
+		Context.Test->TestFalse(TEXT("The state knows that"), GetState(Context)->CanFireFlare());
+		GetGameMode(Context)->GetRun()->SkipContracts(1);
+		Context.Test->TestTrue(TEXT("With enough contracts the flare is ready"), GetState(Context)->CanFireFlare());
+
+		// Beyond the edge of the map there is no ground for the barge in any direction.
+		FEIRunValues FarAway = GetGameMode(Context)->GetRun()->GetValues();
+		FarAway.BargeDistanceMeters = 1000.0f;
+		GetGameMode(Context)->GetRun()->ApplyValues(FarAway);
+	}));
+	AddTap(Steps, EKeys::G);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("Without room for the barge the flare stays down"), GetState(Context)->GetRunPhase(), EEIRunPhase::Contracts);
+		Context.Test->TestTrue(TEXT("The note says that too"), Context.Player->GetProfile()->GetRewardText().Contains(TEXT("Platz")));
+		FEIRunValues Back = GetGameMode(Context)->GetRun()->GetValues();
+		Back.BargeDistanceMeters = State->BargeDistanceMeters;
+		GetGameMode(Context)->GetRun()->ApplyValues(Back);
 	}));
 
-	// Leaving the zone stops the wait for the barge.
-	Steps.Add(Do([](const FEIPlayContext& Context) { StandAtBeacon(Context, GetBeacons(Context)[0], 4000.0f); }));
+	// Now it flies, calls the barge and brings the last wave.
+	AddTap(Steps, EKeys::G);
+	Steps.Add(WaitForPhase(TEXT("the flare flies"), 1.0, EEIRunPhase::FlareLit));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const AEIFlare* Flare = GetFlare(Context);
+		Context.Test->TestNotNull(TEXT("The flare is there"), Flare);
+		if (Flare == nullptr)
+		{
+			return;
+		}
+		Context.Test->TestNearlyEqual(TEXT("Its circle lies around the hero"), static_cast<float>(FVector::Dist2D(Flare->GetActorLocation(), Context.Hero->GetActorLocation())), 0.0f, 10.0f);
+		Context.Test->TestNearlyEqual(TEXT("Its circle lies on the ground"), static_cast<float>(Flare->GetActorLocation().Z), 0.0f, 1.0f);
+		Context.Test->TestTrue(TEXT("The hero stands in the circle"), Flare->IsInZone(Context.Hero));
+	}));
+
+	// Leaving the circle stops the wait for the barge.
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenPlace + FVector(0.0f, -4000.0f, 0.0f), 180.0f); }));
 	Steps.Add(Wait(0.1));
-	Steps.Add(Do([State](const FEIPlayContext& Context) { State->HoldLeft = GetState(Context)->GetBeaconHoldLeft(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->HoldLeft = GetState(Context)->GetFlareHoldLeft(); }));
 	Steps.Add(Wait(0.3));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
-		Context.Test->TestFalse(TEXT("Outside the zone nobody holds the fire"), GetState(Context)->IsBeaconHeld());
-		Context.Test->TestEqual(TEXT("Outside the zone the wait stands still"), GetState(Context)->GetBeaconHoldLeft(), State->HoldLeft);
-		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
+		Context.Test->TestFalse(TEXT("Outside the circle nobody holds it"), GetState(Context)->IsFlareHeld());
+		Context.Test->TestEqual(TEXT("Outside the circle the wait stands still"), GetState(Context)->GetFlareHoldLeft(), State->HoldLeft);
+		Teleport(Context, OpenPlace, 180.0f);
 	}));
 
-	// Back in the zone the barge arrives after the rest of the time.
+	// Back in the circle the barge arrives after the rest of the time.
 	Steps.Add(WaitForPhase(TEXT("the barge arrives"), 5.0, EEIRunPhase::BargeWaiting));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		const FVector BargeLocation = GetBarge(Context)->GetActorLocation();
-		const double Distance = FVector::Dist2D(BargeLocation, GetBeacons(Context)[0]->GetActorLocation());
-		Context.Test->AddInfo(FString::Printf(TEXT("The barge hovers %.0f cm from the beacon, %.0f cm high"), Distance, BargeLocation.Z));
-		Context.Test->TestNearlyEqual(TEXT("The barge comes to the beacon"), static_cast<float>(Distance), GetGameMode(Context)->GetRun()->GetValues().BargeDistanceMeters * CentimetersPerMeter, 10.0f);
+		const double Distance = FVector::Dist2D(BargeLocation, GetFlare(Context)->GetActorLocation());
+		Context.Test->AddInfo(FString::Printf(TEXT("The barge hovers %.0f cm from the flare, %.0f cm high"), Distance, BargeLocation.Z));
+		Context.Test->TestNearlyEqual(TEXT("The barge comes to the flare"), static_cast<float>(Distance), GetGameMode(Context)->GetRun()->GetValues().BargeDistanceMeters * CentimetersPerMeter, 10.0f);
 		Context.Test->TestTrue(TEXT("The barge comes down"), BargeLocation.Z < 500.0);
 	}));
 
-	// The use key does not board from afar.
-	Steps.Add(Do([](const FEIPlayContext& Context) { StandAtBeacon(Context, GetBeacons(Context)[0], -1200.0f); }));
+	// The use key does not board from afar: on the other side of the flare.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const FVector Flare = GetFlare(Context)->GetActorLocation();
+		const FVector Mirrored = Flare * 2.0 - GetBarge(Context)->GetActorLocation();
+		Teleport(Context, FVector(Mirrored.X, Mirrored.Y, HeroHeight), 0.0f);
+	}));
 	Steps.Add(Wait(0.1));
 	AddTap(Steps, EKeys::F);
 	Steps.Add(Wait(0.1));
@@ -271,13 +309,23 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("Standing at the barge is not boarding yet"), GetState(Context)->GetRunPhase(), EEIRunPhase::BargeWaiting);
 	}));
 
-	// Right there it ends the run, and the barge carries the hero away. Whatever the hero found is safe now.
-	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Player->GetProfile()->GrantReward(EEIRewardSource::Ritual); }));
+	// Right there it ends the run, and the barge carries the hero away. Whatever the hero earned is safe now.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Profile->GrantContract(0, 100, 10);
+		Profile->GrantEnemyReward(0.0f, 1.0f);
+	}));
 	AddTap(Steps, EKeys::F);
 	Steps.Add(WaitForPhase(TEXT("the hero gets away"), 1.0, EEIRunPhase::Escaped));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
 		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		const FString Faction = Profile->GetContractTable().Factions[0].Name;
+		Context.Test->TestTrue(TEXT("The run has earned gold"), Profile->GetRunGold() >= 100);
+		Context.Test->TestEqual(TEXT("All the gold is safe"), Profile->GetSave().Gold, Profile->GetRunGold());
+		Context.Test->TestTrue(TEXT("The run has earned points"), Profile->GetRunPoints(Faction) >= 10);
+		Context.Test->TestEqual(TEXT("All the points are safe"), Profile->GetSave().FactionPoints.FindRef(Faction), Profile->GetRunPoints(Faction));
 		Context.Test->TestEqual(TEXT("The loot is still there"), Profile->GetLoot().Num(), 1);
 		Context.Test->TestFalse(TEXT("The loot came to something"), Profile->GetLoot()[0].Result.IsEmpty());
 		Context.Test->TestTrue(TEXT("The loot is safe"), Profile->GetSave().Items.Contains(Profile->GetTable().Items[Profile->GetLoot()[0].Item].Name));
@@ -302,15 +350,16 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		const AEISkyBarge* Barge = GetBarge(Context);
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
 		Context.Test->TestTrue(TEXT("The barge is back"), FVector::Dist(Barge->GetActorLocation(), Barge->GetStartLocation()) < 1.0);
 		Context.Test->TestTrue(TEXT("The hero is back on the deck"), Context.Hero->GetActorLocation().Z > Barge->GetDeckHeight());
 		Context.Test->TestFalse(TEXT("The hero is no longer attached"), Context.Hero->GetAttachParentActor() != nullptr);
-		for (const AEIBeacon* Beacon : GetBeacons(Context))
-		{
-			Context.Test->TestFalse(TEXT("The fires are out"), Beacon->IsLit());
-		}
+		Context.Test->TestNull(TEXT("The flare is gone"), GetFlare(Context));
 		Context.Test->TestEqual(TEXT("All enemies are gone"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
 		Context.Test->TestEqual(TEXT("The next run starts with the same rune"), Context.Hero->GetRunes()->GetRuneIndex(), 1);
+		Context.Test->TestEqual(TEXT("The new run has earned nothing yet"), Profile->GetRunGold(), 0);
+		Context.Test->TestTrue(TEXT("The gold of the last one stays"), Profile->GetSave().Gold >= 100);
+		Context.Test->TestEqual(TEXT("A new run has new contracts"), GetState(Context)->CountContractsDone(), 0);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }
@@ -359,13 +408,12 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	{
 		Context.Hero->SetCanBeDamaged(false);
 		EmptyCamps(Context);
-		SkipRitual(Context);
 		Context.Test->TestEqual(TEXT("On the barge nothing comes yet"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
 		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
 	}));
 
 	// Before the first stage of the corruption nobody comes by themselves.
-	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::RitualDone));
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Contracts));
 	Steps.Add(Wait(1.5));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -448,7 +496,6 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("A fresh run has no enemies"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
 		Context.Hero->SetCanBeDamaged(false);
 		SwitchOffDirector(Context);
-		SkipRitual(Context);
 		FEIRunValues Fast = GetGameMode(Context)->GetRun()->GetValues();
 		Fast.CorruptionEverySeconds = 0.1f;
 		GetGameMode(Context)->GetRun()->ApplyValues(Fast);
@@ -469,12 +516,12 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	{
 		Context.Hero->SetCanBeDamaged(false);
 		EmptyCamps(Context);
-		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
-		Run->GetGroups().AltarWaveEverySeconds = 0.5f;
-		const FVector Altar = Run->GetActiveAltar()->GetActorLocation();
+		OnlyContracts(Context, EEIContractKind::Altar);
+		GetGameMode(Context)->GetRun()->GetGroups().AltarWaveEverySeconds = 0.5f;
+		const FVector Altar = GetState(Context)->GetContracts()[0].Location;
 		Teleport(Context, FVector(Altar.X + 300.0f, Altar.Y, HeroHeight), 180.0f);
 	}));
-	Steps.Add(WaitForPhase(TEXT("the ritual begins"), 2.0, EEIRunPhase::Ritual));
+	Steps.Add(WaitForPhase(TEXT("the run begins at the altar"), 2.0, EEIRunPhase::Contracts));
 	Steps.Add(Wait(0.15));
 	Steps.Add(Do([Threat](const FEIPlayContext& Context)
 	{
@@ -495,28 +542,28 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("Away from the altar no waves come"), Threat(Context), 0.0f);
 	}));
 
-	// At the fire too.
+	// In the circle of the flare too.
 	AddTap(Steps, EKeys::R);
 	Steps.Add(WaitForPhase(TEXT("one more fresh run starts"), 3.0, EEIRunPhase::OnBarge));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Hero->SetCanBeDamaged(false);
 		EmptyCamps(Context);
-		SkipRitual(Context);
-		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
+		FlareAtOnce(Context);
+		Teleport(Context, OpenPlace, 180.0f);
 	}));
-	Steps.Add(WaitForPhase(TEXT("the run begins again"), 2.0, EEIRunPhase::RitualDone));
+	Steps.Add(WaitForPhase(TEXT("the run begins again"), 2.0, EEIRunPhase::Contracts));
 	Steps.Add(Wait(0.3));
 	Steps.Add(Do([Threat](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("Before the fire burns nobody comes"), Threat(Context), 0.0f);
+		Context.Test->TestEqual(TEXT("Before the flare flies nobody comes"), Threat(Context), 0.0f);
 	}));
-	AddTap(Steps, EKeys::F);
-	Steps.Add(WaitForPhase(TEXT("the beacon burns"), 1.0, EEIRunPhase::BeaconLit));
+	AddTap(Steps, EKeys::G);
+	Steps.Add(WaitForPhase(TEXT("the flare flies"), 1.0, EEIRunPhase::FlareLit));
 	Steps.Add(Wait(0.1));
 	Steps.Add(Do([Threat](const FEIPlayContext& Context)
 	{
-		Context.Test->TestTrue(TEXT("At the fire a wave comes"), Threat(Context) > 0.0f);
+		Context.Test->TestTrue(TEXT("At the flare a wave comes"), Threat(Context) > 0.0f);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }
@@ -565,7 +612,7 @@ bool FEICampsTest::RunTest(const FString& Parameters)
 	}));
 
 	// When the run begins the camps are full, and from far away nobody notices the hero.
-	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Exploring));
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Contracts));
 	Steps.Add(Wait(1.0));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
@@ -750,6 +797,7 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 	{
 		Context.Hero->SetCanBeDamaged(false);
 		SwitchOffDirector(Context);
+		OnlyContracts(Context, EEIContractKind::Chest);
 
 		// The map has more chests than a run uses, and the others are gone.
 		int32 All = 0;
@@ -760,11 +808,11 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 		}
 		const int32 InUse = ChestsInUse(Context).Num();
 		Context.Test->AddInfo(FString::Printf(TEXT("%d of %d chests in this run"), InUse, All));
-		Context.Test->TestEqual(TEXT("A run uses its number of chests"), InUse, FMath::RoundToInt(GetGameMode(Context)->GetRun()->GetValues().ChestsPerRun));
+		Context.Test->TestEqual(TEXT("Every contract has its chest"), InUse, GetState(Context)->GetContracts().Num());
 		Context.Test->TestTrue(TEXT("The map has more chests than that"), All > InUse);
 		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
 	}));
-	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Exploring));
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Contracts));
 
 	// Outside the circle nothing happens.
 	Steps.Add(Do([ChestsInUse, StandBeside](const FEIPlayContext& Context)
@@ -779,7 +827,7 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 		const AEIChest* Chest = ChestsInUse(Context)[0];
 		Context.Test->TestEqual(TEXT("Outside the circle the chest stays sealed"), Chest->GetState(), EEIChestState::Sealed);
 		Context.Test->TestEqual(TEXT("Outside the circle nobody comes"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
-		Context.Test->TestEqual(TEXT("Far from a chest the use key finds nothing"), Context.Hero->GetOmens()->CountAll(), 0);
+		Context.Test->TestEqual(TEXT("Far from a chest the use key finds nothing"), GetState(Context)->CountContractsDone(), 0);
 		StandBeside(Context, Chest, 200.0f);
 	}));
 	Steps.Add(Wait(0.1));
@@ -801,8 +849,8 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 			const float Distance = static_cast<float>(FVector::Dist2D(It->GetActorLocation(), Chest->GetActorLocation()));
 			Context.Test->TestTrue(TEXT("They stand around the chest"), Distance < Values.ChestZoneMeters * CentimetersPerMeter);
 		}
-		Context.Test->TestEqual(TEXT("The seal holds: no omen yet"), Context.Hero->GetOmens()->CountAll(), 0);
-		Context.Test->TestFalse(TEXT("The seal holds: the chest stays closed"), Chest->IsOpenFor(Context.Hero));
+		Context.Test->TestEqual(TEXT("The seal holds: the contract stays open"), GetState(Context)->CountContractsDone(), 0);
+		Context.Test->TestFalse(TEXT("The seal holds: the chest stays closed"), Chest->IsOpen());
 
 		// All but one fall, and the last one is far from the hero, but it does not count as left behind.
 		DefeatGuards(Context, Expected - 1);
@@ -830,22 +878,25 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 	}));
 	Steps.Add(Wait(0.1));
 
-	// Now the use key opens it and gives an omen, once, and nobody comes a second time.
+	// Now the use key opens it and fulfils the contract, once, and nobody comes a second time.
 	AddTap(Steps, EKeys::F);
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([ChestsInUse](const FEIPlayContext& Context)
 	{
-		const UEIOmenComponent* Omens = Context.Hero->GetOmens();
-		Context.Test->TestEqual(TEXT("A chest gives an omen"), Omens->CountAll(), 1);
-		Context.Test->TestTrue(TEXT("The chest is open now"), ChestsInUse(Context)[0]->IsOpenFor(Context.Hero));
-		Context.Test->TestTrue(TEXT("The hero is told"), Omens->GetFoundNote() > 0.0f);
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Context.Test->TestEqual(TEXT("The chest fulfils its contract"), GetState(Context)->CountContractsDone(), 1);
+		Context.Test->TestEqual(TEXT("It pays the gold"), Profile->GetRunGold(), Profile->GetContractTable().GetGold(0));
+		Context.Test->TestTrue(TEXT("The chest is open now"), ChestsInUse(Context)[0]->IsOpen());
+		Context.Test->TestTrue(TEXT("The hero is told"), Profile->GetRewardNote() > 0.0f);
 		Context.Test->TestEqual(TEXT("Nobody comes a second time"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
 	}));
 	AddTap(Steps, EKeys::F);
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([ChestsInUse, StandBeside](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("An open chest gives nothing more"), Context.Hero->GetOmens()->CountAll(), 1);
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Context.Test->TestEqual(TEXT("An open chest counts only once"), GetState(Context)->CountContractsDone(), 1);
+		Context.Test->TestEqual(TEXT("An open chest pays only once"), Profile->GetRunGold(), Profile->GetContractTable().GetGold(0));
 
 		// Later in the run a chest has more guards.
 		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
@@ -861,125 +912,255 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("The other chests stay sealed"), ChestsInUse(Context)[2]->GetState(), EEIChestState::Sealed);
 	}));
 
-	// R: the omens end with the run, the guards are gone, and the chests are closed and sealed again.
+	// R: the guards are gone, and the chests are closed and sealed again.
 	AddTap(Steps, EKeys::R);
 	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::OnBarge));
 	Steps.Add(Do([ChestsInUse](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("The omens end with the run"), Context.Hero->GetOmens()->CountAll(), 0);
 		Context.Test->TestEqual(TEXT("The guards are gone"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
 		for (const AEIChest* Chest : ChestsInUse(Context))
 		{
 			Context.Test->TestEqual(TEXT("A fresh run has sealed chests"), Chest->GetState(), EEIChestState::Sealed);
-			Context.Test->TestFalse(TEXT("A fresh run has closed chests"), Chest->IsOpenFor(Context.Hero));
+			Context.Test->TestFalse(TEXT("A fresh run has closed chests"), Chest->IsOpen());
 		}
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FEIRitualTest,
-	"Eisenseelen.Play.Run.Ritual",
+	FEIContractsTest,
+	"Eisenseelen.Play.Run.Contracts",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FEIRitualTest::RunTest(const FString& Parameters)
+bool FEIContractsTest::RunTest(const FString& Parameters)
 {
-	constexpr float ShortHoldSeconds = 0.5f;
-	const TSharedRef<TWeakObjectPtr<AEIAltar>> FirstAltar = MakeShared<TWeakObjectPtr<AEIAltar>>();
-
-	const auto StandAtActiveAltar = [](const FEIPlayContext& Context)
+	const auto Leaders = [](const FEIPlayContext& Context)
 	{
-		const FVector Location = GetGameMode(Context)->GetRun()->GetActiveAltar()->GetActorLocation();
-		Teleport(Context, FVector(Location.X + 300.0f, Location.Y, HeroHeight), 180.0f);
+		TArray<AEIEnemy*> Found;
+		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
+		{
+			if (It->IsLeader())
+			{
+				Found.Add(*It);
+			}
+		}
+		return Found;
 	};
+	const auto CountKind = [](const FEIPlayContext& Context, EEIContractKind Kind)
+	{
+		int32 Count = 0;
+		for (const FEIContract& Contract : GetState(Context)->GetContracts())
+		{
+			Count += Contract.Kind == Kind ? 1 : 0;
+		}
+		return Count;
+	};
+	const auto StandAt = [](const FEIPlayContext& Context, const FVector& Location, float OffsetCm)
+	{
+		Teleport(Context, FVector(Location.X + OffsetCm, Location.Y, HeroHeight), 180.0f);
+	};
+	const TSharedRef<float> HoldLeft = MakeShared<float>(0.0f);
 
 	TArray<FEIPlayStep> Steps;
-	Steps.Add(Do([FirstAltar](const FEIPlayContext& Context)
+	Steps.Add(WaitUntil(TEXT("the paths are built"), 30.0, [](const FEIPlayContext& Context)
+	{
+		const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
+		return Navigation != nullptr && Navigation->GetDefaultNavDataInstance() != nullptr && !Navigation->IsNavigationBeingBuilt(Context.World);
+	}));
+
+	// The list is there from the barge on: six jobs, each faction has its share, and each lies somewhere else.
+	Steps.Add(Do([Leaders, CountKind](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		SwitchOffReinforcements(Context);
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		FEIRunValues NoCamps = Run->GetValues();
+		NoCamps.CampFactor = 0.0f;
+		Run->ApplyValues(NoCamps);
+
+		const FEIContractTable& Table = Run->GetContractTable();
+		const TArray<FEIContract>& Contracts = GetState(Context)->GetContracts();
+		Context.Test->TestEqual(TEXT("A run offers six contracts"), Contracts.Num(), 6);
+		for (int32 Faction = 0; Faction < Table.Factions.Num(); ++Faction)
+		{
+			const int32 Count = Algo::CountIf(Contracts, [Faction](const FEIContract& Contract) { return Contract.Faction == Faction; });
+			Context.Test->TestEqual(TEXT("Each faction offers two"), Count, 2);
+		}
+		for (const FEIContractTask& Task : Table.Tasks)
+		{
+			Context.Test->TestTrue(TEXT("Each task comes up"), CountKind(Context, Task.Kind) > 0);
+		}
+		for (int32 First = 0; First < Contracts.Num(); ++First)
+		{
+			for (int32 Second = First + 1; Second < Contracts.Num(); ++Second)
+			{
+				Context.Test->TestTrue(TEXT("No two contracts share a place"), FVector::Dist2D(Contracts[First].Location, Contracts[Second].Location) > 100.0);
+			}
+			const FEIContractTask* Task = Table.FindTask(Contracts[First].Kind);
+			Context.Test->TestEqual(TEXT("A contract has its time to hold"), Contracts[First].HoldLeft, Task->HoldSeconds);
+		}
+		int32 Woken = 0;
+		for (TActorIterator<AEIAltar> It(Context.World); It; ++It)
+		{
+			Woken += It->IsActive() ? 1 : 0;
+		}
+		Context.Test->TestEqual(TEXT("Only the altars of contracts are awake"), Woken, CountKind(Context, EEIContractKind::Altar) + CountKind(Context, EEIContractKind::Shrine));
+		int32 ChestsInUse = 0;
+		for (TActorIterator<AEIChest> It(Context.World); It; ++It)
+		{
+			ChestsInUse += It->IsInUse() ? 1 : 0;
+		}
+		Context.Test->TestEqual(TEXT("Only the chests of contracts are there"), ChestsInUse, CountKind(Context, EEIContractKind::Chest));
+		Context.Test->TestEqual(TEXT("On the barge no leader stands yet"), Leaders(Context).Num(), 0);
+		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
+	}));
+
+	// With the jump the leaders stand in their camps.
+	Steps.Add(WaitForPhase(TEXT("the run begins"), 3.0, EEIRunPhase::Contracts));
+	Steps.Add(Do([Leaders, CountKind](const FEIPlayContext& Context)
+	{
+		const FEIRunValues& Values = GetGameMode(Context)->GetRun()->GetValues();
+		const TArray<AEIEnemy*> Found = Leaders(Context);
+		Context.Test->TestEqual(TEXT("Every leader contract has its leader"), Found.Num(), CountKind(Context, EEIContractKind::Leader));
+		FEIEnemyValues Normal;
+		FString Error;
+		FEIEnemyValues::LoadFromProjectFile(Values.LeaderKind, Normal, Error);
+		for (const AEIEnemy* Leader : Found)
+		{
+			Context.Test->TestEqual(TEXT("A leader has more life"), Leader->GetHealth()->GetMaxHealth(), Normal.Life * Values.LeaderLifeFactor);
+			Context.Test->TestEqual(TEXT("A leader hits harder"), Leader->GetValues().Damage, Normal.Damage * Values.LeaderDamageFactor);
+			Context.Test->TestEqual(TEXT("A leader is of the wanted kind"), Leader->GetKind(), Values.LeaderKind);
+			Context.Test->TestTrue(TEXT("A leader waits at home"), Leader->HasHome());
+			Context.Test->TestNearlyEqual(TEXT("A leader is bigger"), static_cast<float>(Leader->GetActorScale3D().X), Normal.Scale * Values.LeaderScaleFactor, 0.001f);
+		}
+	}));
+
+	// A run of leaders: the fall counts for the contract, but only whoever stood near is paid.
+	AddTap(Steps, EKeys::R);
+	Steps.Add(WaitForPhase(TEXT("a run of leaders starts"), 3.0, EEIRunPhase::OnBarge));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		SwitchOffReinforcements(Context);
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		FEIRunValues NoCamps = Run->GetValues();
+		NoCamps.CampFactor = 0.0f;
+		Run->ApplyValues(NoCamps);
+		OnlyContracts(Context, EEIContractKind::Leader);
+		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
+	}));
+	Steps.Add(WaitForPhase(TEXT("the run of leaders begins"), 3.0, EEIRunPhase::Contracts));
+	Steps.Add(Do([Leaders](const FEIPlayContext& Context)
+	{
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		const TArray<AEIEnemy*> Found = Leaders(Context);
+		Context.Test->TestEqual(TEXT("Six contracts, six leaders"), Found.Num(), 6);
+
+		const FVector Far = Found[0]->GetActorLocation() + FVector(0.0f, Profile->GetTable().Rewards.RadiusMeters * CentimetersPerMeter + 1000.0f, 0.0f);
+		Context.Hero->SetActorLocation(FVector(Far.X, Far.Y, 500.0f), false, nullptr, ETeleportType::TeleportPhysics);
+		Found[0]->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		Context.Test->TestEqual(TEXT("The fall of a leader fulfils the contract"), GetState(Context)->CountContractsDone(), 1);
+		Context.Test->TestEqual(TEXT("From afar it pays nothing"), Profile->GetRunGold(), 0);
+
+		const float EnemyExperience = Found[1]->GetValues().Experience;
+		const FVector Near = Found[1]->GetActorLocation() + FVector(500.0f, 0.0f, 300.0f);
+		Context.Hero->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
+		const FEIContract* Contract = GetState(Context)->GetContracts().FindByPredicate([&Found](const FEIContract& Candidate) { return Candidate.Target == Found[1]; });
+		Context.Test->TestNotNull(TEXT("The contract knows its leader"), Contract);
+		const int32 Faction = Contract != nullptr ? Contract->Faction : 0;
+		Found[1]->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+		const FEIContractTable& Table = Profile->GetContractTable();
+		Context.Test->TestEqual(TEXT("Near it pays gold"), Profile->GetRunGold(), Table.GetGold(0));
+		Context.Test->TestEqual(TEXT("Near it pays points of its faction"), Profile->GetRunPoints(Table.Factions[Faction].Name), Table.GetPoints(0));
+		Context.Test->TestTrue(TEXT("The note names the faction"), Profile->GetRewardText().Contains(Table.Factions[Faction].Name));
+		Context.Test->TestFalse(TEXT("Nothing is safe yet"), Profile->GetSave().Gold > 0);
+		Context.Test->TestEqual(TEXT("Experience only comes from the enemy itself"), Profile->GetRunExperience(), FMath::RoundToInt32(EnemyExperience));
+	}));
+
+	// A run of shrines: the time runs in the zone and only there, and the next stage of the corruption pays more.
+	AddTap(Steps, EKeys::R);
+	Steps.Add(WaitForPhase(TEXT("a run of shrines starts"), 3.0, EEIRunPhase::OnBarge));
+	Steps.Add(Do([StandAt](const FEIPlayContext& Context)
 	{
 		Context.Hero->SetCanBeDamaged(false);
 		SwitchOffDirector(Context);
-		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
-		FEIRunValues Short = Run->GetValues();
-		Short.AltarHoldSeconds = ShortHoldSeconds;
-		Run->ApplyValues(Short);
-		Run->ResetRun();
-
-		// One altar burns, and the marker shows it already from the barge.
-		int32 Active = 0;
-		int32 Altars = 0;
-		for (TActorIterator<AEIAltar> It(Context.World); It; ++It)
-		{
-			++Altars;
-			Active += It->IsActive() ? 1 : 0;
-		}
-		Context.Test->TestEqual(TEXT("Every place has an altar"), Altars, 8);
-		Context.Test->TestEqual(TEXT("One altar burns"), Active, 1);
-		Context.Test->TestEqual(TEXT("The ritual has three altars"), GetState(Context)->GetAltarsTotal(), 3);
-		*FirstAltar = Run->GetActiveAltar();
-
-		// Away from the barge and from the altar.
-		const FVector AltarLocation = Run->GetActiveAltar()->GetActorLocation();
-		Teleport(Context, AltarLocation + FVector(2000.0f, 0.0f, HeroHeight), 180.0f);
+		OnlyContracts(Context, EEIContractKind::Shrine);
+		const float Zone = GetGameMode(Context)->GetRun()->GetContractTable().Tasks[0].ZoneMeters;
+		StandAt(Context, GetState(Context)->GetContracts()[0].Location, Zone * CentimetersPerMeter + 100.0f);
 	}));
-	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Exploring));
-
-	// The beacons stay cold until the ritual is broken.
-	Steps.Add(Do([](const FEIPlayContext& Context) { StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f); }));
+	Steps.Add(WaitForPhase(TEXT("the run of shrines begins"), 3.0, EEIRunPhase::Contracts));
 	Steps.Add(Wait(0.1));
-	AddTap(Steps, EKeys::F);
-	Steps.Add(Wait(0.1));
-	Steps.Add(Do([StandAtActiveAltar](const FEIPlayContext& Context)
+	Steps.Add(Do([StandAt](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("Before the ritual is broken the beacon stays cold"), GetState(Context)->GetRunPhase(), EEIRunPhase::Exploring);
-		StandAtActiveAltar(Context);
+		const FEIContract& Contract = GetState(Context)->GetContracts()[0];
+		const FEIContractTask& Task = GetGameMode(Context)->GetRun()->GetContractTable().Tasks[0];
+		Context.Test->TestFalse(TEXT("Beside the zone nobody holds the shrine"), Contract.bHeld);
+		Context.Test->TestEqual(TEXT("Beside the zone the time stands still"), Contract.HoldLeft, Task.HoldSeconds);
+		StandAt(Context, Contract.Location, 200.0f);
 	}));
+	Steps.Add(Wait(0.3));
+	Steps.Add(Do([StandAt](const FEIPlayContext& Context)
+	{
+		const TArray<FEIContract>& Contracts = GetState(Context)->GetContracts();
+		const FEIContractTask& Task = GetGameMode(Context)->GetRun()->GetContractTable().Tasks[0];
+		Context.Test->TestTrue(TEXT("In the zone the hero holds it"), Contracts[0].bHeld);
+		Context.Test->TestTrue(TEXT("Its time runs"), Contracts[0].HoldLeft < Task.HoldSeconds);
+		Context.Test->TestEqual(TEXT("The other ones wait"), Contracts[1].HoldLeft, Task.HoldSeconds);
+		StandAt(Context, FVector(-1500.0f, 0.0f, 0.0f), 0.0f);
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([HoldLeft](const FEIPlayContext& Context) { *HoldLeft = GetState(Context)->GetContracts()[0].HoldLeft; }));
+	Steps.Add(Wait(0.2));
+	Steps.Add(Do([HoldLeft, StandAt](const FEIPlayContext& Context)
+	{
+		TArray<FEIContract>& Contracts = GetState(Context)->EditContracts();
+		Context.Test->TestFalse(TEXT("Away from it nobody holds it"), Contracts[0].bHeld);
+		Context.Test->TestEqual(TEXT("Away from it the time stands still"), Contracts[0].HoldLeft, *HoldLeft);
 
-	// In the zone of the altar the time runs, however many enemies stand in it.
-	Steps.Add(WaitForPhase(TEXT("the ritual begins"), 1.0, EEIRunPhase::Ritual));
+		// The rest of the time, shortened here.
+		Contracts[0].HoldLeft = 0.2f;
+		StandAt(Context, Contracts[0].Location, 200.0f);
+	}));
+	Steps.Add(WaitUntil(TEXT("the shrine is done"), 2.0, [](const FEIPlayContext& Context) { return GetState(Context)->CountContractsDone() == 1; }));
+	Steps.Add(Do([StandAt](const FEIPlayContext& Context)
+	{
+		TArray<FEIContract>& Contracts = GetState(Context)->EditContracts();
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Context.Test->TestEqual(TEXT("The shrine pays"), Profile->GetRunGold(), Profile->GetContractTable().GetGold(0));
+		Context.Test->TestEqual(TEXT("It gives no experience"), Profile->GetRunExperience(), 0);
+		Context.Test->TestFalse(TEXT("A finished shrine is not held any more"), Contracts[0].bHeld);
+		Context.Test->TestEqual(TEXT("It is broken now"), Cast<AEIAltar>(Contracts[0].Target)->GetState(), EEIAltarState::Broken);
+
+		GetGameMode(Context)->GetRun()->SetCorruptionStage(3);
+		Contracts[1].HoldLeft = 0.1f;
+		StandAt(Context, Contracts[1].Location, 200.0f);
+	}));
+	Steps.Add(WaitUntil(TEXT("the next shrine is done"), 2.0, [](const FEIPlayContext& Context) { return GetState(Context)->CountContractsDone() == 2; }));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		const FVector AltarLocation = GetGameMode(Context)->GetRun()->GetActiveAltar()->GetActorLocation();
-		for (int32 Index = 0; Index < 6; ++Index)
-		{
-			Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), AltarLocation + FVector(-300.0f, -300.0f + Index * 120.0f, HeroHeight), FRotator::ZeroRotator);
-		}
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		const FEIContractTable& Table = Profile->GetContractTable();
+		Context.Test->TestEqual(TEXT("More corruption pays more"), Profile->GetRunGold(), Table.GetGold(0) + Table.GetGold(3));
+		Context.Test->TestTrue(TEXT("The bonus is real"), Table.GetGold(3) > Table.GetGold(0));
 	}));
 
-	Steps.Add(WaitUntil(TEXT("the first altar breaks with enemies in the zone"), 2.0, [](const FEIPlayContext& Context) { return GetState(Context)->GetAltarsBroken() == 1; }));
-	Steps.Add(Do([FirstAltar, StandAtActiveAltar](const FEIPlayContext& Context)
-	{
-		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
-		{
-			It->Destroy();
-		}
-		const AEIAltar* NextAltar = GetGameMode(Context)->GetRun()->GetActiveAltar();
-		Context.Test->TestEqual(TEXT("The altar is broken"), FirstAltar->Get()->GetState(), EEIAltarState::Broken);
-		Context.Test->TestTrue(TEXT("The next altar is another one"), NextAltar != FirstAltar->Get() && NextAltar->IsActive());
-		StandAtActiveAltar(Context);
-	}));
-	Steps.Add(WaitUntil(TEXT("the second altar breaks"), 3.0, [](const FEIPlayContext& Context) { return GetState(Context)->GetAltarsBroken() == 2; }));
-	Steps.Add(Do(StandAtActiveAltar));
-
-	// After the third the ritual is over, and now a beacon can burn.
-	Steps.Add(WaitForPhase(TEXT("the ritual is broken"), 3.0, EEIRunPhase::RitualDone));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestNull(TEXT("No altar burns any more"), GetGameMode(Context)->GetRun()->GetActiveAltar());
-		Context.Test->TestEqual(TEXT("The broken ritual brings its reward"), Context.Player->GetProfile()->GetLoot().Num(), 1);
-		Context.Test->TestTrue(TEXT("The broken ritual brings experience"), Context.Player->GetProfile()->GetRunExperience() > 0);
-		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
-	}));
-	Steps.Add(Wait(0.1));
-	AddTap(Steps, EKeys::F);
-	Steps.Add(WaitForPhase(TEXT("the beacon burns"), 1.0, EEIRunPhase::BeaconLit));
-
-	// R wakes the ritual up again.
+	// However often it is rolled: with a big distance the two contracts lie far apart.
 	AddTap(Steps, EKeys::R);
-	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::OnBarge));
+	Steps.Add(WaitForPhase(TEXT("a last run starts"), 3.0, EEIRunPhase::OnBarge));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("A fresh ritual has no broken altars"), GetState(Context)->GetAltarsBroken(), 0);
-		Context.Test->TestNotNull(TEXT("A fresh ritual has an altar"), GetGameMode(Context)->GetRun()->GetActiveAltar());
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		FEIContractTable& Table = Run->GetContractTable();
+		Table.ContractsPerRun = 2.0f;
+		Table.MinDistanceMeters = 100.0f;
+		Table.Tasks.RemoveAll([](const FEIContractTask& Task) { return Task.Kind != EEIContractKind::Altar; });
+		for (int32 Roll = 0; Roll < 10; ++Roll)
+		{
+			Run->ResetRun();
+			const TArray<FEIContract>& Contracts = GetState(Context)->GetContracts();
+			Context.Test->TestEqual(TEXT("The number comes from the file"), Contracts.Num(), 2);
+			Context.Test->TestTrue(TEXT("The contracts keep their distance"), FVector::Dist2D(Contracts[0].Location, Contracts[1].Location) >= Table.MinDistanceMeters * CentimetersPerMeter);
+		}
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }
@@ -1053,14 +1234,21 @@ bool FEIRunFailedTest::RunTest(const FString& Parameters)
 	TArray<FEIPlayStep> Steps;
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Player->GetProfile()->GrantReward(EEIRewardSource::Ritual);
+		UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Profile->GrantContract(0, 100, 10);
+		Profile->GrantEnemyReward(10.0f, 1.0f);
 		Context.Hero->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 	}));
 	Steps.Add(WaitForPhase(TEXT("the run is lost"), 1.0, EEIRunPhase::Failed));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		const UEIProfileComponent* Profile = Context.Player->GetProfile();
-		Context.Test->TestEqual(TEXT("The loot of a lost run is gone"), Profile->GetLoot()[0].Result, FString(TEXT("verloren")));
+		const FEIContractTable& Table = Profile->GetContractTable();
+		Context.Test->TestEqual(TEXT("A share of the gold stays"), Profile->GetSave().Gold, Table.GetKeptOnFailure(100));
+		Context.Test->TestEqual(TEXT("The file says 30 percent"), Table.GetKeptOnFailure(100), 30);
+		Context.Test->TestEqual(TEXT("A share of the points stays"), Profile->GetSave().FactionPoints.FindRef(Table.Factions[0].Name), Table.GetKeptOnFailure(10));
+		Context.Test->TestEqual(TEXT("The settlement can say so"), Profile->GetSecured(100), 30);
+		Context.Test->TestEqual(TEXT("A found item is gone"), Profile->GetLoot()[0].Result, FString(TEXT("verloren")));
 		Context.Test->TestFalse(TEXT("It did not reach the save"), Profile->GetSave().Items.Contains(Profile->GetTable().Items[Profile->GetLoot()[0].Item].Name));
 		Context.Test->TestTrue(TEXT("The experience stays"), Profile->GetSave().Experience > 0);
 	}));
@@ -1069,148 +1257,7 @@ bool FEIRunFailedTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestFalse(TEXT("The fresh hero lives"), Context.Hero->IsDead());
-	}));
-	return RunInMap(this, RunMap, MoveTemp(Steps));
-}
-
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FEISideJobsTest,
-	"Eisenseelen.Play.Run.SideJobs",
-	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-bool FEISideJobsTest::RunTest(const FString& Parameters)
-{
-	const auto Leaders = [](const FEIPlayContext& Context)
-	{
-		TArray<AEIEnemy*> Found;
-		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
-		{
-			if (It->IsLeader())
-			{
-				Found.Add(*It);
-			}
-		}
-		return Found;
-	};
-	const auto Shrines = [](const FEIPlayContext& Context)
-	{
-		TArray<AEIAltar*> Found;
-		for (TActorIterator<AEIAltar> It(Context.World); It; ++It)
-		{
-			if (It->IsShrine())
-			{
-				Found.Add(*It);
-			}
-		}
-		return Found;
-	};
-	const TSharedRef<float> ShrineLeft = MakeShared<float>(0.0f);
-
-	TArray<FEIPlayStep> Steps;
-	Steps.Add(WaitUntil(TEXT("the paths are built"), 30.0, [](const FEIPlayContext& Context)
-	{
-		const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
-		return Navigation != nullptr && Navigation->GetDefaultNavDataInstance() != nullptr && !Navigation->IsNavigationBeingBuilt(Context.World);
-	}));
-	Steps.Add(Do([Leaders, Shrines](const FEIPlayContext& Context)
-	{
-		Context.Hero->SetCanBeDamaged(false);
-		SwitchOffReinforcements(Context);
-		FEIRunValues NoCamps = GetGameMode(Context)->GetRun()->GetValues();
-		NoCamps.CampFactor = 0.0f;
-		GetGameMode(Context)->GetRun()->ApplyValues(NoCamps);
-		const FEIRunValues& Values = GetGameMode(Context)->GetRun()->GetValues();
-		Context.Test->TestEqual(TEXT("On the barge no leader stands yet"), Leaders(Context).Num(), 0);
-		Context.Test->TestEqual(TEXT("The shrines are waiting"), Shrines(Context).Num(), FMath::RoundToInt(Values.ShrinesPerRun));
-		for (const AEIAltar* Shrine : Shrines(Context))
-		{
-			Context.Test->TestFalse(TEXT("A shrine is not an altar of the ritual"), Shrine->IsActive());
-			Context.Test->TestEqual(TEXT("A shrine has its time"), Shrine->GetShrineLeft(), Values.ShrineHoldSeconds);
-		}
-		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
-	}));
-	Steps.Add(WaitForPhase(TEXT("the run begins"), 3.0, EEIRunPhase::Exploring));
-	Steps.Add(Do([Leaders](const FEIPlayContext& Context)
-	{
-		const FEIRunValues& Values = GetGameMode(Context)->GetRun()->GetValues();
-		const TArray<AEIEnemy*> Found = Leaders(Context);
-		Context.Test->TestEqual(TEXT("The leaders stand at their camps"), Found.Num(), FMath::RoundToInt(Values.LeadersPerRun));
-		FEIEnemyValues Normal;
-		FString Error;
-		FEIEnemyValues::LoadFromProjectFile(Values.LeaderKind, Normal, Error);
-		for (const AEIEnemy* Leader : Found)
-		{
-			Context.Test->TestEqual(TEXT("A leader has more life"), Leader->GetHealth()->GetMaxHealth(), Normal.Life * Values.LeaderLifeFactor);
-			Context.Test->TestEqual(TEXT("A leader hits harder"), Leader->GetValues().Damage, Normal.Damage * Values.LeaderDamageFactor);
-			Context.Test->TestEqual(TEXT("A leader is of the wanted kind"), Leader->GetKind(), Values.LeaderKind);
-			Context.Test->TestTrue(TEXT("A leader waits at home"), Leader->HasHome());
-			Context.Test->TestNearlyEqual(TEXT("A leader is bigger"), static_cast<float>(Leader->GetActorScale3D().X), Normal.Scale * Values.LeaderScaleFactor, 0.001f);
-		}
-
-		// A leader falling far away from the hero brings nothing.
-		const FVector Far = Found[0]->GetActorLocation() + FVector(0.0f, Context.Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter + 1000.0f, 0.0f);
-		Context.Hero->SetActorLocation(FVector(Far.X, Far.Y, 500.0f), false, nullptr, ETeleportType::TeleportPhysics);
-		Found[0]->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
-		Context.Test->TestEqual(TEXT("From afar a leader brings no experience"), Context.Player->GetProfile()->GetRunExperience(), 0);
-
-		// Whoever stands near gets armour and experience.
-		const float EnemyExperience = Found[1]->GetValues().Experience;
-		const FVector Near = Found[1]->GetActorLocation() + FVector(500.0f, 0.0f, 300.0f);
-		Context.Hero->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
-		Found[1]->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
-		const UEIProfileComponent* Profile = Context.Player->GetProfile();
-		Context.Test->TestEqual(TEXT("A leader brings a reward"), Profile->GetLoot().Num(), 1);
-		const EEISlot Slot = Profile->GetTable().Items[Profile->GetLoot()[0].Item].Slot;
-		Context.Test->TestTrue(TEXT("A leader brings armour"), Slot == EEISlot::Helmet || Slot == EEISlot::Chest || Slot == EEISlot::Gloves || Slot == EEISlot::Boots);
-		Context.Test->TestEqual(TEXT("A leader brings experience"), Profile->GetRunExperience(), FMath::RoundToInt32(Profile->GetTable().Rewards.LeaderExperience + EnemyExperience));
-	}));
-
-	// Standing in the zone of a shrine runs its time, and only there.
-	Steps.Add(Do([Shrines](const FEIPlayContext& Context)
-	{
-		Context.Hero->SetActorLocation(Shrines(Context)[0]->GetActorLocation() + FVector(300.0f, 0.0f, 150.0f), false, nullptr, ETeleportType::TeleportPhysics);
-	}));
-	Steps.Add(Wait(0.3));
-	Steps.Add(Do([Shrines, ShrineLeft](const FEIPlayContext& Context)
-	{
-		AEIAltar* Shrine = Shrines(Context)[0];
-		Context.Test->TestTrue(TEXT("The hero holds the shrine"), Shrine->IsShrineHeld());
-		Context.Test->TestTrue(TEXT("Its time runs"), Shrine->GetShrineLeft() < GetGameMode(Context)->GetRun()->GetValues().ShrineHoldSeconds);
-		Context.Test->TestEqual(TEXT("The other shrine waits"), Shrines(Context)[1]->GetShrineLeft(), GetGameMode(Context)->GetRun()->GetValues().ShrineHoldSeconds);
-		Context.Hero->SetActorLocation(Shrine->GetActorLocation() + FVector(5000.0f, 0.0f, 500.0f), false, nullptr, ETeleportType::TeleportPhysics);
-	}));
-	Steps.Add(Wait(0.1));
-	Steps.Add(Do([Shrines, ShrineLeft](const FEIPlayContext& Context)
-	{
-		*ShrineLeft = Shrines(Context)[0]->GetShrineLeft();
-	}));
-	Steps.Add(Wait(0.2));
-	Steps.Add(Do([Shrines, ShrineLeft](const FEIPlayContext& Context)
-	{
-		AEIAltar* Shrine = Shrines(Context)[0];
-		Context.Test->TestFalse(TEXT("Away from the shrine nobody holds it"), Shrine->IsShrineHeld());
-		Context.Test->TestEqual(TEXT("Away from it the time stands still"), Shrine->GetShrineLeft(), *ShrineLeft);
-
-		// The rest of the time, shortened here.
-		Shrine->SetShrineHold(0.2f, false);
-		Context.Hero->SetActorLocation(Shrine->GetActorLocation() + FVector(300.0f, 0.0f, 150.0f), false, nullptr, ETeleportType::TeleportPhysics);
-	}));
-	Steps.Add(WaitUntil(TEXT("the shrine is done"), 2.0, [Shrines](const FEIPlayContext& Context) { return Shrines(Context).Num() == 1; }));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		const UEIProfileComponent* Profile = Context.Player->GetProfile();
-		Context.Test->TestEqual(TEXT("The shrine brings a reward"), Profile->GetLoot().Num(), 2);
-		Context.Test->TestTrue(TEXT("The shrine brings experience"), Profile->GetRunExperience() > FMath::RoundToInt32(Profile->GetTable().Rewards.LeaderExperience + Profile->GetTable().Rewards.ShrineExperience));
-		Context.Test->TestTrue(TEXT("It says so"), Profile->GetRewardText().Contains(TEXT("Schrein")));
-	}));
-
-	// A new run has all of it anew.
-	AddTap(Steps, EKeys::R);
-	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::OnBarge));
-	Steps.Add(Do([Leaders, Shrines](const FEIPlayContext& Context)
-	{
-		Context.Test->TestEqual(TEXT("All leaders are gone"), Leaders(Context).Num(), 0);
-		Context.Test->TestEqual(TEXT("The shrines are back"), Shrines(Context).Num(), FMath::RoundToInt(GetGameMode(Context)->GetRun()->GetValues().ShrinesPerRun));
+		Context.Test->TestEqual(TEXT("What stayed is still there"), Context.Player->GetProfile()->GetSave().Gold, 30);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

@@ -93,6 +93,29 @@ void AEIPlayerController::HandleMenu()
 	SetMenuOpen(!bMenuOpen);
 }
 
+void AEIPlayerController::HandleMap()
+{
+	bMapOpen = !bMapOpen;
+}
+
+void AEIPlayerController::HandleFlare()
+{
+	if (!bMenuOpen)
+	{
+		ServerFireFlare();
+	}
+}
+
+void AEIPlayerController::ServerFireFlare_Implementation()
+{
+	AEIHeroCharacter* Hero = GetLivingHero();
+	AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>();
+	if (Hero != nullptr && GameMode != nullptr)
+	{
+		GameMode->GetRun()->FireFlare(Hero);
+	}
+}
+
 void AEIPlayerController::PreviewMenuSlot(int32 Slot)
 {
 	Menu.SelectSlot(static_cast<EEISlot>(FMath::Clamp(Slot, 0, EISlotCount - 1)));
@@ -124,11 +147,11 @@ void AEIPlayerController::PreviewCorruption(int32 Stage)
 	}
 }
 
-void AEIPlayerController::PreviewBreakAltar()
+void AEIPlayerController::PreviewSkipContracts(int32 Count)
 {
 	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
-		GameMode->GetRun()->SkipAltarHold();
+		GameMode->GetRun()->SkipContracts(Count);
 	}
 }
 
@@ -183,6 +206,8 @@ void AEIPlayerController::SetupInputComponent()
 	RuneSpellAction = MakeAction(this, EInputActionValueType::Boolean);
 	ClassAction = MakeAction(this, EInputActionValueType::Boolean);
 	MenuAction = MakeAction(this, EInputActionValueType::Boolean);
+	FlareAction = MakeAction(this, EInputActionValueType::Boolean);
+	MapAction = MakeAction(this, EInputActionValueType::Boolean);
 
 	Mapping = NewObject<UInputMappingContext>(this);
 	MapMoveKey(Mapping, MoveAction, EKeys::W, true, false);
@@ -201,6 +226,8 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(RuneSpellAction, EKeys::E);
 	Mapping->MapKey(ClassAction, EKeys::C);
 	Mapping->MapKey(MenuAction, EKeys::I);
+	Mapping->MapKey(FlareAction, EKeys::G);
+	Mapping->MapKey(MapAction, EKeys::M);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AEIPlayerController::HandleMove);
@@ -220,6 +247,8 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(RuneSpellAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleRuneSpell);
 	Input->BindAction(ClassAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleClass);
 	Input->BindAction(MenuAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleMenu);
+	Input->BindAction(FlareAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleFlare);
+	Input->BindAction(MapAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleMap);
 
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 	Subsystem->AddMappingContext(Mapping, 0);

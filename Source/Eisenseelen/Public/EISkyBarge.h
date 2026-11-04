@@ -32,6 +32,9 @@ public:
 	float GetDeckHeight() const;
 	const FVector& GetStartLocation() const { return StartLocation; }
 
+	/** Half of the room it needs on the ground, along the axes of the world. */
+	FVector GetRoomNeeded() const;
+
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

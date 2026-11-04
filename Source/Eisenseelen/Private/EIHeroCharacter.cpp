@@ -8,7 +8,6 @@
 #include "EIGearComponent.h"
 #include "EIHealthComponent.h"
 #include "EIHeroMovementComponent.h"
-#include "EIOmenComponent.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
@@ -79,7 +78,6 @@ AEIHeroCharacter::AEIHeroCharacter(const FObjectInitializer& ObjectInitializer)
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
 	Sword = CreateDefaultSubobject<UEISwordComponent>(TEXT("Sword"));
 	Caster = CreateDefaultSubobject<UEICasterComponent>(TEXT("Caster"));
-	Omens = CreateDefaultSubobject<UEIOmenComponent>(TEXT("Omens"));
 	Runes = CreateDefaultSubobject<UEIRuneComponent>(TEXT("Runes"));
 	Gear = CreateDefaultSubobject<UEIGearComponent>(TEXT("Gear"));
 }
@@ -105,7 +103,6 @@ void AEIHeroCharacter::BeginPlay()
 	}
 	Sword->LoadValues();
 	Caster->LoadValues();
-	Omens->LoadValues();
 	Runes->LoadValues();
 	Gear->LoadValues();
 	LoadClassValues();
@@ -365,11 +362,6 @@ void AEIHeroCharacter::ApplyValues(const FEIHeroValues& NewValues)
 {
 	Values = NewValues;
 	GetHeroMovement()->ApplyValues(Values, Gear->GetSpeedFactor());
-}
-
-void AEIHeroCharacter::OnOmensChanged()
-{
-	Gear->Recalculate();
 }
 
 void AEIHeroCharacter::OnGearChanged()

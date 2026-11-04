@@ -2,7 +2,7 @@
 	"boden_m": 300,
 	"rand_hoehe_m": 3,
 	"barke": { "x_m": 0, "y_m": 0, "hoehe_m": 120 },
-	"leuchtfeuer": [
+	"freiflaechen": [
 		{ "x_m": -105, "y_m": 95 },
 		{ "x_m": 105, "y_m": -95 }
 	],

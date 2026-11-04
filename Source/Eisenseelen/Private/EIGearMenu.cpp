@@ -115,6 +115,15 @@ void FEIGearMenu::Build(UEIProfileComponent& Profile, const AEIHeroCharacter& He
 	const float ChoicesX = Left + SlotsWidth + ColumnGap;
 	const float ChoicesWidth = InnerWidth * ChoicesShare;
 	const float SumsX = ChoicesX + ChoicesWidth + ColumnGap;
+	if (!Profile.IsFreeChoice())
+	{
+		FString Purse = FString::Printf(TEXT("Gold %d"), Profile.GetSave().Gold);
+		for (const FEIFaction& Faction : Profile.GetContractTable().Factions)
+		{
+			Purse += FString::Printf(TEXT("   %s %d"), *Faction.Name, Profile.GetSave().FactionPoints.FindRef(Faction.Name));
+		}
+		AddText(ChoicesX, Top, Purse, TitleColor);
+	}
 	BuildSlots(Profile, Left, ColumnsTop, SlotsWidth, MouseX, MouseY);
 	const int32 Hovered = BuildChoices(Profile, ChoicesX, ColumnsTop, ChoicesWidth, MouseX, MouseY);
 	BuildSums(Profile, Hero, SumsX, ColumnsTop);

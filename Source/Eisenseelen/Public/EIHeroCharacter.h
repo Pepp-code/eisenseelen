@@ -11,7 +11,6 @@ class UEICasterComponent;
 class UEIGearComponent;
 class UEIHealthComponent;
 class UEIHeroMovementComponent;
-class UEIOmenComponent;
 class UEIRuneComponent;
 class AEISkyBarge;
 class UEISwordComponent;
@@ -58,12 +57,8 @@ public:
 	float GetHurtFlash() const { return HurtFlashRemaining; }
 	UEISwordComponent* GetSword() const { return Sword; }
 	UEICasterComponent* GetCaster() const { return Caster; }
-	UEIOmenComponent* GetOmens() const { return Omens; }
 	UEIRuneComponent* GetRunes() const { return Runes; }
 	UEIGearComponent* GetGear() const { return Gear; }
-
-	/** Called on the server and the owner when the set of omens changed. */
-	void OnOmensChanged();
 
 	/** Passes the sum of all bonuses on to whoever needs it. */
 	void OnGearChanged();
@@ -150,9 +145,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEICasterComponent> Caster;
-
-	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UEIOmenComponent> Omens;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIRuneComponent> Runes;

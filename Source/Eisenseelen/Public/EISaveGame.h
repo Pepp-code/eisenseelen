@@ -22,6 +22,10 @@ struct EISENSEELEN_API FEISavedClass
 struct EISENSEELEN_API FEISaveGame
 {
 	int32 Experience = 0;
+	int32 Gold = 0;
+
+	/** Name of a faction and the points earned with it. */
+	TMap<FString, int32> FactionPoints;
 
 	/** Name of an item and its quality. Whatever stands in here is owned. */
 	TMap<FString, int32> Items;

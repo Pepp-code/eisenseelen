@@ -113,9 +113,6 @@ struct EISENSEELEN_API FEIArmorSet
 /** What deeds bring, from the section belohnung of Data/items.json. */
 struct EISENSEELEN_API FEIRewardValues
 {
-	float RitualExperience = 100.0f;
-	float LeaderExperience = 40.0f;
-	float ShrineExperience = 40.0f;
 	float DuplicateExperience = 30.0f;
 	float RadiusMeters = 40.0f;
 	float ExperiencePerStage = 0.1f;

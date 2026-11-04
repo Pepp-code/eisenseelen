@@ -2,16 +2,15 @@
 
 #include "Dom/JsonObject.h"
 #include "EIAltar.h"
-#include "EIBeacon.h"
 #include "EIChest.h"
 #include "EIDataFile.h"
 #include "EIEnemy.h"
 #include "EIEnemyCamp.h"
+#include "EIFlare.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
 #include "EIHordeDirector.h"
-#include "EIOmenComponent.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
 #include "EISkyBarge.h"
@@ -24,6 +23,29 @@ namespace
 	// Falling this far below the deck counts as having jumped.
 	constexpr float LeftBargeBelowCm = 300.0f;
 	constexpr float BargeHoverHeightCm = 140.0f;
+	constexpr int32 BargeSpotTries = 8;
+	constexpr float GroundSearchUpCm = 1000.0f;
+	constexpr float GroundSearchDownCm = 3000.0f;
+	// On a different level than the flare the barge could not be reached from its circle.
+	constexpr float BargeSpotHeightDifferenceCm = 150.0f;
+	constexpr float BargeRoomAboveGroundCm = 20.0f;
+
+	/** The first place far enough from all others, or else simply the first one. It leaves the list. */
+	template <typename TPlace>
+	TPlace* TakePlace(TArray<TPlace*>& Places, const TArray<FVector>& Taken, double MinDistanceCm)
+	{
+		if (Places.IsEmpty())
+		{
+			return nullptr;
+		}
+		const int32 Found = Places.IndexOfByPredicate([&Taken, MinDistanceCm](const TPlace* Place)
+		{
+			return !Taken.ContainsByPredicate([Place, MinDistanceCm](const FVector& Other) { return FVector::Dist2D(Place->GetActorLocation(), Other) < MinDistanceCm; });
+		});
+		TPlace* Place = Places[FMath::Max(Found, 0)];
+		Places.RemoveAt(FMath::Max(Found, 0));
+		return Place;
+	}
 }
 
 bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutError)
@@ -34,25 +56,16 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_faktor"), 0.0, 100.0, Loaded.CampFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_radius_m"), 0.5, 100.0, Loaded.CampRadiusMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_nachschub_ab_abstand_m"), 0.0, 1000.0, Loaded.CampRefillFromMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhen_pro_lauf"), 0.0, 1000.0, Loaded.ChestsPerRun, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_reichweite_m"), 0.5, 100.0, Loaded.ChestReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_zone_m"), 1.0, 100.0, Loaded.ChestZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_waechter_abstand_m"), 1.0, 100.0, Loaded.ChestGuardDistanceMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("ritual_altare"), 0.0, 100.0, Loaded.RitualAltars, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_halten_s"), 0.1, 3600.0, Loaded.AltarHoldSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("altar_zone_m"), 1.0, 100.0, Loaded.AltarZoneMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_halten_s"), 0.1, 3600.0, Loaded.BeaconHoldSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_reichweite_m"), 0.5, 100.0, Loaded.BeaconReachMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("leuchtfeuer_zone_m"), 1.0, 200.0, Loaded.BeaconZoneMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("fackel_halten_s"), 0.1, 3600.0, Loaded.FlareHoldSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("fackel_zone_m"), 1.0, 200.0, Loaded.FlareZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abstand_m"), 1.0, 100.0, Loaded.BargeDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abflug_tempo_m_pro_s"), 0.1, 100.0, Loaded.BargeDepartMetersPerSecond, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_pro_lauf"), 0.0, 100.0, Loaded.LeadersPerRun, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_leben_faktor"), 0.1, 100.0, Loaded.LeaderLifeFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_schaden_faktor"), 0.1, 100.0, Loaded.LeaderDamageFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_groesse_faktor"), 0.1, 10.0, Loaded.LeaderScaleFactor, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("schreine_pro_lauf"), 0.0, 100.0, Loaded.ShrinesPerRun, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("schrein_halten_s"), 0.1, 3600.0, Loaded.ShrineHoldSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("schrein_zone_m"), 1.0, 100.0, Loaded.ShrineZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_alle_s"), 0.1, 3600.0, Loaded.CorruptionEverySeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_stufen"), 1.0, 100.0, Loaded.CorruptionMaxStage, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_gegner_staerke_je_stufe"), 0.0, 10.0, Loaded.CorruptionStrengthPerStage, OutError))
@@ -95,6 +108,10 @@ void UEIRunDirector::LoadValues()
 	{
 		FEIDataFile::ReportError(TEXT("gruppen.json"), Error);
 	}
+	if (!FEIContractTable::LoadFromProjectFile(ContractTable, Error))
+	{
+		FEIDataFile::ReportError(TEXT("vertraege.json"), Error);
+	}
 }
 
 void UEIRunDirector::ResetRun()
@@ -102,47 +119,21 @@ void UEIRunDirector::ResetRun()
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	TActorIterator<AEISkyBarge> FoundBarge(GetWorld());
 	Barge = FoundBarge ? *FoundBarge : nullptr;
-	LitBeacon = nullptr;
-	HoldLeft = 0.0f;
-	for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)
+	if (Flare != nullptr)
 	{
-		It->SetLit(false);
+		Flare->Destroy();
+		Flare = nullptr;
 	}
+	HoldLeft = 0.0f;
 	State->ResetRunClock();
-	State->SetBeaconHold(0.0f, false);
+	State->SetFlareHold(0.0f, false);
 	SetCorruptionStage(0);
 	WaveLeft = 0.0f;
 	ReinforcementLeft = 0.0f;
 	LastStage = 0;
 	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetEnemyStrength(1.0f);
 
-	PrepareChests();
-
-	AltarOrder.Reset();
-	AltarsBroken = 0;
-	for (TActorIterator<AEIAltar> It(GetWorld()); It; ++It)
-	{
-		It->SetState(EEIAltarState::Dormant);
-		AltarOrder.Insert(*It, FMath::RandRange(0, AltarOrder.Num()));
-	}
-	const int32 AltarsThisRun = FMath::Min(FMath::RoundToInt(Values.RitualAltars), AltarOrder.Num());
-
-	// The places the ritual does not use this time hold the shrines.
-	Shrines.Reset();
-	for (int32 Index = AltarsThisRun; Index < AltarOrder.Num() && Shrines.Num() < FMath::RoundToInt(Values.ShrinesPerRun); ++Index)
-	{
-		AltarOrder[Index]->SetState(EEIAltarState::Shrine);
-		AltarOrder[Index]->SetShrineHold(Values.ShrineHoldSeconds, false);
-		Shrines.Add(AltarOrder[Index]);
-	}
-	AltarOrder.SetNum(AltarsThisRun);
-	State->SetAltarProgress(0, AltarsThisRun);
-	AltarHoldLeft = Values.AltarHoldSeconds;
-	State->SetAltarHold(AltarHoldLeft, false);
-	if (AltarOrder.Num() > 0)
-	{
-		AltarOrder[0]->SetState(EEIAltarState::Active);
-	}
+	PrepareContracts();
 	if (Barge == nullptr)
 	{
 		State->SetRunPhase(EEIRunPhase::None);
@@ -152,21 +143,80 @@ void UEIRunDirector::ResetRun()
 	State->SetRunPhase(EEIRunPhase::OnBarge);
 }
 
-void UEIRunDirector::PrepareChests()
+void UEIRunDirector::PrepareContracts()
 {
+	// All places are free again, and every run finds its jobs somewhere else.
+	TArray<AEIAltar*> Altars;
+	for (TActorIterator<AEIAltar> It(GetWorld()); It; ++It)
+	{
+		It->SetState(EEIAltarState::Dormant);
+		Altars.Insert(*It, FMath::RandRange(0, Altars.Num()));
+	}
 	TArray<AEIChest*> Chests;
 	for (TActorIterator<AEIChest> It(GetWorld()); It; ++It)
 	{
+		It->PrepareForRun(false);
 		Chests.Insert(*It, FMath::RandRange(0, Chests.Num()));
 	}
-	const int32 InUse = FMath::RoundToInt(Values.ChestsPerRun);
-	ChestsInUse.Reset();
-	for (int32 Index = 0; Index < Chests.Num(); ++Index)
+	TArray<AEIEnemyCamp*> Camps;
+	for (TActorIterator<AEIEnemyCamp> It(GetWorld()); It; ++It)
 	{
-		Chests[Index]->PrepareForRun(Index < InUse);
-		if (Index < InUse)
+		Camps.Insert(*It, FMath::RandRange(0, Camps.Num()));
+	}
+
+	TArray<FEIContract> Contracts = Barge != nullptr ? ContractTable.RollContracts() : TArray<FEIContract>();
+	const double MinDistance = ContractTable.MinDistanceMeters * CentimetersPerMeter;
+	TArray<FVector> Taken;
+	for (FEIContract& Contract : Contracts)
+	{
+		if (Contract.Kind == EEIContractKind::Leader)
 		{
-			ChestsInUse.Add(Chests[Index]);
+			Contract.Target = TakePlace(Camps, Taken, MinDistance);
+		}
+		else if (Contract.Kind == EEIContractKind::Chest)
+		{
+			AEIChest* Chest = TakePlace(Chests, Taken, MinDistance);
+			Contract.Target = Chest;
+			if (Chest != nullptr)
+			{
+				Chest->PrepareForRun(true);
+			}
+		}
+		else
+		{
+			AEIAltar* Altar = TakePlace(Altars, Taken, MinDistance);
+			Contract.Target = Altar;
+			if (Altar != nullptr)
+			{
+				Altar->StartJob(ContractTable.FindTask(Contract.Kind)->ZoneMeters, ContractTable.FindFaction(Contract.Faction)->Color);
+			}
+		}
+		if (Contract.Target != nullptr)
+		{
+			Contract.Location = Contract.Target->GetActorLocation();
+			Taken.Add(Contract.Location);
+		}
+	}
+	Contracts.RemoveAll([](const FEIContract& Contract) { return Contract.Target == nullptr; });
+	GetWorld()->GetGameState<AEIGameState>()->SetContracts(Contracts, FMath::RoundToInt32(ContractTable.ContractsToFlare));
+}
+
+void UEIRunDirector::SpawnLeaders()
+{
+	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
+	for (FEIContract& Contract : GetWorld()->GetGameState<AEIGameState>()->EditContracts())
+	{
+		AEIEnemyCamp* Camp = Cast<AEIEnemyCamp>(Contract.Target);
+		if (Contract.Kind != EEIContractKind::Leader || Camp == nullptr)
+		{
+			continue;
+		}
+		if (AEIEnemy* Leader = Horde->SpawnKind(Values.LeaderKind, Camp->GetActorLocation()))
+		{
+			Leader->MakeLeader(Values.LeaderLifeFactor, Values.LeaderDamageFactor, Values.LeaderScaleFactor);
+			Leader->StandWatch(Leader->GetActorLocation());
+			Camp->AddMember(Leader);
+			Contract.Target = Leader;
 		}
 	}
 }
@@ -212,133 +262,130 @@ void UEIRunDirector::RefillEmptyCamps(const TArray<AEIHeroCharacter*>& LivingHer
 	}
 }
 
-void UEIRunDirector::UpdateChests(const TArray<AEIHeroCharacter*>& LivingHeroes)
+void UEIRunDirector::UpdateChest(AEIChest* Chest, const TArray<AEIHeroCharacter*>& LivingHeroes)
 {
-	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
-	const int32 Stage = GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage();
-	for (AEIChest* Chest : ChestsInUse)
+	if (Chest->GetState() == EEIChestState::Guarded)
 	{
-		if (Chest->GetState() == EEIChestState::Guarded)
+		Chest->UpdateGuards();
+	}
+	else if (Chest->GetState() == EEIChestState::Sealed
+		&& LivingHeroes.ContainsByPredicate([Chest](const AEIHeroCharacter* Hero) { return Chest->IsInZone(Hero); }))
+	{
+		UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
+		const int32 Stage = GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage();
+		TArray<AEIEnemy*> Guards;
+		if (const FEIEnemyGroup* Group = Groups.Pick(Groups.GetStage(Stage).Chest, Stage))
 		{
-			Chest->UpdateGuards();
+			Guards = Horde->SpawnGroup(*Group, GetPlayerFactor(LivingHeroes.Num()), Chest->GetActorLocation(), Values.ChestGuardDistanceMeters * CentimetersPerMeter);
 		}
-		else if (Chest->GetState() == EEIChestState::Sealed
-			&& LivingHeroes.ContainsByPredicate([Chest](const AEIHeroCharacter* Hero) { return Chest->IsInZone(Hero); }))
+		for (AEIEnemy* Guard : Guards)
 		{
-			TArray<AEIEnemy*> Guards;
-			if (const FEIEnemyGroup* Group = Groups.Pick(Groups.GetStage(Stage).Chest, Stage))
+			Guard->MarkAsGuard();
+		}
+		Chest->SetGuards(Guards);
+	}
+}
+
+void UEIRunDirector::UpdateContracts(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+{
+	TArray<FEIContract>& Contracts = GetWorld()->GetGameState<AEIGameState>()->EditContracts();
+	for (int32 Index = 0; Index < Contracts.Num(); ++Index)
+	{
+		FEIContract& Contract = Contracts[Index];
+		if (Contract.bDone)
+		{
+			continue;
+		}
+		if (const AEIEnemy* Leader = Cast<AEIEnemy>(Contract.Target))
+		{
+			Contract.Location = Leader->GetActorLocation();
+		}
+		else if (AEIChest* Chest = Cast<AEIChest>(Contract.Target))
+		{
+			UpdateChest(Chest, LivingHeroes);
+		}
+		else if (const AEIAltar* Altar = Cast<AEIAltar>(Contract.Target))
+		{
+			// The time runs for whoever stands in the zone, however many enemies stand in it.
+			Contract.bHeld = LivingHeroes.ContainsByPredicate([Altar](const AEIHeroCharacter* Hero) { return Altar->IsInZone(Hero); });
+			Contract.HoldLeft -= Contract.bHeld ? DeltaTime : 0.0f;
+			if (Contract.HoldLeft <= 0.0f)
 			{
-				Guards = Horde->SpawnGroup(*Group, GetPlayerFactor(LivingHeroes.Num()), Chest->GetActorLocation(), Values.ChestGuardDistanceMeters * CentimetersPerMeter);
+				CompleteContract(Index);
 			}
-			for (AEIEnemy* Guard : Guards)
-			{
-				Guard->MarkAsGuard();
-			}
-			Chest->SetGuards(Guards);
+		}
+	}
+}
+
+void UEIRunDirector::CompleteContract(int32 Index)
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	FEIContract& Contract = State->EditContracts()[Index];
+	Contract.bDone = true;
+	Contract.bHeld = false;
+	if (AEIAltar* Altar = Cast<AEIAltar>(Contract.Target))
+	{
+		Altar->SetState(EEIAltarState::Broken);
+	}
+
+	// Everybody near gets their own pay, so nobody has to fight over the last hit.
+	const int32 Stage = State->GetCorruptionStage();
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get());
+		const AEIHeroCharacter* Hero = Player != nullptr ? Player->GetPawn<AEIHeroCharacter>() : nullptr;
+		if (Hero != nullptr && !Hero->IsDead() && FVector::Dist2D(Hero->GetActorLocation(), Contract.Location) <= Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter)
+		{
+			Player->GetProfile()->GrantContract(Contract.Faction, ContractTable.GetGold(Stage), ContractTable.GetPoints(Stage));
+		}
+	}
+}
+
+void UEIRunDirector::SkipContracts(int32 Count)
+{
+	const TArray<FEIContract>& Contracts = GetWorld()->GetGameState<AEIGameState>()->GetContracts();
+	for (int32 Index = 0; Index < Contracts.Num() && Count > 0; ++Index)
+	{
+		if (!Contracts[Index].bDone)
+		{
+			CompleteContract(Index);
+			--Count;
 		}
 	}
 }
 
 bool UEIRunDirector::OpenChest(AEIHeroCharacter* Hero)
 {
-	for (AEIChest* Chest : ChestsInUse)
+	const TArray<FEIContract>& Contracts = GetWorld()->GetGameState<AEIGameState>()->GetContracts();
+	for (int32 Index = 0; Index < Contracts.Num(); ++Index)
 	{
-		if (Chest->GetState() == EEIChestState::Free && Chest->IsInReach(Hero) && !Chest->IsOpenFor(Hero))
+		AEIChest* Chest = Cast<AEIChest>(Contracts[Index].Target);
+		if (Chest != nullptr && !Contracts[Index].bDone && Chest->GetState() == EEIChestState::Free && Chest->IsInReach(Hero))
 		{
-			Chest->OpenFor(Hero);
-			Hero->GetOmens()->GrantRandomOmen();
+			Chest->Open();
+			CompleteContract(Index);
 			return true;
 		}
 	}
 	return false;
 }
 
-AEIAltar* UEIRunDirector::GetActiveAltar() const
-{
-	return AltarOrder.IsValidIndex(AltarsBroken) ? AltarOrder[AltarsBroken] : nullptr;
-}
-
-void UEIRunDirector::HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
-{
-	AEIAltar* Altar = GetActiveAltar();
-	const bool bHeld = LivingHeroes.ContainsByPredicate([Altar](const AEIHeroCharacter* Hero) { return Altar->IsInZone(Hero); });
-	if (bHeld)
-	{
-		AltarHoldLeft -= DeltaTime;
-	}
-	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	State->SetAltarHold(AltarHoldLeft, bHeld);
-	if (AltarHoldLeft > 0.0f)
-	{
-		return;
-	}
-
-	// Broken. The ritual moves on to the next place, or it is over.
-	Altar->SetState(EEIAltarState::Broken);
-	++AltarsBroken;
-	AltarHoldLeft = Values.AltarHoldSeconds;
-	State->SetAltarProgress(AltarsBroken, AltarOrder.Num());
-	State->SetAltarHold(AltarHoldLeft, false);
-	if (AEIAltar* NextAltar = GetActiveAltar())
-	{
-		NextAltar->SetState(EEIAltarState::Active);
-	}
-	else
-	{
-		State->SetRunPhase(EEIRunPhase::RitualDone);
-		for (const AEIHeroCharacter* Hero : LivingHeroes)
-		{
-			if (const AEIPlayerController* Player = Hero->GetController<AEIPlayerController>())
-			{
-				Player->GetProfile()->GrantReward(EEIRewardSource::Ritual);
-			}
-		}
-	}
-}
-
-void UEIRunDirector::PrepareLeaders()
-{
-	TArray<AEIEnemyCamp*> Camps;
-	for (TActorIterator<AEIEnemyCamp> It(GetWorld()); It; ++It)
-	{
-		Camps.Insert(*It, FMath::RandRange(0, Camps.Num()));
-	}
-	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
-	const int32 Count = FMath::Min(FMath::RoundToInt(Values.LeadersPerRun), Camps.Num());
-	for (int32 Index = 0; Index < Count; ++Index)
-	{
-		if (AEIEnemy* Leader = Horde->SpawnKind(Values.LeaderKind, Camps[Index]->GetActorLocation()))
-		{
-			Leader->MakeLeader(Values.LeaderLifeFactor, Values.LeaderDamageFactor, Values.LeaderScaleFactor);
-			Leader->StandWatch(Leader->GetActorLocation());
-			Camps[Index]->AddMember(Leader);
-		}
-	}
-}
-
-void UEIRunDirector::GrantNear(const FVector& Location, EEIRewardSource Source)
-{
-	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-	{
-		const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get());
-		const AEIHeroCharacter* Hero = Player != nullptr ? Player->GetPawn<AEIHeroCharacter>() : nullptr;
-		if (Hero != nullptr && !Hero->IsDead() && FVector::Dist2D(Hero->GetActorLocation(), Location) <= Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter)
-		{
-			Player->GetProfile()->GrantReward(Source);
-		}
-	}
-}
-
 void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
 {
 	// In the test arena nothing counts.
-	if (GetWorld()->GetGameState<AEIGameState>()->GetRunPhase() == EEIRunPhase::None)
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (State->GetRunPhase() == EEIRunPhase::None)
 	{
 		return;
 	}
-	if (Enemy.IsLeader())
+	TArray<FEIContract>& Contracts = State->EditContracts();
+	for (int32 Index = 0; Index < Contracts.Num(); ++Index)
 	{
-		GrantNear(Enemy.GetActorLocation(), EEIRewardSource::Leader);
+		if (!Contracts[Index].bDone && Contracts[Index].Target == &Enemy)
+		{
+			Contracts[Index].Location = Enemy.GetActorLocation();
+			CompleteContract(Index);
+		}
 	}
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -347,30 +394,6 @@ void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
 		if (Hero != nullptr && !Hero->IsDead() && FVector::Dist2D(Hero->GetActorLocation(), Enemy.GetActorLocation()) <= Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter)
 		{
 			Player->GetProfile()->GrantEnemyReward(Enemy.GetValues().Experience, Enemy.GetValues().ItemChance);
-		}
-	}
-}
-
-bool UEIRunDirector::IsShrineHeld() const
-{
-	return Shrines.ContainsByPredicate([](const AEIAltar* Shrine) { return Shrine->IsShrine() && Shrine->IsShrineHeld(); });
-}
-
-void UEIRunDirector::UpdateShrines(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
-{
-	for (AEIAltar* Shrine : Shrines)
-	{
-		if (!Shrine->IsShrine())
-		{
-			continue;
-		}
-		const bool bHeld = LivingHeroes.ContainsByPredicate([Shrine](const AEIHeroCharacter* Hero) { return Shrine->IsInZone(Hero); });
-		const float Left = Shrine->GetShrineLeft() - (bHeld ? DeltaTime : 0.0f);
-		Shrine->SetShrineHold(Left, bHeld);
-		if (Left <= 0.0f)
-		{
-			Shrine->SetState(EEIAltarState::Broken);
-			GrantNear(Shrine->GetActorLocation(), EEIRewardSource::Shrine);
 		}
 	}
 }
@@ -394,36 +417,77 @@ void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 	{
 		return;
 	}
-	if (Phase == EEIRunPhase::RitualDone)
-	{
-		for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)
-		{
-			if (It->IsInReach(Hero))
-			{
-				IgniteBeacon(*It);
-				return;
-			}
-		}
-	}
-	else if (Phase == EEIRunPhase::BargeWaiting && !Hero->IsAboard() && Barge->IsInBoardingZone(Hero))
+	if (Phase == EEIRunPhase::BargeWaiting && !Hero->IsAboard() && Barge->IsInBoardingZone(Hero))
 	{
 		Hero->BoardBarge(Barge);
 	}
 }
 
-void UEIRunDirector::IgniteBeacon(AEIBeacon* Beacon)
+bool UEIRunDirector::FindGround(const FVector& Location, FVector& OutGround) const
+{
+	FHitResult Hit;
+	const FVector Start = Location + FVector(0.0f, 0.0f, GroundSearchUpCm);
+	const FVector End = Location - FVector(0.0f, 0.0f, GroundSearchDownCm);
+	if (!GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, FCollisionObjectQueryParams(ECC_WorldStatic)))
+	{
+		return false;
+	}
+	OutGround = Hit.ImpactPoint;
+	return true;
+}
+
+bool UEIRunDirector::FindBargeSpot(const FVector& FlareGround, FVector& OutHover) const
+{
+	// Towards the middle of the map first, where it is usually open.
+	const FVector Inwards = (-FlareGround).GetSafeNormal2D();
+	const FVector First = Inwards.IsNearlyZero() ? FVector::ForwardVector : Inwards;
+	const FVector Room = Barge->GetRoomNeeded();
+	const FCollisionShape Box = FCollisionShape::MakeBox(Room);
+	for (int32 Try = 0; Try < BargeSpotTries; ++Try)
+	{
+		const FVector Direction = First.RotateAngleAxis(Try * 360.0f / BargeSpotTries, FVector::UpVector);
+		FVector Ground;
+		if (!FindGround(FlareGround + Direction * Values.BargeDistanceMeters * CentimetersPerMeter, Ground)
+			|| FMath::Abs(Ground.Z - FlareGround.Z) > BargeSpotHeightDifferenceCm)
+		{
+			continue;
+		}
+		const FVector BoxCenter = Ground + FVector(0.0f, 0.0f, BargeRoomAboveGroundCm + Room.Z);
+		if (!GetWorld()->OverlapAnyTestByObjectType(BoxCenter, FQuat::Identity, FCollisionObjectQueryParams(ECC_WorldStatic), Box))
+		{
+			OutHover = Ground + FVector(0.0f, 0.0f, BargeHoverHeightCm);
+			return true;
+		}
+	}
+	return false;
+}
+
+void UEIRunDirector::FireFlare(AEIHeroCharacter* Hero)
 {
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	LitBeacon = Beacon;
-	Beacon->SetLit(true);
-	HoldLeft = Values.BeaconHoldSeconds;
-	State->SetBeaconHold(HoldLeft, true);
-	State->SetRunPhase(EEIRunPhase::BeaconLit);
-
-	// The barge comes down on the side towards the middle of the map, where it is open.
-	const FVector BeaconLocation = Beacon->GetActorLocation();
-	FVector Hover = BeaconLocation - BeaconLocation.GetSafeNormal2D() * Values.BargeDistanceMeters * CentimetersPerMeter;
-	Hover.Z = BeaconLocation.Z + BargeHoverHeightCm;
+	const AEIPlayerController* Player = Hero->GetController<AEIPlayerController>();
+	if (State->GetRunPhase() != EEIRunPhase::Contracts || Player == nullptr)
+	{
+		return;
+	}
+	if (!State->CanFireFlare())
+	{
+		Player->GetProfile()->ClientShowNote(FString::Printf(TEXT("Die Leuchtfackel geht erst nach %d erf\u00FCllten Vertr\u00E4gen."), State->GetContractsToFlare()));
+		return;
+	}
+	FVector Ground;
+	FVector Hover;
+	if (!FindGround(Hero->GetActorLocation(), Ground) || !FindBargeSpot(Ground, Hover))
+	{
+		Player->GetProfile()->ClientShowNote(TEXT("Hier hat die Barke keinen Platz. Geh ins Freie."));
+		return;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Flare = GetWorld()->SpawnActor<AEIFlare>(Ground, FRotator::ZeroRotator, Params);
+	HoldLeft = Values.FlareHoldSeconds;
+	State->SetFlareHold(HoldLeft, true);
+	State->SetRunPhase(EEIRunPhase::FlareLit);
 	Barge->BeginApproach(Hover);
 }
 
@@ -480,31 +544,31 @@ void UEIRunDirector::UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCh
 		}
 	}
 
-	// Waves attack whoever holds an altar or the fire. Whoever comes back gets the next one at once.
-	const bool bAtAltar = (Phase == EEIRunPhase::Ritual && State->IsAltarHeld()) || IsShrineHeld();
-	const bool bAtFire = Phase == EEIRunPhase::BeaconLit && State->IsBeaconHeld();
-	if (!bAtAltar && !bAtFire)
+	// Waves attack whoever holds an altar or the circle of the flare. Whoever comes back gets the next one at once.
+	const bool bAtAltar = State->IsContractHeld();
+	const bool bAtFlare = Phase == EEIRunPhase::FlareLit && State->IsFlareHeld();
+	if (!bAtAltar && !bAtFlare)
 	{
 		WaveLeft = 0.0f;
 		return;
 	}
 	WaveLeft -= DeltaTime;
-	if (WaveLeft <= 0.0f && SendGroup(bAtFire ? Row.BeaconWave : Row.AltarWave, HeroCount))
+	if (WaveLeft <= 0.0f && SendGroup(bAtFlare ? Row.FlareWave : Row.AltarWave, HeroCount))
 	{
-		WaveLeft = bAtFire ? Groups.BeaconWaveEverySeconds : Groups.AltarWaveEverySeconds;
+		WaveLeft = bAtFlare ? Groups.FlareWaveEverySeconds : Groups.AltarWaveEverySeconds;
 	}
 }
 
-void UEIRunDirector::HoldBeacon(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+void UEIRunDirector::HoldFlare(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
 {
-	const bool bHeld = LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return LitBeacon->IsInZone(Hero); });
+	const bool bHeld = LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return Flare->IsInZone(Hero); });
 	if (bHeld)
 	{
 		HoldLeft = FMath::Max(0.0f, HoldLeft - DeltaTime);
 	}
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	State->SetBeaconHold(HoldLeft, bHeld);
-	Barge->SetApproachFraction(1.0f - HoldLeft / FMath::Max(Values.BeaconHoldSeconds, KINDA_SMALL_NUMBER));
+	State->SetFlareHold(HoldLeft, bHeld);
+	Barge->SetApproachFraction(1.0f - HoldLeft / FMath::Max(Values.FlareHoldSeconds, KINDA_SMALL_NUMBER));
 	if (HoldLeft <= 0.0f)
 	{
 		State->SetRunPhase(EEIRunPhase::BargeWaiting);
@@ -568,8 +632,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	{
 		UpdateCorruption();
 		UpdateEnemyGroups(Phase, LivingHeroes, DeltaTime);
-		UpdateChests(LivingHeroes);
-		UpdateShrines(LivingHeroes, DeltaTime);
+		UpdateContracts(LivingHeroes, DeltaTime);
 	}
 
 	switch (Phase)
@@ -580,31 +643,20 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 			if (Hero->GetActorLocation().Z < Barge->GetDeckHeight() - LeftBargeBelowCm)
 			{
 				State->StartRunClock();
-				State->SetRunPhase(AltarOrder.IsEmpty() ? EEIRunPhase::RitualDone : EEIRunPhase::Exploring);
+				State->SetRunPhase(EEIRunPhase::Contracts);
 				for (TActorIterator<AEIEnemyCamp> Camp(GetWorld()); Camp; ++Camp)
 				{
 					FillCamp(*Camp, Camp->GetStartSize(), LivingHeroes.Num());
 				}
-				PrepareLeaders();
+				SpawnLeaders();
 				CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(true);
 				break;
 			}
 		}
 		break;
 
-	case EEIRunPhase::Exploring:
-		if (LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return GetActiveAltar()->IsInZone(Hero); }))
-		{
-			State->SetRunPhase(EEIRunPhase::Ritual);
-		}
-		break;
-
-	case EEIRunPhase::Ritual:
-		HoldAltar(LivingHeroes, DeltaTime);
-		break;
-
-	case EEIRunPhase::BeaconLit:
-		HoldBeacon(LivingHeroes, DeltaTime);
+	case EEIRunPhase::FlareLit:
+		HoldFlare(LivingHeroes, DeltaTime);
 		break;
 
 	case EEIRunPhase::BargeWaiting:

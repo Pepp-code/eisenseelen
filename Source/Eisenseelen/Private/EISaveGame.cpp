@@ -88,6 +88,13 @@ FString FEISaveGame::ToJson() const
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetNumberField(TEXT("version"), 1);
 	Root->SetNumberField(TEXT("erfahrung"), Experience);
+	Root->SetNumberField(TEXT("gold"), Gold);
+	const TSharedRef<FJsonObject> Points = MakeShared<FJsonObject>();
+	for (const TPair<FString, int32>& Pair : FactionPoints)
+	{
+		Points->SetNumberField(Pair.Key, Pair.Value);
+	}
+	Root->SetObjectField(TEXT("fraktionspunkte"), Points);
 
 	const TSharedRef<FJsonObject> Owned = MakeShared<FJsonObject>();
 	for (const TPair<FString, int32>& Pair : Items)
@@ -129,6 +136,21 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 	if (Root->TryGetNumberField(TEXT("erfahrung"), Number))
 	{
 		Loaded.Experience = FMath::RoundToInt32(Number);
+	}
+	if (Root->TryGetNumberField(TEXT("gold"), Number))
+	{
+		Loaded.Gold = FMath::RoundToInt32(Number);
+	}
+	Loaded.FactionPoints.Reset();
+	const TSharedPtr<FJsonObject>* Points = nullptr;
+	if (Root->TryGetObjectField(TEXT("fraktionspunkte"), Points))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Points)->Values)
+		{
+			double Amount = 0.0;
+			Pair.Value->TryGetNumber(Amount);
+			Loaded.FactionPoints.Add(Pair.Key, FMath::RoundToInt32(Amount));
+		}
 	}
 	Loaded.Items.Reset();
 	for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Owned)->Values)

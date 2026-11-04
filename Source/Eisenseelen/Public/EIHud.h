@@ -30,6 +30,9 @@ private:
 	/** What a run has brought, once it is over. */
 	void DrawSettlement(const class AEIHeroCharacter* Hero, const class AEIGameState* State, const FString& Clock);
 
-	/** The omens found so far, in a column going up from this height, and the note about a new one. */
-	void DrawOmens(const class AEIHeroCharacter* Hero, float BottomY);
+	/** The marks of the open contracts in the world, and what to do at the one the hero stands at. */
+	void DrawContracts(const class AEIHeroCharacter* Hero, const class AEIGameState* State, const struct FEIContractTable& Table, float PromptY);
+
+	/** The overview: a small map of the contracts and a list of what they ask for and pay. */
+	void DrawContractBoard(const class AEIHeroCharacter* Hero, const class AEIGameState* State, const struct FEIContractTable& Table);
 };

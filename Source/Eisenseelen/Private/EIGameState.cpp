@@ -21,12 +21,10 @@ void AEIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIGameState, RunPhase);
 	DOREPLIFETIME(AEIGameState, RunStartedAt);
 	DOREPLIFETIME(AEIGameState, RunEndedAfter);
-	DOREPLIFETIME(AEIGameState, BeaconHoldLeft);
-	DOREPLIFETIME(AEIGameState, bBeaconHeld);
-	DOREPLIFETIME(AEIGameState, AltarsBroken);
-	DOREPLIFETIME(AEIGameState, AltarsTotal);
-	DOREPLIFETIME(AEIGameState, AltarHoldLeft);
-	DOREPLIFETIME(AEIGameState, bAltarHeld);
+	DOREPLIFETIME(AEIGameState, FlareHoldLeft);
+	DOREPLIFETIME(AEIGameState, bFlareHeld);
+	DOREPLIFETIME(AEIGameState, Contracts);
+	DOREPLIFETIME(AEIGameState, ContractsToFlare);
 	DOREPLIFETIME(AEIGameState, CorruptionStage);
 	DOREPLIFETIME(AEIGameState, CorruptionShare);
 	DOREPLIFETIME(AEIGameState, bBloodMoon);
@@ -58,22 +56,36 @@ void AEIGameState::StopRunClock()
 	RunEndedAfter = RunStartedAt < 0.0 ? 0.0f : GetRunSeconds();
 }
 
-void AEIGameState::SetBeaconHold(float SecondsLeft, bool bHeld)
+void AEIGameState::SetFlareHold(float SecondsLeft, bool bHeld)
 {
-	BeaconHoldLeft = SecondsLeft;
-	bBeaconHeld = bHeld;
+	FlareHoldLeft = SecondsLeft;
+	bFlareHeld = bHeld;
 }
 
-void AEIGameState::SetAltarProgress(int32 Broken, int32 Total)
+void AEIGameState::SetContracts(const TArray<FEIContract>& NewContracts, int32 ToFlare)
 {
-	AltarsBroken = Broken;
-	AltarsTotal = Total;
+	Contracts = NewContracts;
+	ContractsToFlare = ToFlare;
 }
 
-void AEIGameState::SetAltarHold(float SecondsLeft, bool bHeld)
+int32 AEIGameState::CountContractsDone() const
 {
-	AltarHoldLeft = SecondsLeft;
-	bAltarHeld = bHeld;
+	int32 Done = 0;
+	for (const FEIContract& Contract : Contracts)
+	{
+		Done += Contract.bDone ? 1 : 0;
+	}
+	return Done;
+}
+
+bool AEIGameState::IsContractHeld() const
+{
+	return Contracts.ContainsByPredicate([](const FEIContract& Contract) { return Contract.bHeld; });
+}
+
+bool AEIGameState::CanFireFlare() const
+{
+	return RunPhase == EEIRunPhase::Contracts && CountContractsDone() >= ContractsToFlare;
 }
 
 void AEIGameState::SetCorruption(int32 Stage, float Share, bool bIsBloodMoon)

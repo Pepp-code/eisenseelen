@@ -219,10 +219,7 @@ namespace
 			OutError = TEXT("Der Abschnitt belohnung fehlt.");
 			return false;
 		}
-		if (!FEIDataFile::ReadNumber(**Rewards, TEXT("ritual_erfahrung"), 0.0, 1000000.0, Out.Rewards.RitualExperience, OutError)
-			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("anfuehrer_erfahrung"), 0.0, 1000000.0, Out.Rewards.LeaderExperience, OutError)
-			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("schrein_erfahrung"), 0.0, 1000000.0, Out.Rewards.ShrineExperience, OutError)
-			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("doppelt_erfahrung"), 0.0, 1000000.0, Out.Rewards.DuplicateExperience, OutError)
+		if (!FEIDataFile::ReadNumber(**Rewards, TEXT("doppelt_erfahrung"), 0.0, 1000000.0, Out.Rewards.DuplicateExperience, OutError)
 			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("umkreis_m"), 1.0, 1000.0, Out.Rewards.RadiusMeters, OutError)
 			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("verderbnis_erfahrung_je_stufe"), 0.0, 100.0, Out.Rewards.ExperiencePerStage, OutError)
 			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("geschmiedet_ab_stufe"), 0.0, 100.0, Out.Rewards.ForgedFromStage, OutError))

@@ -6,7 +6,6 @@
 #include "EIProjectile.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
-#include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
@@ -115,7 +114,7 @@ void AEIChest::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(AEIChest, bInUse);
 	DOREPLIFETIME(AEIChest, State);
 	DOREPLIFETIME(AEIChest, GuardsLeft);
-	DOREPLIFETIME(AEIChest, OpenedBy);
+	DOREPLIFETIME(AEIChest, bOpened);
 }
 
 bool AEIChest::IsInZone(const AActor* Hero) const
@@ -127,11 +126,6 @@ bool AEIChest::IsInZone(const AActor* Hero) const
 bool AEIChest::IsInReach(const AActor* Hero) const
 {
 	return FVector::Dist(Hero->GetActorLocation(), GetActorLocation()) <= Values.ChestReachMeters * CentimetersPerMeter;
-}
-
-bool AEIChest::IsOpenFor(const AActor* Hero) const
-{
-	return OpenedBy.Contains(Hero);
 }
 
 FVector AEIChest::GetMarkLocation() const
@@ -147,7 +141,7 @@ void AEIChest::PrepareForRun(bool bUse)
 	ShownState = State;
 	Guards.Reset();
 	GuardsLeft = 0;
-	OpenedBy.Reset();
+	bOpened = false;
 	OnRep_Look();
 }
 
@@ -177,9 +171,9 @@ void AEIChest::UpdateGuards()
 	}
 }
 
-void AEIChest::OpenFor(AActor* Hero)
+void AEIChest::Open()
 {
-	OpenedBy.AddUnique(Hero);
+	bOpened = true;
 	OnRep_Look();
 }
 
@@ -188,10 +182,8 @@ void AEIChest::OnRep_Look()
 	SetActorHiddenInGame(!bInUse);
 	SetActorEnableCollision(bInUse);
 
-	const APlayerController* LocalPlayer = GetWorld()->GetFirstPlayerController();
-	const bool bOpen = LocalPlayer != nullptr && IsOpenFor(LocalPlayer->GetPawn());
-	LidTargetDegrees = bOpen ? OpenLidDegrees : 0.0f;
-	if (!bOpen)
+	LidTargetDegrees = bOpened ? OpenLidDegrees : 0.0f;
+	if (!bOpened)
 	{
 		LidDegrees = 0.0f;
 	}
@@ -199,7 +191,7 @@ void AEIChest::OnRep_Look()
 	SetActorTickEnabled(LidDegrees != LidTargetDegrees);
 
 	const bool bFree = State == EEIChestState::Free;
-	Gem->SetVisibility(bInUse && !bOpen);
+	Gem->SetVisibility(bInUse && !bOpened);
 	Seal->SetVisibility(bInUse && !bFree);
 	ZoneDisc->SetVisibility(bInUse && !bFree);
 	if (GemMaterial != nullptr)

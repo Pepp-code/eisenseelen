@@ -38,7 +38,7 @@ namespace
 		"start_items": ["Probeschwert", "Probestab"],
 		"erfahrung": { "level_max": 4, "erste_stufe": 100, "zuwachs_je_level": 50 },
 		"attribute": [{ "name": "Probekraft", "wert": "angriffskraft", "je_punkt": 0.03 }],
-		"belohnung": { "ritual_erfahrung": 11, "anfuehrer_erfahrung": 12, "schrein_erfahrung": 13, "doppelt_erfahrung": 14, "umkreis_m": 15, "verderbnis_erfahrung_je_stufe": 0.5, "geschmiedet_ab_stufe": 2 },
+		"belohnung": { "doppelt_erfahrung": 14, "umkreis_m": 15, "verderbnis_erfahrung_je_stufe": 0.5, "geschmiedet_ab_stufe": 2 },
 		"arten": [{ "name": "Probeart", "je_zwei_teile": { "leben": 10 } }],
 		"items": [
 			{ "name": "Probeschwert", "platz": "waffe", "grundform": "schwert", "element": "eis" },
@@ -159,7 +159,7 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	FEIItemTable Small;
 	TestTrue(TEXT("A complete table loads"), FEIItemTable::LoadFromStrings(SmallItems, SmallWeapons, Small, Error));
 	TestEqual(TEXT("All lines are there"), Small.Items.Num(), 3);
-	TestEqual(TEXT("The rewards count"), Small.Rewards.ShrineExperience, 13.0f);
+	TestEqual(TEXT("The rewards count"), Small.Rewards.DuplicateExperience, 14.0f);
 	TestEqual(TEXT("The attributes count"), Small.Attributes[0].PerPoint, 0.03f);
 	TestEqual(TEXT("A new player is level 1"), Small.GetLevel(0), 1);
 	TestEqual(TEXT("Just before the first step still level 1"), Small.GetLevel(99), 1);
@@ -226,6 +226,8 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Both have the first rune on"), Save.Classes[1].Slots[RuneSlot], FString(TEXT("Frostrune")));
 
 	Save.Experience = 340;
+	Save.Gold = 1250;
+	Save.FactionPoints.Add(TEXT("Feuer"), 40);
 	Save.Items.Add(TEXT("Sturmrune"), 2);
 	Save.Classes[0].Slots[RuneSlot] = TEXT("Sturmrune");
 	Save.Classes[0].Attributes.Add(TEXT("Kraft"), 3);
@@ -237,6 +239,8 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	FEISaveGame Loaded = FEISaveGame::MakeNew(Table);
 	TestTrue(TEXT("What was written can be read"), Loaded.FromJson(Save.ToJson(), Error));
 	TestEqual(TEXT("The experience stays"), Loaded.Experience, 340);
+	TestEqual(TEXT("The gold stays"), Loaded.Gold, 1250);
+	TestEqual(TEXT("The points of a faction stay"), Loaded.FactionPoints.FindRef(TEXT("Feuer")), 40);
 	TestEqual(TEXT("The quality stays"), Loaded.Items.FindRef(TEXT("Sturmrune")), 2);
 	TestEqual(TEXT("What is on stays on"), Loaded.Classes[0].Slots[RuneSlot], FString(TEXT("Sturmrune")));
 	TestEqual(TEXT("The points stay"), Loaded.Classes[0].Attributes.FindRef(TEXT("Kraft")), 3);
@@ -511,6 +515,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FEILootTest::RunTest(const FString& Parameters)
 {
+	constexpr float FoundExperience = 50.0f;
 	struct FState
 	{
 		FString Item;
@@ -529,34 +534,33 @@ bool FEILootTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([Remember](const FEIPlayContext& Context)
 	{
 		Context.Test->TestEqual(TEXT("A new player has no experience"), Profile(Context)->GetSave().Experience, 0);
-		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
 		Remember(Context);
 		const FEIRewardValues& Rewards = Profile(Context)->GetTable().Rewards;
 		const FEIItemTable& Table = Profile(Context)->GetTable();
-		Context.Test->TestEqual(TEXT("The ritual brings one item"), Profile(Context)->GetLoot().Num(), 1);
+		Context.Test->TestEqual(TEXT("A find brings one item"), Profile(Context)->GetLoot().Num(), 1);
 		const FEIItem& Item = Table.Items[Profile(Context)->GetLoot()[0].Item];
-		Context.Test->TestTrue(TEXT("The ritual brings a weapon or a rune"), Item.Slot == EEISlot::Weapon || Item.Slot == EEISlot::Rune);
 		Context.Test->TestTrue(TEXT("It fits the class"), Item.FitsClass(false));
 		Context.Test->TestFalse(TEXT("It is not safe yet"), Profile(Context)->GetSave().Items.Contains(Item.Name));
-		Context.Test->TestEqual(TEXT("The experience is there at once"), Profile(Context)->GetSave().Experience, FMath::RoundToInt32(Rewards.RitualExperience));
+		Context.Test->TestEqual(TEXT("The experience is there at once"), Profile(Context)->GetSave().Experience, FMath::RoundToInt32(FoundExperience));
 		Context.Test->TestTrue(TEXT("The screen says so"), Profile(Context)->GetRewardNote() > 0.0f);
 		Context.Test->TestTrue(TEXT("The note names the item"), Profile(Context)->GetRewardText().Contains(Item.Name));
 
 		// The next one is something else, as long as there is something else.
-		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
 		Context.Test->TestNotEqual(TEXT("The second reward is another item"), Profile(Context)->GetLoot()[1].Item, Profile(Context)->GetLoot()[0].Item);
 
 		// Without the barge the loot is gone.
 		Profile(Context)->EndRun(false);
 		Context.Test->TestFalse(TEXT("A failed run loses the item"), Profile(Context)->GetSave().Items.Contains(Item.Name));
 		Context.Test->TestEqual(TEXT("The loot can still be read"), Profile(Context)->GetLoot()[0].Result, FString(TEXT("verloren")));
-		Context.Test->TestEqual(TEXT("A failed run keeps the experience"), Profile(Context)->GetSave().Experience, FMath::RoundToInt32(Rewards.RitualExperience * 2.0f));
+		Context.Test->TestEqual(TEXT("A failed run keeps the experience"), Profile(Context)->GetSave().Experience, FMath::RoundToInt32(FoundExperience * 2.0f));
 		Profile(Context)->StartFresh();
 		Context.Test->TestEqual(TEXT("A new run has an empty bag"), Profile(Context)->GetLoot().Num(), 0);
 		Context.Test->TestEqual(TEXT("A new run counts from nothing"), Profile(Context)->GetRunExperience(), 0);
 
 		// In the barge it is safe.
-		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
 		Remember(Context);
 		Profile(Context)->EndRun(true);
 		Context.Test->TestTrue(TEXT("Getting away secures the item"), Profile(Context)->GetSave().Items.Contains(Profile(Context)->GetTable().Items[Profile(Context)->GetLoot()[0].Item].Name));
@@ -570,7 +574,7 @@ bool FEILootTest::RunTest(const FString& Parameters)
 			Save.Items.Add(Entry.Name, 0);
 		}
 		Profile(Context)->EquipByName(TEXT("Frostrune"));
-		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
 		Profile(Context)->EndRun(true);
 		Context.Test->TestTrue(TEXT("A second find raises the quality"), Profile(Context)->GetLoot()[0].Result.Contains(Table.GetQualityName(1)));
 		Context.Test->TestEqual(TEXT("It counts in the save"), Save.Items.FindRef(Table.Items[Profile(Context)->GetLoot()[0].Item].Name), 1);
@@ -583,9 +587,9 @@ bool FEILootTest::RunTest(const FString& Parameters)
 		}
 		Profile(Context)->EquipByName(TEXT("Frostrune"));
 		const int32 Before = Save.Experience;
-		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
 		Profile(Context)->EndRun(true);
-		Context.Test->TestEqual(TEXT("A find of the best is worth experience"), Save.Experience, Before + FMath::RoundToInt32(Rewards.RitualExperience + Rewards.DuplicateExperience));
+		Context.Test->TestEqual(TEXT("A find of the best is worth experience"), Save.Experience, Before + FMath::RoundToInt32(FoundExperience + Rewards.DuplicateExperience));
 		Profile(Context)->StartFresh();
 		Save.Items.Reset();
 		for (const FString& Name : Table.StartItems)
@@ -604,8 +608,8 @@ bool FEILootTest::RunTest(const FString& Parameters)
 		const int32 Stage = FMath::RoundToInt32(Rewards.ForgedFromStage);
 		GameMode->GetRun()->SetCorruptionStage(Stage);
 		const int32 Before = Profile(Context)->GetSave().Experience;
-		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
-		const int32 Expected = FMath::RoundToInt32(Rewards.RitualExperience * (1.0f + Rewards.ExperiencePerStage * Stage));
+		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
+		const int32 Expected = FMath::RoundToInt32(FoundExperience * (1.0f + Rewards.ExperiencePerStage * Stage));
 		Context.Test->TestEqual(TEXT("More corruption brings more experience"), Profile(Context)->GetSave().Experience - Before, Expected);
 		Context.Test->TestEqual(TEXT("From that stage on a new item comes forged"), Profile(Context)->GetLoot()[0].Quality, 1);
 		Profile(Context)->EndRun(true);
@@ -621,7 +625,7 @@ bool FEILootTest::RunTest(const FString& Parameters)
 	{
 		for (int32 Count = 0; Count < 4; ++Count)
 		{
-			Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+			Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
 		}
 		for (const FEILootLine& Line : Profile(Context)->GetLoot())
 		{
@@ -821,6 +825,8 @@ bool FEIExperienceTest::RunTest(const FString& Parameters)
 		FEIGearMenu& Menu = Context.Player->GetMenu();
 		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
 		Context.Test->TestTrue(TEXT("The page shows the level"), Menu.Shows(TEXT("Level 3")));
+		Context.Test->TestTrue(TEXT("The page shows the gold"), Menu.Shows(TEXT("Gold 0")));
+		Context.Test->TestTrue(TEXT("The page shows the points of a faction"), Menu.Shows(TEXT("Feuer 0")));
 		const FEIMenuElement* Minus = Menu.FindButton(TEXT("- Kraft"));
 		Context.Test->TestNotNull(TEXT("The page has the button"), Minus);
 		Menu.Click(Minus->X + 1.0f, Minus->Y + 1.0f);

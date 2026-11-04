@@ -11,9 +11,6 @@
 	"waffe_element_bonus": 0.1,
 	"start_items": ["Flammenschwert", "Feuerstab", "Frostrune"],
 	"belohnung": {
-		"ritual_erfahrung": 100,
-		"anfuehrer_erfahrung": 40,
-		"schrein_erfahrung": 40,
 		"doppelt_erfahrung": 30,
 		"umkreis_m": 40,
 		"verderbnis_erfahrung_je_stufe": 0.1,

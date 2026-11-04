@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "EIRunDirector.h"
 #include "GameFramework/Actor.h"
 #include "EIAltar.generated.h"
 
@@ -13,11 +12,10 @@ enum class EEIAltarState : uint8
 {
 	Dormant,
 	Active,
-	Broken,
-	Shrine
+	Broken
 };
 
-/** A stone with a glowing crystal at a place on the map. The ritual is disturbed by holding the zone of the active altars. */
+/** A stone with a crystal at a place on the map. A contract wakes it up, and holding its zone for long enough breaks it. */
 UCLASS()
 class EISENSEELEN_API AEIAltar : public AActor
 {
@@ -31,15 +29,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
 	bool IsActive() const { return State == EEIAltarState::Active; }
 
-	/** A small job on the side: whoever holds its zone for a short while gets a reward. */
-	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
-	bool IsShrine() const { return State == EEIAltarState::Shrine; }
-
-	float GetShrineLeft() const { return ShrineLeft; }
-	bool IsShrineHeld() const { return bShrineHeld; }
-
-	/** Server only. */
-	void SetShrineHold(float SecondsLeft, bool bHeld);
+	/** Server only. Wakes it up for a contract, in the color of the faction. */
+	void StartJob(float NewZoneMeters, const FLinearColor& Color);
 
 	/** Server only. */
 	void SetState(EEIAltarState NewState);
@@ -71,11 +62,11 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_State)
 	EEIAltarState State = EEIAltarState::Dormant;
 
-	UPROPERTY(Replicated)
-	float ShrineLeft = 0.0f;
+	UPROPERTY(ReplicatedUsing = OnRep_State)
+	float ZoneMeters = 0.0f;
 
-	UPROPERTY(Replicated)
-	bool bShrineHeld = false;
+	UPROPERTY(ReplicatedUsing = OnRep_State)
+	FLinearColor JobColor = FLinearColor::White;
 
-	FEIRunValues Values;
+	EEIAltarState ShownState = EEIAltarState::Dormant;
 };

@@ -89,10 +89,10 @@ def add_place(actors, place, index):
 
 
 def add_cover(actors, layout):
-    """Loose blocks that give cover and break the view. They keep clear of the places and the beacons."""
+    """Loose blocks that give cover and break the view. They keep clear of the places and the open spaces."""
     rng = random.Random(layout["deckung_zufall"])
     half = layout["boden_m"] / 2 - COVER_CLEAR_M
-    taken = [(p["x_m"], p["y_m"]) for p in layout["orte"] + layout["leuchtfeuer"] + layout["sprungfelder"]]
+    taken = [(p["x_m"], p["y_m"]) for p in layout["orte"] + layout["freiflaechen"] + layout["sprungfelder"]]
     placed = 0
     while placed < layout["deckung_anzahl"]:
         x, y = rng.uniform(-half, half), rng.uniform(-half, half)
@@ -121,7 +121,7 @@ def add_chests(actors, layout, cover):
     rng = random.Random(layout["deckung_zufall"] + 1)
     half = layout["boden_m"] / 2 - CHEST_CLEAR_EDGE_M
     keep_clear = [(point, CHEST_CLEAR_COVER_M) for point in cover]
-    keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PLACE_M) for p in layout["orte"] + layout["leuchtfeuer"]]
+    keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PLACE_M) for p in layout["orte"] + layout["freiflaechen"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PAD_M) for p in layout["sprungfelder"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_CAMP_M) for p in layout["lager"]]
     keep_clear.append(((0, 0), CHEST_CLEAR_PLACE_M))
@@ -174,10 +174,6 @@ def main():
     navigation = spawn(actors, unreal.NavMeshBoundsVolume, label="Wegfindung")
     scale = floor_size / VOLUME_BRUSH_M
     navigation.set_actor_scale3d(unreal.Vector(scale, scale, NAVIGATION_HEIGHT_M / VOLUME_BRUSH_M))
-
-    beacon_class = unreal.load_class(None, "/Script/Eisenseelen.EIBeacon")
-    for beacon in layout["leuchtfeuer"]:
-        spawn(actors, beacon_class, location=(beacon["x_m"] * CM_PER_M, beacon["y_m"] * CM_PER_M, 0), label="Leuchtfeuer")
 
     barge = layout["barke"]
     barge_location = [barge["x_m"] * CM_PER_M, barge["y_m"] * CM_PER_M, barge["hoehe_m"] * CM_PER_M]

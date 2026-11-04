@@ -13,17 +13,6 @@ namespace
 {
 	constexpr float RewardNoteSeconds = 5.0f;
 
-	const TCHAR* RewardSourceName(EEIRewardSource Source)
-	{
-		switch (Source)
-		{
-		case EEIRewardSource::Ritual: return TEXT("Ritual gest\u00F6rt");
-		case EEIRewardSource::Leader: return TEXT("Anf\u00FChrer besiegt");
-		case EEIRewardSource::Shrine: return TEXT("Schrein gehalten");
-		default: return TEXT("Gefunden");
-		}
-	}
-
 	bool AllowsGearChange(EEIRunPhase Phase)
 	{
 		return Phase == EEIRunPhase::None || Phase == EEIRunPhase::OnBarge || Phase == EEIRunPhase::Escaped || Phase == EEIRunPhase::Failed;
@@ -71,6 +60,10 @@ void UEIProfileComponent::LoadTable()
 	if (!FEIItemTable::LoadFromProjectFiles(Table, Error))
 	{
 		FEIDataFile::ReportError(TEXT("items.json"), Error);
+	}
+	if (!FEIContractTable::LoadFromProjectFile(ContractTable, Error))
+	{
+		FEIDataFile::ReportError(TEXT("vertraege.json"), Error);
 	}
 }
 
@@ -344,7 +337,7 @@ int32 UEIProfileComponent::ScaleExperience(float Experience) const
 	return FMath::RoundToInt32(Experience * (1.0f + Table.Rewards.ExperiencePerStage * GetCorruptionStage()));
 }
 
-int32 UEIProfileComponent::RollItem(EEIRewardSource Source, int32 Quality)
+int32 UEIProfileComponent::RollItem(int32 Quality)
 {
 	const AEIHeroCharacter* Hero = GetPlayer()->GetPawn<AEIHeroCharacter>();
 	const bool bArcanist = Hero != nullptr && Hero->GetHeroClass() == EEIHeroClass::Arcanist;
@@ -355,10 +348,7 @@ int32 UEIProfileComponent::RollItem(EEIRewardSource Source, int32 Quality)
 	for (int32 Index = 0; Index < Table.Items.Num(); ++Index)
 	{
 		const FEIItem& Item = Table.Items[Index];
-		const bool bWeaponOrRune = Item.Slot == EEISlot::Weapon || Item.Slot == EEISlot::Rune;
-		const bool bArmor = Item.Slot == EEISlot::Helmet || Item.Slot == EEISlot::Chest || Item.Slot == EEISlot::Gloves || Item.Slot == EEISlot::Boots;
-		const bool bKind = Source == EEIRewardSource::Ritual ? bWeaponOrRune : (Source == EEIRewardSource::Enemy ? bWeaponOrRune || bArmor : bArmor);
-		if (!bKind || !Item.FitsClass(bArcanist))
+		if (Item.Slot == EEISlot::Crystal || !Item.FitsClass(bArcanist))
 		{
 			continue;
 		}
@@ -395,21 +385,14 @@ int32 UEIProfileComponent::RollItem(EEIRewardSource Source, int32 Quality)
 	return Picked;
 }
 
-void UEIProfileComponent::GrantReward(EEIRewardSource Source)
-{
-	const float Experience = Source == EEIRewardSource::Ritual ? Table.Rewards.RitualExperience : (Source == EEIRewardSource::Leader ? Table.Rewards.LeaderExperience : Table.Rewards.ShrineExperience);
-	const int32 Quality = GetCorruptionStage() >= FMath::RoundToInt32(Table.Rewards.ForgedFromStage) ? 1 : 0;
-	ClientReceiveReward(RollItem(Source, Quality), Quality, ScaleExperience(Experience), Source);
-}
-
 void UEIProfileComponent::GrantEnemyReward(float Experience, float ItemChance)
 {
 	const int32 Quality = GetCorruptionStage() >= FMath::RoundToInt32(Table.Rewards.ForgedFromStage) ? 1 : 0;
-	const int32 Item = FMath::FRand() < ItemChance ? RollItem(EEIRewardSource::Enemy, Quality) : INDEX_NONE;
-	ClientReceiveReward(Item, Quality, ScaleExperience(Experience), EEIRewardSource::Enemy);
+	const int32 Item = FMath::FRand() < ItemChance ? RollItem(Quality) : INDEX_NONE;
+	ClientReceiveReward(Item, Quality, ScaleExperience(Experience));
 }
 
-void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Item, int32 Quality, int32 Experience, EEIRewardSource Source)
+void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Item, int32 Quality, int32 Experience)
 {
 	const int32 LevelBefore = Table.GetLevel(Save.Experience);
 	Save.Experience += Experience;
@@ -418,35 +401,50 @@ void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Item, int32 Q
 	const FString LevelNote = LevelAfter > LevelBefore ? FString::Printf(TEXT("Level %d! Einen neuen Punkt verteilst du in der Ausr\u00FCstung."), LevelAfter) : FString();
 
 	// An ordinary kill does not interrupt with a note every time.
-	if (Source == EEIRewardSource::Enemy && !Table.Items.IsValidIndex(Item))
+	const bool bFound = Table.Items.IsValidIndex(Item);
+	if (!bFound && LevelNote.IsEmpty())
 	{
-		if (!LevelNote.IsEmpty())
-		{
-			RewardText = LevelNote;
-			RewardNoteRemaining = RewardNoteSeconds;
-			EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
-		}
 		return;
 	}
-	if (Table.Items.IsValidIndex(Item))
+	if (bFound)
 	{
 		FEILootLine Line;
 		Line.Item = Item;
 		Line.Quality = Quality;
-		Line.Source = Source;
 		Loot.Add(Line);
-		RewardText = FString::Printf(TEXT("%s: %s, +%d Erfahrung"), RewardSourceName(Source), *Table.Items[Item].Name, Experience);
 	}
-	else
-	{
-		RewardText = FString::Printf(TEXT("%s: +%d Erfahrung"), RewardSourceName(Source), Experience);
-	}
-	if (!LevelNote.IsEmpty())
-	{
-		RewardText += TEXT("   ") + LevelNote;
-	}
-	RewardNoteRemaining = RewardNoteSeconds;
+	const FString FoundNote = bFound ? FString::Printf(TEXT("Gefunden: %s"), *Table.Items[Item].Name) : FString();
+	ClientShowNote_Implementation(FoundNote + (bFound && !LevelNote.IsEmpty() ? TEXT("   ") : TEXT("")) + LevelNote);
 	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
+}
+
+void UEIProfileComponent::ClientShowNote_Implementation(const FString& Text)
+{
+	RewardText = Text;
+	RewardNoteRemaining = RewardNoteSeconds;
+}
+
+void UEIProfileComponent::GrantContract(int32 Faction, int32 Gold, int32 Points)
+{
+	ClientReceiveContract(Faction, Gold, Points);
+}
+
+void UEIProfileComponent::ClientReceiveContract_Implementation(int32 Faction, int32 Gold, int32 Points)
+{
+	const FEIFaction* Found = ContractTable.FindFaction(Faction);
+	if (Found == nullptr)
+	{
+		return;
+	}
+	RunGold += Gold;
+	RunPoints.FindOrAdd(Found->Name) += Points;
+	ClientShowNote_Implementation(FString::Printf(TEXT("%s-Vertrag erf\u00FCllt: +%d Gold, +%d %spunkte"), *Found->Name, Gold, Points, *Found->Name));
+	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
+}
+
+int32 UEIProfileComponent::GetSecured(int32 Amount) const
+{
+	return bLastRunEscaped ? Amount : ContractTable.GetKeptOnFailure(Amount);
 }
 
 FString UEIProfileComponent::AddToSave(int32 Item, int32 Quality)
@@ -477,6 +475,12 @@ void UEIProfileComponent::EndRun(bool bEscaped)
 
 void UEIProfileComponent::ClientEndRun_Implementation(bool bEscaped)
 {
+	bLastRunEscaped = bEscaped;
+	Save.Gold += GetSecured(RunGold);
+	for (const TPair<FString, int32>& Pair : RunPoints)
+	{
+		Save.FactionPoints.FindOrAdd(Pair.Key) += GetSecured(Pair.Value);
+	}
 	for (FEILootLine& Line : Loot)
 	{
 		Line.Result = bEscaped ? AddToSave(Line.Item, Line.Quality) : FString(TEXT("verloren"));
@@ -496,6 +500,8 @@ void UEIProfileComponent::ClientStartFresh_Implementation()
 	LoadTable();
 	Loot.Reset();
 	RunExperience = 0;
+	RunGold = 0;
+	RunPoints.Reset();
 	RewardNoteRemaining = 0.0f;
 	WriteSave();
 	SendSetups();

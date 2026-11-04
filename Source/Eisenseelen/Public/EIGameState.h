@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EIContracts.h"
 #include "GameFramework/GameStateBase.h"
 #include "EIGameState.generated.h"
 
@@ -10,10 +11,8 @@ enum class EEIRunPhase : uint8
 {
 	None,
 	OnBarge,
-	Exploring,
-	Ritual,
-	RitualDone,
-	BeaconLit,
+	Contracts,
+	FlareLit,
 	BargeWaiting,
 	Escaped,
 	Failed
@@ -33,12 +32,19 @@ public:
 
 	EEIRunPhase GetRunPhase() const { return RunPhase; }
 	float GetRunSeconds() const;
-	float GetBeaconHoldLeft() const { return BeaconHoldLeft; }
-	bool IsBeaconHeld() const { return bBeaconHeld; }
-	int32 GetAltarsBroken() const { return AltarsBroken; }
-	int32 GetAltarsTotal() const { return AltarsTotal; }
-	float GetAltarHoldLeft() const { return AltarHoldLeft; }
-	bool IsAltarHeld() const { return bAltarHeld; }
+	float GetFlareHoldLeft() const { return FlareHoldLeft; }
+	bool IsFlareHeld() const { return bFlareHeld; }
+
+	const TArray<FEIContract>& GetContracts() const { return Contracts; }
+	int32 CountContractsDone() const;
+	int32 GetContractsToFlare() const { return ContractsToFlare; }
+
+	/** Whether somebody stands in the zone of a contract right now. */
+	bool IsContractHeld() const;
+
+	/** Enough contracts are done, and the flare has not been fired yet. */
+	bool CanFireFlare() const;
+
 	int32 GetCorruptionStage() const { return CorruptionStage; }
 	bool IsBloodMoon() const { return bBloodMoon; }
 
@@ -50,9 +56,9 @@ public:
 	void ResetRunClock();
 	void StartRunClock();
 	void StopRunClock();
-	void SetBeaconHold(float SecondsLeft, bool bHeld);
-	void SetAltarProgress(int32 Broken, int32 Total);
-	void SetAltarHold(float SecondsLeft, bool bHeld);
+	void SetFlareHold(float SecondsLeft, bool bHeld);
+	void SetContracts(const TArray<FEIContract>& NewContracts, int32 ToFlare);
+	TArray<FEIContract>& EditContracts() { return Contracts; }
 
 	/** Share is how far along the way to the worst the sky should be, from 0 to 1. */
 	void SetCorruption(int32 Stage, float Share, bool bIsBloodMoon);
@@ -79,22 +85,16 @@ private:
 	float RunEndedAfter = 0.0f;
 
 	UPROPERTY(Replicated)
-	float BeaconHoldLeft = 0.0f;
+	float FlareHoldLeft = 0.0f;
 
 	UPROPERTY(Replicated)
-	bool bBeaconHeld = false;
+	bool bFlareHeld = false;
 
 	UPROPERTY(Replicated)
-	int32 AltarsBroken = 0;
+	TArray<FEIContract> Contracts;
 
 	UPROPERTY(Replicated)
-	int32 AltarsTotal = 0;
-
-	UPROPERTY(Replicated)
-	float AltarHoldLeft = 0.0f;
-
-	UPROPERTY(Replicated)
-	bool bAltarHeld = false;
+	int32 ContractsToFlare = 0;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CorruptionStage)
 	int32 CorruptionStage = 0;

@@ -1,15 +1,14 @@
 #include "EIHud.h"
 
-#include "EIAltar.h"
-#include "EIBeacon.h"
 #include "EICasterComponent.h"
 #include "EIChest.h"
+#include "EIContracts.h"
 #include "EIEnemy.h"
+#include "EIFlare.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
-#include "EIOmenComponent.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
@@ -42,17 +41,11 @@ namespace
 	constexpr float ThreatInViewDot = 0.6f;
 	constexpr float ThreatMarkSize = 18.0f;
 	constexpr float ThreatEdgeShare = 0.42f;
-	const FLinearColor BeaconMarkColor(1.0f, 0.55f, 0.1f);
-	const FLinearColor AltarMarkColor(0.7f, 0.3f, 1.0f);
+	const FLinearColor FlareMarkColor(1.0f, 0.55f, 0.1f);
 	const FLinearColor TextShadowColor(0.0f, 0.0f, 0.0f, 0.75f);
 	constexpr float TextShadowOffset = 1.5f;
-	const FLinearColor QuestMarkColor(0.3f, 0.95f, 0.75f);
-	constexpr float QuestMarkRangeCm = 12000.0f;
-	constexpr float LeaderMarkAboveCm = 170.0f;
-	const FLinearColor ChestMarkColor(1.0f, 0.8f, 0.25f);
-	const FLinearColor GuardedChestMarkColor(1.0f, 0.3f, 0.15f);
-	const FLinearColor OmenColor(1.0f, 0.85f, 0.45f);
-	constexpr float ChestMarkRangeCm = 4000.0f;
+	constexpr float ContractMarkAboveCm = 220.0f;
+	const FLinearColor RewardColor(1.0f, 0.85f, 0.45f);
 	const FLinearColor BargeMarkColor(0.5f, 0.85f, 1.0f);
 	const FLinearColor WarningTextColor(1.0f, 0.25f, 0.15f);
 	constexpr float WorldMarkSize = 10.0f;
@@ -65,6 +58,15 @@ namespace
 	constexpr float MenuTextInset = 10.0f;
 	constexpr float MenuTextDrop = 6.0f;
 	constexpr float CentimetersPerMeter = 100.0f;
+	constexpr float BoardMapSize = 300.0f;
+	constexpr float BoardListWidth = 400.0f;
+	constexpr float BoardY = 110.0f;
+	constexpr float BoardLine = 22.0f;
+	constexpr float BoardMarkSize = 12.0f;
+	constexpr float BoardHeroSize = 8.0f;
+	constexpr float BoardHeroAheadDistance = 9.0f;
+	constexpr float BoardHeroAheadSize = 4.0f;
+	const FLinearColor BoardFloorColor(0.14f, 0.14f, 0.16f, 0.9f);
 }
 
 void AEIHud::DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Color)
@@ -99,7 +101,7 @@ void AEIHud::DrawHUD()
 		return;
 	}
 	const TCHAR* GearKey = Player != nullptr && Player->GetProfile()->CanChangeGear() ? TEXT("I Ausr\u00FCstung   ") : TEXT("");
-	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   Q %s   %sF benutzen   C Klasse   %s%sR Neustart"), *SpellName, *RuneKey, GearKey, bHasRun ? TEXT("") : TEXT("H Horde   ")), Margin, Margin, TextColor);
+	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   Q %s   %sF benutzen   C Klasse   %s%sR Neustart"), *SpellName, *RuneKey, GearKey, bHasRun ? TEXT("M Karte   ") : TEXT("H Horde   ")), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -178,7 +180,6 @@ void AEIHud::DrawHUD()
 		}
 		DrawLine(FString::Printf(TEXT("Mana %.0f / %.0f"), Caster->GetMana(), Caster->GetMaxMana()), Margin, SpellY - 24.0f, TextColor);
 	}
-	DrawOmens(Hero, SpellY - 56.0f);
 
 	const float Charge = bArcanist ? Caster->GetChargeFraction() : Hero->GetSword()->GetChargeFraction();
 	if (Charge > 0.25f)
@@ -198,27 +199,6 @@ void AEIHud::DrawWorldMark(const FVector& Location, const FString& Label, const 
 	}
 	DrawRect(Color, OnScreen.X - WorldMarkSize / 2.0f, OnScreen.Y - WorldMarkSize / 2.0f, WorldMarkSize, WorldMarkSize);
 	DrawLine(Label, OnScreen.X + WorldMarkSize, OnScreen.Y - WorldMarkSize, TextColor);
-}
-
-void AEIHud::DrawOmens(const AEIHeroCharacter* Hero, float BottomY)
-{
-	const UEIOmenComponent* Omens = Hero->GetOmens();
-	const TArray<FEIOmen>& Table = Omens->GetTable().Omens;
-	float LineY = BottomY;
-	for (int32 Index = 0; Index < Table.Num(); ++Index)
-	{
-		const int32 Count = Omens->CountOf(Index);
-		if (Count > 0)
-		{
-			DrawLine(Count > 1 ? FString::Printf(TEXT("%s x%d"), *Table[Index].Name, Count) : Table[Index].Name, Margin, LineY, OmenColor);
-			LineY -= 22.0f;
-		}
-	}
-	if (Omens->GetFoundNote() > 0.0f && Table.IsValidIndex(Omens->GetLastFound()))
-	{
-		const FEIOmen& Found = Table[Omens->GetLastFound()];
-		DrawLine(FString::Printf(TEXT("%s: %s"), *Found.Name, *Found.Describe()), Canvas->SizeX / 2.0f - 200.0f, 150.0f, OmenColor, 1.5f);
-	}
 }
 
 void AEIHud::DrawMenu(AEIPlayerController* Player, const AEIHeroCharacter& Hero)
@@ -252,7 +232,27 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 	const UEIProfileComponent* Profile = Player->GetProfile();
 	const TArray<FEILootLine>& Loot = Profile->GetLoot();
 	const bool bEscaped = State->GetRunPhase() == EEIRunPhase::Escaped;
-	const float PanelHeight = PanelPadding * 2.0f + PanelLine * (6 + Loot.Num()) + 40.0f;
+
+	// Without the barge only a share stays, and it says how much of what.
+	TArray<FString> Earned;
+	const auto AddEarned = [Profile, bEscaped, &Earned](const FString& Name, int32 Amount)
+	{
+		Earned.Add(bEscaped
+			? FString::Printf(TEXT("%s: +%d"), *Name, Amount)
+			: FString::Printf(TEXT("%s: %d von %d bleiben"), *Name, Profile->GetSecured(Amount), Amount));
+	};
+	AddEarned(TEXT("Gold"), Profile->GetRunGold());
+	for (const FEIFaction& Faction : Profile->GetContractTable().Factions)
+	{
+		const int32 Points = Profile->GetRunPoints(Faction.Name);
+		if (Points > 0)
+		{
+			AddEarned(Faction.Name + TEXT("punkte"), Points);
+		}
+	}
+
+	const int32 LootLines = Loot.IsEmpty() ? 0 : Loot.Num() + 1;
+	const float PanelHeight = PanelPadding * 2.0f + PanelLine * (4 + Earned.Num() + LootLines) + 40.0f;
 	const float X = Canvas->SizeX / 2.0f - PanelWidth / 2.0f;
 	float Y = FMath::Max(Margin, Canvas->SizeY / 2.0f - PanelHeight / 2.0f);
 	DrawRect(PanelColor, X, Y, PanelWidth, PanelHeight);
@@ -260,21 +260,122 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 	Y += PanelPadding;
 	DrawLine(bEscaped ? TEXT("Entkommen!") : TEXT("Lauf gescheitert"), TextX, Y, bEscaped ? TextColor : WarningTextColor, 2.0f);
 	Y += 40.0f + PanelLine / 2.0f;
-	DrawLine(FString::Printf(TEXT("Laufzeit %s, %d Omen"), *Clock, Hero->GetOmens()->CountAll()), TextX, Y, TextColor);
+	DrawLine(FString::Printf(TEXT("Laufzeit %s, %d von %d Vertr\u00E4gen erf\u00FCllt"), *Clock, State->CountContractsDone(), State->GetContracts().Num()), TextX, Y, TextColor);
 	Y += PanelLine;
+	for (const FString& Line : Earned)
+	{
+		DrawLine(Line, TextX, Y, RewardColor);
+		Y += PanelLine;
+	}
 	DrawLine(FString::Printf(TEXT("Erfahrung: +%d, sie bleibt in jedem Fall. Du bist Level %d."), Profile->GetRunExperience(), Profile->GetLevel()), TextX, Y, TextColor);
 	Y += PanelLine;
-	DrawLine(Loot.IsEmpty() ? FString(TEXT("Keine Beute")) : FString(bEscaped ? TEXT("Beute:") : TEXT("Diese Beute ist verloren:")), TextX, Y, TextColor);
-	Y += PanelLine;
+	if (!Loot.IsEmpty())
+	{
+		DrawLine(bEscaped ? TEXT("Gefunden:") : TEXT("Diese Funde sind verloren:"), TextX, Y, TextColor);
+		Y += PanelLine;
+	}
 	for (const FEILootLine& Line : Loot)
 	{
 		const FEIItemTable& Table = Profile->GetTable();
 		const FString Name = Table.Items.IsValidIndex(Line.Item) ? Table.Items[Line.Item].Name : FString();
-		DrawLine(FString::Printf(TEXT("%s: %s"), *Name, *Line.Result), TextX + PanelPadding, Y, bEscaped ? OmenColor : LostColor);
+		DrawLine(FString::Printf(TEXT("%s: %s"), *Name, *Line.Result), TextX + PanelPadding, Y, bEscaped ? RewardColor : LostColor);
 		Y += PanelLine;
 	}
 	Y += PanelLine / 2.0f;
 	DrawLine(TEXT("I Ausr\u00FCstung   R startet einen neuen Lauf"), TextX, Y, TextColor);
+}
+
+void AEIHud::DrawContracts(const AEIHeroCharacter* Hero, const AEIGameState* State, const FEIContractTable& Table, float PromptY)
+{
+	const float CenterX = Canvas->SizeX / 2.0f;
+	for (const FEIContract& Contract : State->GetContracts())
+	{
+		const FEIContractTask* Task = Table.FindTask(Contract.Kind);
+		const FEIFaction* Faction = Table.FindFaction(Contract.Faction);
+		if (Contract.bDone || Task == nullptr || Faction == nullptr)
+		{
+			continue;
+		}
+		const FString Label = FString::Printf(TEXT("%s: %s %.0f m"), *Faction->Name, *Task->ShortName, FVector::Dist(Hero->GetActorLocation(), Contract.Location) / CentimetersPerMeter);
+		DrawWorldMark(Contract.Location + FVector(0.0f, 0.0f, ContractMarkAboveCm), Label, Faction->Color);
+		if (Contract.bHeld && FVector::Dist2D(Hero->GetActorLocation(), Contract.Location) <= Task->ZoneMeters * CentimetersPerMeter)
+		{
+			DrawLine(FString::Printf(TEXT("%s: noch %.0f s halten"), *Task->ShortName, Contract.HoldLeft), CenterX - 130.0f, PromptY - 80.0f, Faction->Color, 1.5f);
+		}
+	}
+	int32 GuardsLeft = 0;
+	for (TActorIterator<AEIChest> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsInUse() || It->IsOpen())
+		{
+			continue;
+		}
+		GuardsLeft += It->GetGuardsLeft();
+		if (It->IsInReach(Hero))
+		{
+			const bool bFree = It->GetState() == EEIChestState::Free;
+			DrawLine(bFree ? TEXT("F: Truhe \u00F6ffnen") : TEXT("Besiege erst die W\u00E4chter!"), CenterX - (bFree ? 95.0f : 150.0f), PromptY - 40.0f, bFree ? TextColor : WarningTextColor, 1.5f);
+		}
+	}
+	if (GuardsLeft > 0)
+	{
+		DrawLine(FString::Printf(TEXT("W\u00E4chter: %d"), GuardsLeft), CenterX - 70.0f, 190.0f, WarningTextColor, 1.5f);
+	}
+}
+
+void AEIHud::DrawContractBoard(const AEIHeroCharacter* Hero, const AEIGameState* State, const FEIContractTable& Table)
+{
+	const TArray<FEIContract>& Contracts = State->GetContracts();
+	const float Width = PanelPadding * 3.0f + BoardMapSize + BoardListWidth;
+	const float Height = PanelPadding * 2.0f + BoardMapSize;
+	const float X = Canvas->SizeX - Width - Margin;
+	DrawRect(PanelColor, X, BoardY, Width, Height);
+
+	// Up on the map is the way the hero looks with no turn at all, and right is right.
+	const float MapX = X + PanelPadding;
+	const float MapY = BoardY + PanelPadding;
+	const float Scale = BoardMapSize / FMath::Max(Table.MapMeters * CentimetersPerMeter, 1.0f);
+	const auto ToMap = [MapX, MapY, Scale](const FVector& Location)
+	{
+		return FVector2D(MapX + BoardMapSize / 2.0f + Location.Y * Scale, MapY + BoardMapSize / 2.0f - Location.X * Scale);
+	};
+	DrawRect(BoardFloorColor, MapX, MapY, BoardMapSize, BoardMapSize);
+
+	const float ListX = MapX + BoardMapSize + PanelPadding;
+	float ListY = MapY;
+	const int32 Stage = State->GetCorruptionStage();
+	for (int32 Index = 0; Index < Contracts.Num(); ++Index)
+	{
+		const FEIContract& Contract = Contracts[Index];
+		const FEIContractTask* Task = Table.FindTask(Contract.Kind);
+		const FEIFaction* Faction = Table.FindFaction(Contract.Faction);
+		if (Task == nullptr || Faction == nullptr)
+		{
+			continue;
+		}
+		const FLinearColor Color = Contract.bDone ? LostColor : Faction->Color;
+		const FVector2D Mark = ToMap(Contract.Location);
+		DrawRect(Color, Mark.X - BoardMarkSize / 2.0f, Mark.Y - BoardMarkSize / 2.0f, BoardMarkSize, BoardMarkSize);
+		DrawLine(FString::FromInt(Index + 1), Mark.X + BoardMarkSize / 2.0f + 2.0f, Mark.Y - BoardMarkSize, TextColor);
+
+		const float Distance = static_cast<float>(FVector::Dist(Hero->GetActorLocation(), Contract.Location)) / CentimetersPerMeter;
+		DrawLine(FString::Printf(TEXT("%d  %s: %s, %.0f m"), Index + 1, *Faction->Name, *Task->Name, Distance), ListX, ListY, Color);
+		ListY += BoardLine;
+		const FString Pay = Contract.bDone ? FString(TEXT("erf\u00FCllt")) : FString::Printf(TEXT("%d Gold, %d %spunkte"), Table.GetGold(Stage), Table.GetPoints(Stage), *Faction->Name);
+		DrawLine(Pay, ListX + 22.0f, ListY, Contract.bDone ? LostColor : TextColor);
+		ListY += BoardLine * 1.25f;
+	}
+
+	for (TActorIterator<AEIFlare> It(GetWorld()); It; ++It)
+	{
+		const FVector2D Mark = ToMap(It->GetActorLocation());
+		DrawRect(FlareMarkColor, Mark.X - BoardMarkSize / 2.0f, Mark.Y - BoardMarkSize / 2.0f, BoardMarkSize, BoardMarkSize);
+	}
+	const FVector2D HeroMark = ToMap(Hero->GetActorLocation());
+	const FVector Ahead = Hero->GetViewRotation().Vector().GetSafeNormal2D();
+	const FVector2D AheadMark = HeroMark + FVector2D(Ahead.Y, -Ahead.X) * BoardHeroAheadDistance;
+	DrawRect(FLinearColor::White, HeroMark.X - BoardHeroSize / 2.0f, HeroMark.Y - BoardHeroSize / 2.0f, BoardHeroSize, BoardHeroSize);
+	DrawRect(FLinearColor::White, AheadMark.X - BoardHeroAheadSize / 2.0f, AheadMark.Y - BoardHeroAheadSize / 2.0f, BoardHeroAheadSize, BoardHeroAheadSize);
 }
 
 void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
@@ -295,77 +396,41 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	}
 	const float LineY = Margin + 48.0f;
 	const float CenterX = Canvas->SizeX / 2.0f;
-	if (const AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner); Player != nullptr && Player->GetProfile()->GetRewardNote() > 0.0f)
+	const AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner);
+	if (Player == nullptr)
 	{
-		DrawLine(Player->GetProfile()->GetRewardText(), CenterX - 260.0f, RewardNoteY, OmenColor, 1.5f);
+		return;
 	}
+	const UEIProfileComponent* Profile = Player->GetProfile();
+	const FEIContractTable& Table = Profile->GetContractTable();
 	const float PromptY = Canvas->SizeY / 2.0f + 100.0f;
 	const auto DistanceLabel = [Hero](const TCHAR* Name, const FVector& Location)
 	{
 		return FString::Printf(TEXT("%s %.0f m"), Name, FVector::Dist(Hero->GetActorLocation(), Location) / CentimetersPerMeter);
 	};
-	const auto DrawActiveAltar = [this, &DistanceLabel]()
-	{
-		for (TActorIterator<AEIAltar> It(GetWorld()); It; ++It)
-		{
-			if (It->IsActive())
-			{
-				DrawWorldMark(It->GetCrystalLocation(), DistanceLabel(TEXT("Altar"), It->GetActorLocation()), AltarMarkColor);
-			}
-		}
-	};
 
 	const EEIRunPhase Phase = State->GetRunPhase();
-	if (Phase != EEIRunPhase::OnBarge && Phase != EEIRunPhase::Escaped && Phase != EEIRunPhase::Failed)
+	if (Phase != EEIRunPhase::Escaped && Phase != EEIRunPhase::Failed)
 	{
-		int32 GuardsLeft = 0;
-		for (TActorIterator<AEIChest> It(GetWorld()); It; ++It)
+		DrawContracts(Hero, State, Table, PromptY);
+		if (Phase == EEIRunPhase::OnBarge || Player->IsMapOpen())
 		{
-			GuardsLeft += It->IsInUse() ? It->GetGuardsLeft() : 0;
-			if (!It->IsInUse() || It->IsOpenFor(Hero) || FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) > ChestMarkRangeCm)
-			{
-				continue;
-			}
-			const bool bFree = It->GetState() == EEIChestState::Free;
-			if (!It->IsInReach(Hero))
-			{
-				DrawWorldMark(It->GetMarkLocation(), DistanceLabel(bFree ? TEXT("Truhe") : TEXT("Bewachte Truhe"), It->GetActorLocation()), bFree ? ChestMarkColor : GuardedChestMarkColor);
-			}
-			else if (bFree)
-			{
-				DrawLine(TEXT("F: Truhe \u00F6ffnen"), CenterX - 95.0f, PromptY - 40.0f, TextColor, 1.5f);
-			}
-			else
-			{
-				DrawLine(TEXT("Besiege erst die W\u00E4chter!"), CenterX - 150.0f, PromptY - 40.0f, WarningTextColor, 1.5f);
-			}
+			DrawContractBoard(Hero, State, Table);
 		}
-		// The small jobs on the side show from afar what they bring.
-		for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
+	}
+	if (Profile->GetRewardNote() > 0.0f)
+	{
+		DrawLine(Profile->GetRewardText(), CenterX - 260.0f, RewardNoteY, RewardColor, 1.5f);
+	}
+
+	// What this run has earned so far, which is only safe in the barge.
+	FString Purse = FString::Printf(TEXT("Beute: %d Gold"), Profile->GetRunGold());
+	for (const FEIFaction& Faction : Table.Factions)
+	{
+		const int32 Points = Profile->GetRunPoints(Faction.Name);
+		if (Points > 0)
 		{
-			if (It->IsLeader() && !It->IsDead() && FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) <= QuestMarkRangeCm)
-			{
-				DrawWorldMark(It->GetActorLocation() + FVector(0.0f, 0.0f, LeaderMarkAboveCm), DistanceLabel(TEXT("Anf\u00FChrer"), It->GetActorLocation()) + TEXT(": R\u00FCstung"), QuestMarkColor);
-			}
-		}
-		for (TActorIterator<AEIAltar> It(GetWorld()); It; ++It)
-		{
-			if (!It->IsShrine())
-			{
-				continue;
-			}
-			if (It->IsShrineHeld())
-			{
-				DrawLine(FString::Printf(TEXT("Schrein: noch %.0f s halten"), It->GetShrineLeft()), CenterX - 130.0f, PromptY - 80.0f, QuestMarkColor, 1.5f);
-			}
-			else if (FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) <= QuestMarkRangeCm)
-			{
-				DrawWorldMark(It->GetCrystalLocation(), DistanceLabel(TEXT("Schrein"), It->GetActorLocation()) + TEXT(": R\u00FCstung"), QuestMarkColor);
-			}
-		}
-		if (GuardsLeft > 0)
-		{
-			DrawLine(FString::Printf(TEXT("W\u00E4chter: %d"), GuardsLeft), CenterX - 70.0f, 190.0f, WarningTextColor, 1.5f);
+			Purse += FString::Printf(TEXT(", %d %s"), Points, *Faction.Name);
 		}
 	}
 
@@ -373,52 +438,35 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	{
 	case EEIRunPhase::OnBarge:
 		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse, mit I die Ausr\u00FCstung."), Margin, LineY, TextColor);
-		DrawActiveAltar();
+		DrawLine(FString::Printf(TEXT("Nach %d Vertr\u00E4gen kannst du die Barke rufen. Erst in der Barke ist die Beute sicher."), State->GetContractsToFlare()), Margin, LineY + 24.0f, RewardColor);
 		break;
 
-	case EEIRunPhase::Exploring:
-		DrawLine(FString::Printf(TEXT("%s   St\u00F6re das Ritual: Halte den Altar"), *Clock), Margin, LineY, TextColor);
-		DrawActiveAltar();
-		break;
-
-	case EEIRunPhase::Ritual:
-		DrawLine(FString::Printf(TEXT("%s   Altar %d von %d: noch %.0f s halten"), *Clock, State->GetAltarsBroken() + 1, State->GetAltarsTotal(), State->GetAltarHoldLeft()), Margin, LineY, TextColor);
-		DrawActiveAltar();
-		if (!State->IsAltarHeld())
+	case EEIRunPhase::Contracts:
+		if (!State->CanFireFlare())
 		{
-			DrawLine(TEXT("Geh zum Altar!"), CenterX - 90.0f, PromptY, TextColor, 1.5f);
+			DrawLine(FString::Printf(TEXT("%s   Vertr\u00E4ge: %d von %d   %s"), *Clock, State->CountContractsDone(), State->GetContractsToFlare(), *Purse), Margin, LineY, TextColor);
+		}
+		else
+		{
+			DrawLine(FString::Printf(TEXT("%s   Vertr\u00E4ge: %d erf\u00FCllt   %s"), *Clock, State->CountContractsDone(), *Purse), Margin, LineY, TextColor);
+			DrawLine(TEXT("G schie\u00DFt die Leuchtfackel und ruft die Barke, oder du machst weiter."), Margin, LineY + 24.0f, RewardColor);
 		}
 		break;
 
-	case EEIRunPhase::RitualDone:
-		DrawLine(FString::Printf(TEXT("%s   Das Ritual ist gest\u00F6rt. Entz\u00FCnde ein Leuchtfeuer, um die Barke zu rufen"), *Clock), Margin, LineY, TextColor);
-		for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)
+	case EEIRunPhase::FlareLit:
+		DrawLine(FString::Printf(TEXT("%s   Halte den Kreis noch %.0f s, bis die Barke da ist   %s"), *Clock, State->GetFlareHoldLeft(), *Purse), Margin, LineY, TextColor);
+		for (TActorIterator<AEIFlare> It(GetWorld()); It; ++It)
 		{
-			DrawWorldMark(It->GetFireLocation(), DistanceLabel(TEXT("Leuchtfeuer"), It->GetActorLocation()), BeaconMarkColor);
-			if (It->IsInReach(Hero))
-			{
-				DrawLine(TEXT("F: Leuchtfeuer entz\u00FCnden"), CenterX - 120.0f, PromptY, TextColor, 1.5f);
-			}
+			DrawWorldMark(It->GetLightLocation(), DistanceLabel(TEXT("Leuchtfackel"), It->GetActorLocation()), FlareMarkColor);
 		}
-		break;
-
-	case EEIRunPhase::BeaconLit:
-		DrawLine(FString::Printf(TEXT("%s   Halte das Feuer noch %.0f s, bis die Barke da ist"), *Clock, State->GetBeaconHoldLeft()), Margin, LineY, TextColor);
-		for (TActorIterator<AEIBeacon> It(GetWorld()); It; ++It)
+		if (!State->IsFlareHeld())
 		{
-			if (It->IsLit())
-			{
-				DrawWorldMark(It->GetFireLocation(), DistanceLabel(TEXT("Feuer"), It->GetActorLocation()), BeaconMarkColor);
-			}
-		}
-		if (!State->IsBeaconHeld())
-		{
-			DrawLine(TEXT("Zur\u00FCck zum Feuer!"), CenterX - 110.0f, PromptY, WarningTextColor, 1.5f);
+			DrawLine(TEXT("Zur\u00FCck zur Leuchtfackel!"), CenterX - 140.0f, PromptY, WarningTextColor, 1.5f);
 		}
 		break;
 
 	case EEIRunPhase::BargeWaiting:
-		DrawLine(FString::Printf(TEXT("%s   Die Barke ist da. Steig ein!"), *Clock), Margin, LineY, TextColor);
+		DrawLine(FString::Printf(TEXT("%s   Die Barke ist da. Steig ein!   %s"), *Clock, *Purse), Margin, LineY, TextColor);
 		for (TActorIterator<AEISkyBarge> It(GetWorld()); It; ++It)
 		{
 			DrawWorldMark(It->GetActorLocation(), DistanceLabel(TEXT("Barke"), It->GetActorLocation()), BargeMarkColor);

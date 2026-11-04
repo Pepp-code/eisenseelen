@@ -1,6 +1,6 @@
 {
 	"altar_welle_alle_s": 12,
-	"leuchtfeuer_welle_alle_s": 15,
+	"fackel_welle_alle_s": 15,
 	"gruppen": [
 		{ "name": "Knochentrupp", "groesse": "klein", "ab_stufe": 0, "bis_stufe": 6, "knochenlaeufer": 3 },
 		{ "name": "Spähtrupp", "groesse": "klein", "ab_stufe": 0, "bis_stufe": 6, "knochenlaeufer": 2, "knochenwerfer": 1 },
@@ -20,12 +20,12 @@
 		{ "name": "Kriegshaufen", "groesse": "elite", "ab_stufe": 5, "bis_stufe": 6, "knochenlaeufer": 2, "knochenwerfer": 2, "schildtraeger": 1, "kettenkoloss": 1 }
 	],
 	"stufen": [
-		{ "stufe": 0, "lager": "klein", "nachschub": "", "nachschub_alle_s": 0, "truhe": "mittel", "altar": "klein", "leuchtfeuer": "klein", "obergrenze": 10 },
-		{ "stufe": 1, "lager": "klein", "nachschub": "klein", "nachschub_alle_s": 45, "truhe": "mittel", "altar": "klein", "leuchtfeuer": "mittel", "obergrenze": 12 },
-		{ "stufe": 2, "lager": "klein", "nachschub": "klein", "nachschub_alle_s": 35, "truhe": "mittel", "altar": "klein", "leuchtfeuer": "mittel", "obergrenze": 14 },
-		{ "stufe": 3, "lager": "mittel", "nachschub": "mittel", "nachschub_alle_s": 40, "truhe": "mittel", "altar": "mittel", "leuchtfeuer": "gross", "obergrenze": 16 },
-		{ "stufe": 4, "lager": "mittel", "nachschub": "mittel", "nachschub_alle_s": 30, "truhe": "gross", "altar": "mittel", "leuchtfeuer": "gross", "obergrenze": 20 },
-		{ "stufe": 5, "lager": "gross", "nachschub": "gross", "nachschub_alle_s": 35, "truhe": "gross", "altar": "gross", "leuchtfeuer": "elite", "obergrenze": 24 },
-		{ "stufe": 6, "lager": "gross", "nachschub": "gross", "nachschub_alle_s": 20, "truhe": "elite", "altar": "gross", "leuchtfeuer": "elite", "obergrenze": 30 }
+		{ "stufe": 0, "lager": "klein", "nachschub": "", "nachschub_alle_s": 0, "truhe": "mittel", "altar": "klein", "fackel": "klein", "obergrenze": 10 },
+		{ "stufe": 1, "lager": "klein", "nachschub": "klein", "nachschub_alle_s": 45, "truhe": "mittel", "altar": "klein", "fackel": "mittel", "obergrenze": 12 },
+		{ "stufe": 2, "lager": "klein", "nachschub": "klein", "nachschub_alle_s": 35, "truhe": "mittel", "altar": "klein", "fackel": "mittel", "obergrenze": 14 },
+		{ "stufe": 3, "lager": "mittel", "nachschub": "mittel", "nachschub_alle_s": 40, "truhe": "mittel", "altar": "mittel", "fackel": "gross", "obergrenze": 16 },
+		{ "stufe": 4, "lager": "mittel", "nachschub": "mittel", "nachschub_alle_s": 30, "truhe": "gross", "altar": "mittel", "fackel": "gross", "obergrenze": 20 },
+		{ "stufe": 5, "lager": "gross", "nachschub": "gross", "nachschub_alle_s": 35, "truhe": "gross", "altar": "gross", "fackel": "elite", "obergrenze": 24 },
+		{ "stufe": 6, "lager": "gross", "nachschub": "gross", "nachschub_alle_s": 20, "truhe": "elite", "altar": "gross", "fackel": "elite", "obergrenze": 30 }
 	]
 }

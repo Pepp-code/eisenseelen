@@ -30,6 +30,9 @@ public:
 	FEIGearMenu& GetMenu() { return Menu; }
 	void SetMenuOpen(bool bOpen);
 
+	/** The overview of the contracts. The hero stays in the player's hands while it is open. */
+	bool IsMapOpen() const { return bMapOpen; }
+
 	/** For preview pictures: puts on an item, by its name. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewEquip(const FString& Name);
@@ -46,9 +49,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewCorruption(int32 Stage);
 
-	/** For preview pictures: the active altar breaks as soon as a hero stands in its zone. */
+	/** For preview pictures: so many open contracts count as done. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
-	void PreviewBreakAltar();
+	void PreviewSkipContracts(int32 Count);
 
 	/** For preview pictures: a group of that name appears some way in front of the hero. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
@@ -88,9 +91,14 @@ private:
 	void HandleRuneSpell();
 	void HandleClass();
 	void HandleMenu();
+	void HandleFlare();
+	void HandleMap();
 
 	UFUNCTION(Server, Reliable)
 	void ServerInteract();
+
+	UFUNCTION(Server, Reliable)
+	void ServerFireFlare();
 
 	UFUNCTION(Server, Reliable)
 	void ServerToggleClass();
@@ -151,7 +159,14 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> MenuAction;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> FlareAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> MapAction;
+
 	EEIHeroClass SelectedClass = EEIHeroClass::Bladewarden;
 	FEIGearMenu Menu;
 	bool bMenuOpen = false;
+	bool bMapOpen = false;
 };

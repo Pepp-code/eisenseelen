@@ -18,9 +18,8 @@ enum class EEIChestState : uint8
 };
 
 /**
- * A chest with an omen in it, which has to be earned: whoever steps into its circle calls its guards, and only when they
- * have fallen does the seal break. The map has more chests than a run uses, so every run finds them somewhere else. Each
- * player opens it for themselves, so nobody takes anything away from anyone.
+ * A chest that a contract asks for: whoever steps into its circle calls its guards, and only when they have fallen does
+ * the seal break. The map has more chests than a run uses, so every run finds them somewhere else.
  */
 UCLASS()
 class EISENSEELEN_API AEIChest : public AActor
@@ -38,7 +37,7 @@ public:
 
 	bool IsInZone(const AActor* Hero) const;
 	bool IsInReach(const AActor* Hero) const;
-	bool IsOpenFor(const AActor* Hero) const;
+	bool IsOpen() const { return bOpened; }
 	FVector GetMarkLocation() const;
 
 	/** Server only. A chest not in use is gone for this run. Either way it starts sealed and closed. */
@@ -49,7 +48,7 @@ public:
 	void UpdateGuards();
 
 	/** Server only. */
-	void OpenFor(AActor* Hero);
+	void Open();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -92,7 +91,7 @@ private:
 	int32 GuardsLeft = 0;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Look)
-	TArray<TObjectPtr<AActor>> OpenedBy;
+	bool bOpened = false;
 
 	TArray<TWeakObjectPtr<AEIEnemy>> Guards;
 	EEIChestState ShownState = EEIChestState::Sealed;

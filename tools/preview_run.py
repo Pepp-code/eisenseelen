@@ -56,7 +56,9 @@ def stand_looking_at(location, target, height=STAND_HEIGHT):
 def scenario():
     with open(os.path.join(unreal.Paths.project_dir(), "Data", "lauf.json"), encoding="utf-8") as file:
         run_values = json.load(file)
-    hold_seconds = run_values["leuchtfeuer_halten_s"]
+    with open(os.path.join(unreal.Paths.project_dir(), "Data", "laufkarte.json"), encoding="utf-8") as file:
+        open_space = json.load(file)["freiflaechen"][0]
+    hold_seconds = run_values["fackel_halten_s"]
 
     yield SHADER_WAIT_SECONDS
     player().preview_invulnerable()
@@ -87,7 +89,14 @@ def scenario():
     player().preview_corruption(0)
     yield 6.0
 
-    # A chest: sealed from outside its circle, with its guards in it, free once they have fallen, and open with the omen.
+    # The overview of the contracts, down on the ground.
+    yield from tap("M")
+    yield 0.2
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("M")
+
+    # A chest: sealed from outside its circle, with its guards in it, free once they have fallen, and open.
     chest = next(c for c in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIChest) if c.is_in_use())
     spot = chest.get_actor_location()
     front = chest.get_actor_forward_vector()
@@ -109,10 +118,10 @@ def scenario():
     shot()
     yield AFTER_SHOT_SECONDS
 
-    # The jobs on the side: a shrine from afar and from inside its zone, and a leader in its camp.
-    shrine = next(a for a in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar) if a.is_shrine())
-    spot = shrine.get_actor_location()
-    stand_looking_at((spot.x + 1500, spot.y + 300), (spot.x, spot.y, 200))
+    # An altar or a shrine of a contract, from afar and from inside its zone.
+    altar = next(a for a in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar) if a.is_active())
+    spot = altar.get_actor_location()
+    stand_looking_at((spot.x + 1800, spot.y + 300), (spot.x, spot.y, 200))
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
@@ -120,6 +129,8 @@ def scenario():
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
+
+    # A leader in its camp, from afar.
     leader = next(e for e in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIEnemy) if e.is_leader())
     spot = leader.get_actor_location()
     stand_looking_at((spot.x + 1600, spot.y), (spot.x, spot.y, 150))
@@ -127,52 +138,33 @@ def scenario():
     shot()
     yield AFTER_SHOT_SECONDS
 
-    # The ritual: the first altar from afar and from inside its zone, and all of them broken after that.
-    altars = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar)
-    first = True
-    while True:
-        altar = next((a for a in altars if a.is_active()), None)
-        if altar is None:
-            break
-        spot = altar.get_actor_location()
-        if first:
-            stand_looking_at((spot.x + 1800, spot.y + 300), (spot.x, spot.y, 200))
-            yield SETTLE_SECONDS
-            shot()
-            yield AFTER_SHOT_SECONDS
-        stand_looking_at((spot.x + 450, spot.y), (spot.x, spot.y, 200))
-        yield SETTLE_SECONDS
-        if first:
-            shot()
-            yield AFTER_SHOT_SECONDS
-        first = False
-        player().preview_break_altar()
-        yield 0.5
-
-    # A beacon from afar and from close by.
-    beacon = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIBeacon)[0].get_actor_location()
-    fire = (beacon.x, beacon.y, 950)
-    outward = math.hypot(beacon.x, beacon.y)
-    behind_beacon = (beacon.x + beacon.x / outward * 900, beacon.y + beacon.y / outward * 900)
-    stand_looking_at((beacon.x / outward * (outward - 3400), beacon.y / outward * (outward - 3400)), fire)
+    # Enough contracts: the note about the flare, with the overview at the place where it will fly from.
+    player().preview_skip_contracts(4)
+    open_x, open_y = open_space["x_m"] * 100, open_space["y_m"] * 100
+    stand_looking_at((open_x, open_y), (0, 0, 300))
+    yield from tap("M")
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
-    stand_looking_at((beacon.x + 300, beacon.y), (beacon.x, beacon.y, 300))
+    yield from tap("M")
+
+    # The flare climbs, and then the circle shows, the wave comes and the barge is on its way.
+    yield from tap("G")
+    stand_looking_at((open_x + 400, open_y + 400), (open_x, open_y, 900))
+    yield 0.5
+    shot()
+    yield AFTER_SHOT_SECONDS
+    stand_looking_at((open_x + 400, open_y + 400), (open_x, open_y, 2800))
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
-
-    # With the ritual broken the fire can burn: the zone shows, the wave comes and the barge is on its way.
-    # The hero waits behind the beacon.
-    yield from tap("F")
-    stand_looking_at(behind_beacon, (0, 0, -300))
+    stand_looking_at((open_x + 400, open_y + 400), (0, 0, -300))
     yield SETTLE_SECONDS
     shot()
     yield hold_seconds * 0.6
     barge = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EISkyBarge)[0]
     target = barge.get_actor_location()
-    stand_looking_at(behind_beacon, (target.x, target.y, target.z))
+    stand_looking_at((open_x + 400, open_y + 400), (target.x, target.y, target.z))
     yield SETTLE_SECONDS
     shot()
     yield hold_seconds * 0.4
@@ -190,7 +182,7 @@ def scenario():
     shot()
     yield AFTER_SHOT_SECONDS
 
-    # After the flight the gear page shows what the run has brought.
+    # After the flight the gear page shows what stays.
     yield from tap("I")
     yield 0.2
     shot()

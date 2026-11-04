@@ -2,17 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "EIContracts.h"
 #include "EIEnemyGroups.h"
 #include "EIRunDirector.generated.h"
 
-class AEIAltar;
-class AEIBeacon;
 class AEIChest;
 class AEIEnemy;
 class AEIEnemyCamp;
+class AEIFlare;
 class AEIHeroCharacter;
 class AEISkyBarge;
-enum class EEIRewardSource : uint8;
 enum class EEIRunPhase : uint8;
 
 /** The numbers of a run from Data/lauf.json. */
@@ -21,26 +20,17 @@ struct EISENSEELEN_API FEIRunValues
 	float CampFactor = 1.0f;
 	float CampRadiusMeters = 3.0f;
 	float CampRefillFromMeters = 40.0f;
-	float ChestsPerRun = 5.0f;
 	float ChestReachMeters = 3.0f;
 	float ChestZoneMeters = 10.0f;
 	float ChestGuardDistanceMeters = 6.0f;
-	float RitualAltars = 3.0f;
-	float AltarHoldSeconds = 30.0f;
-	float AltarZoneMeters = 8.0f;
-	float BeaconHoldSeconds = 60.0f;
-	float BeaconReachMeters = 4.0f;
-	float BeaconZoneMeters = 15.0f;
+	float FlareHoldSeconds = 60.0f;
+	float FlareZoneMeters = 15.0f;
 	float BargeDistanceMeters = 12.0f;
 	float BargeDepartMetersPerSecond = 6.0f;
-	float LeadersPerRun = 2.0f;
 	EEIEnemyKind LeaderKind = EEIEnemyKind::ShieldBearer;
 	float LeaderLifeFactor = 2.5f;
 	float LeaderDamageFactor = 1.5f;
 	float LeaderScaleFactor = 1.25f;
-	float ShrinesPerRun = 2.0f;
-	float ShrineHoldSeconds = 15.0f;
-	float ShrineZoneMeters = 6.0f;
 	float CorruptionEverySeconds = 120.0f;
 	float CorruptionMaxStage = 6.0f;
 	float CorruptionStrengthPerStage = 0.1f;
@@ -67,33 +57,42 @@ public:
 	/** Who comes when. Tests may change it. */
 	FEIEnemyGroups& GetGroups() { return Groups; }
 
-	/** Puts everything back to the start of a run. */
+	/** Which contracts a run offers. Tests may change it, and it counts from the next reset on. */
+	FEIContractTable& GetContractTable() { return ContractTable; }
+
+	/** Puts everything back to the start of a run, with new contracts. */
 	void ResetRun();
 
 	/** A hero pressed the use key. */
 	void Interact(AEIHeroCharacter* Hero);
 
-	/** Whoever stood near when a leader fell has earned the reward. */
+	/** A hero pressed the key for the flare. It works once enough contracts are done and the barge has room to land. */
+	void FireFlare(AEIHeroCharacter* Hero);
+
+	/** Whoever stood near when an enemy fell has earned something. */
 	void NoteEnemyDied(const AEIEnemy& Enemy);
 
 	AEISkyBarge* GetBarge() const { return Barge; }
-	AEIAltar* GetActiveAltar() const;
+	AEIFlare* GetFlare() const { return Flare; }
 
 	/** The clock raises it by itself. Directly only for preview pictures. */
 	void SetCorruptionStage(int32 Stage);
 
-	/** For preview pictures, which need not wait: the active altar needs no more time. */
-	void SkipAltarHold() { AltarHoldLeft = 0.0f; }
+	/** For tests and preview pictures: so many open contracts count as done, as if somebody had just finished them. */
+	void SkipContracts(int32 Count);
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
-	void HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
-	void PrepareChests();
-	void UpdateChests(const TArray<AEIHeroCharacter*>& LivingHeroes);
+	void PrepareContracts();
+	void SpawnLeaders();
+	void UpdateContracts(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	void UpdateChest(AEIChest* Chest, const TArray<AEIHeroCharacter*>& LivingHeroes);
+	void CompleteContract(int32 Index);
 	bool OpenChest(AEIHeroCharacter* Hero);
-	void IgniteBeacon(AEIBeacon* Beacon);
-	void HoldBeacon(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	bool FindGround(const FVector& Location, FVector& OutGround) const;
+	bool FindBargeSpot(const FVector& FlareGround, FVector& OutHover) const;
+	void HoldFlare(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingHeroes);
 	void UpdateCorruption();
 	void UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
@@ -102,33 +101,18 @@ private:
 	bool SendGroup(const FString& Size, int32 HeroCount);
 	float GetPlayerFactor(int32 HeroCount) const;
 	void EndRunForAll(bool bEscaped);
-	void PrepareLeaders();
-	void UpdateShrines(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
-	bool IsShrineHeld() const;
-	void GrantNear(const FVector& Location, EEIRewardSource Source);
 
 	UPROPERTY(Transient)
 	TObjectPtr<AEISkyBarge> Barge;
 
 	UPROPERTY(Transient)
-	TObjectPtr<AEIBeacon> LitBeacon;
-
-	/** The altars of this run in the order they wake up. */
-	UPROPERTY(Transient)
-	TArray<TObjectPtr<AEIAltar>> AltarOrder;
-
-	UPROPERTY(Transient)
-	TArray<TObjectPtr<AEIChest>> ChestsInUse;
-
-	UPROPERTY(Transient)
-	TArray<TObjectPtr<AEIAltar>> Shrines;
+	TObjectPtr<AEIFlare> Flare;
 
 	FEIRunValues Values;
 	FEIEnemyGroups Groups;
+	FEIContractTable ContractTable;
 	bool bPrepared = false;
 	float HoldLeft = 0.0f;
-	int32 AltarsBroken = 0;
-	float AltarHoldLeft = 0.0f;
 	float WaveLeft = 0.0f;
 	float ReinforcementLeft = 0.0f;
 	int32 LastStage = 0;

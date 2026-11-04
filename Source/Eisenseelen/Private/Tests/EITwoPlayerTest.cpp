@@ -2,9 +2,9 @@
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
-#include "EIBeacon.h"
 #include "EICasterComponent.h"
 #include "EIChest.h"
+#include "EIFlare.h"
 #include "EIEnemy.h"
 #include "EIGearComponent.h"
 #include "EIGameMode.h"
@@ -12,7 +12,6 @@
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
-#include "EIOmenComponent.h"
 #include "EIProfileComponent.h"
 #include "EISwordComponent.h"
 #include "EIProjectile.h"
@@ -439,18 +438,18 @@ public:
 		{
 			Test->TestEqual(TEXT("The guest knows the run has not begun"), GuestState->GetRunPhase(), EEIRunPhase::OnBarge);
 			FEIRunValues Short = GameMode->GetRun()->GetValues();
-			Short.BeaconHoldSeconds = 1.0f;
-			Short.RitualAltars = 0.0f;
+			Short.FlareHoldSeconds = 1.0f;
 			Short.CampFactor = 0.0f;
 			GameMode->GetRun()->ApplyValues(Short);
+			FEIContractTable& Contracts = GameMode->GetRun()->GetContractTable();
+			Contracts.ContractsToFlare = 1.0f;
+			Contracts.Tasks.RemoveAll([](const FEIContractTask& Task) { return Task.Kind != EEIContractKind::Chest; });
 			GameMode->GetRun()->ResetRun();
 			for (FConstPlayerControllerIterator It = ServerWorld->GetPlayerControllerIterator(); It; ++It)
 			{
 				if (It->Get()->IsLocalController())
 				{
-					APawn* HostPawn = It->Get()->GetPawn();
-					HostHero = HostPawn;
-					HostPawn->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+					It->Get()->GetPawn()->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 				}
 			}
 			Session.ServerCopyOfClientHero->SetCanBeDamaged(false);
@@ -472,7 +471,8 @@ public:
 			{
 				return false;
 			}
-			Test->TestEqual(TEXT("The guest sees the run begin"), GuestState->GetRunPhase(), EEIRunPhase::RitualDone);
+			Test->TestEqual(TEXT("The guest sees the run begin"), GuestState->GetRunPhase(), EEIRunPhase::Contracts);
+			Test->TestEqual(TEXT("The guest knows the contracts"), GuestState->GetContracts().Num(), 6);
 			int32 GuardsTheGuestSees = 0;
 			for (TActorIterator<AEIChest> Chest(Session.ClientWorld); Chest; ++Chest)
 			{
@@ -498,7 +498,7 @@ public:
 			{
 				return false;
 			}
-			Test->TestEqual(TEXT("The seal holds while guards live"), Session.ServerCopyOfClientHero->GetOmens()->CountAll(), 0);
+			Test->TestEqual(TEXT("The seal holds while guards live"), GuestState->CountContractsDone(), 0);
 			for (TActorIterator<AEIEnemy> Enemy(ServerWorld); Enemy; ++Enemy)
 			{
 				Enemy->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
@@ -536,42 +536,23 @@ public:
 			{
 				return false;
 			}
-			Test->TestTrue(TEXT("The chest is open for the guest on the server"), OpenedChest != nullptr && OpenedChest->IsOpenFor(Session.ServerCopyOfClientHero));
-			Test->TestEqual(TEXT("The server gives the guest an omen"), Session.ServerCopyOfClientHero->GetOmens()->CountAll(), 1);
-			Test->TestEqual(TEXT("The guest knows about the omen"), Session.ClientHero->GetOmens()->CountAll(), 1);
-			Test->TestTrue(TEXT("The guest is told"), Session.ClientHero->GetOmens()->GetFoundNote() > 0.0f);
-			Test->TestFalse(TEXT("The chest stays closed for the host"), OpenedChest != nullptr && OpenedChest->IsOpenFor(HostHero));
-
-			// The next omen is a faster one for sure, and both sides have to agree on what that means.
-			UEIOmenComponent* ServerOmens = Session.ServerCopyOfClientHero->GetOmens();
-			for (int32 Index = 0; Index < ServerOmens->GetTable().Omens.Num(); ++Index)
-			{
-				if (ServerOmens->GetTable().Omens[Index].Effect == EEIStat::Speed)
-				{
-					ServerOmens->AddOmen(Index);
-				}
-			}
-			TActorIterator<AEIBeacon> Beacon(ServerWorld);
-			Session.ServerCopyOfClientHero->TeleportTo(Beacon->GetActorLocation() + FVector(200.0f, 0.0f, 100.0f), FRotator::ZeroRotator);
+			Test->TestTrue(TEXT("The chest is open on the server"), OpenedChest != nullptr && OpenedChest->IsOpen());
+			Test->TestEqual(TEXT("The guest sees the contract done"), GuestState->CountContractsDone(), 1);
+			const UEIProfileComponent* GuestProfile = Session.ClientPlayer->GetProfile();
+			Test->TestEqual(TEXT("The guest earns the gold"), GuestProfile->GetRunGold(), GuestProfile->GetContractTable().GetGold(0));
+			Test->TestTrue(TEXT("The guest is told"), GuestProfile->GetRewardNote() > 0.0f);
+			const AEIPlayerController* Host = Cast<AEIPlayerController>(ServerWorld->GetFirstPlayerController());
+			Test->TestEqual(TEXT("The fallen host earns nothing"), Host->GetProfile()->GetRunGold(), 0);
+			EISendTestKey(Session.ClientPlayer, EKeys::G, IE_Pressed);
 			EnterStep(7);
 			return false;
 		}
 		case 7:
-			if (Now - StepAt < 0.4)
-			{
-				return false;
-			}
-			Test->TestEqual(TEXT("Guest and server agree on the speed"), Session.ClientHero->GetCharacterMovement()->MaxWalkSpeed, Session.ServerCopyOfClientHero->GetCharacterMovement()->MaxWalkSpeed);
-			Test->TestTrue(TEXT("The omen makes the guest faster"), Session.ClientHero->GetCharacterMovement()->MaxWalkSpeed > Session.ClientHero->GetValues().RunSpeedMetersPerSecond * 100.0f);
-			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Pressed);
-			EnterStep(8);
-			return false;
-		case 8:
 			if (Now - StepAt < 0.05)
 			{
 				return false;
 			}
-			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Released);
+			EISendTestKey(Session.ClientPlayer, EKeys::G, IE_Released);
 			EnterStep(9);
 			return false;
 		case 9:
@@ -580,14 +561,9 @@ public:
 			{
 				return false;
 			}
-			Test->TestEqual(TEXT("The guest's use key lights the beacon"), GuestState->GetRunPhase(), EEIRunPhase::BeaconLit);
-			TActorIterator<AEIBeacon> GuestBeacon(Session.ClientWorld);
-			bool bAnyLit = false;
-			for (; GuestBeacon; ++GuestBeacon)
-			{
-				bAnyLit = bAnyLit || GuestBeacon->IsLit();
-			}
-			Test->TestTrue(TEXT("The guest sees the fire"), bAnyLit);
+			Test->TestEqual(TEXT("The guest's key fires the flare"), GuestState->GetRunPhase(), EEIRunPhase::FlareLit);
+			TActorIterator<AEIFlare> GuestFlare(Session.ClientWorld);
+			Test->TestTrue(TEXT("The guest sees the flare"), static_cast<bool>(GuestFlare));
 			EnterStep(10);
 			return false;
 		}
@@ -622,6 +598,7 @@ public:
 			}
 			Test->TestEqual(TEXT("The guest gets away"), GuestState->GetRunPhase(), EEIRunPhase::Escaped);
 			Test->TestNotNull(TEXT("The guest stands on the barge"), Session.ClientHero->GetAttachParentActor());
+			Test->TestTrue(TEXT("The guest's gold is safe on the guest's side"), Session.ClientPlayer->GetProfile()->GetSave().Gold > 0);
 			HeightAtBoarding = Session.ClientHero->GetActorLocation().Z;
 			EnterStep(14);
 			return false;
@@ -644,7 +621,6 @@ private:
 	double StepAt = 0.0;
 	double HeightAtBoarding = 0.0;
 	const AEIChest* OpenedChest = nullptr;
-	const AActor* HostHero = nullptr;
 };
 
 /**
@@ -881,6 +857,7 @@ public:
 			Test->TestEqual(TEXT("During the cooldown no second spell comes"), CountFields(ServerWorld), 1);
 			// Another weapon: both sides have to agree on how it plays.
 			Session.ClientPlayer->GetProfile()->EquipByName(TEXT("Aschenbrecher"));
+			Session.ClientPlayer->GetProfile()->EquipByName(TEXT("Schuhe der Henkersgarde"));
 			EnterStep(7);
 			return false;
 		case 7:
@@ -890,10 +867,12 @@ public:
 			}
 			Test->TestEqual(TEXT("The guest holds the new weapon"), Session.ClientHero->GetSword()->GetValues().Light.Damage, 50.0f);
 			Test->TestEqual(TEXT("The server knows the new weapon"), Session.ServerCopyOfClientHero->GetSword()->GetValues().Light.Damage, 50.0f);
+			Test->TestEqual(TEXT("Guest and server agree on the speed"), Session.ClientHero->GetCharacterMovement()->MaxWalkSpeed, Session.ServerCopyOfClientHero->GetCharacterMovement()->MaxWalkSpeed);
+			Test->TestTrue(TEXT("The shoes make the guest faster"), Session.ClientHero->GetCharacterMovement()->MaxWalkSpeed > Session.ClientHero->GetValues().RunSpeedMetersPerSecond * 100.0f);
 			// Each player gets their own reward, and it stays on their own machine.
 			if (const AEIPlayerController* ServerCopyOfGuest = Session.ServerCopyOfClientHero->GetController<AEIPlayerController>())
 			{
-				ServerCopyOfGuest->GetProfile()->GrantReward(EEIRewardSource::Ritual);
+				ServerCopyOfGuest->GetProfile()->GrantEnemyReward(0.0f, 1.0f);
 				ServerCopyOfGuest->GetProfile()->EndRun(true);
 			}
 			EnterStep(8);

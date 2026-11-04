@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "EIContracts.h"
 #include "EIHeroCharacter.h"
 #include "EIItems.h"
 #include "EISaveGame.h"
@@ -9,22 +10,11 @@
 
 class AEIPlayerController;
 
-/** What a reward was given for. */
-UENUM()
-enum class EEIRewardSource : uint8
-{
-	Ritual,
-	Leader,
-	Shrine,
-	Enemy
-};
-
 /** One thing found during a run. It is only safe once the hero has got away. */
 struct FEILootLine
 {
 	int32 Item = INDEX_NONE;
 	int32 Quality = 0;
-	EEIRewardSource Source = EEIRewardSource::Ritual;
 
 	/** What it came to, in words for the player. Empty until the run has ended. */
 	FString Result;
@@ -44,6 +34,7 @@ public:
 
 	/** Owner only. */
 	const FEIItemTable& GetTable() const { return Table; }
+	const FEIContractTable& GetContractTable() const { return ContractTable; }
 	FEISaveGame& GetSave() { return Save; }
 	const FEISaveGame& GetSave() const { return Save; }
 
@@ -81,6 +72,11 @@ public:
 	/** Owner only. What this run has brought so far. */
 	const TArray<FEILootLine>& GetLoot() const { return Loot; }
 	int32 GetRunExperience() const { return RunExperience; }
+	int32 GetRunGold() const { return RunGold; }
+	int32 GetRunPoints(const FString& Faction) const { return RunPoints.FindRef(Faction); }
+
+	/** Owner only. What stays of an amount this run has earned, once the run is over. */
+	int32 GetSecured(int32 Amount) const;
 
 	/** Seconds of the note left after a reward, and what it says. For the HUD. */
 	float GetRewardNote() const { return RewardNoteRemaining; }
@@ -89,13 +85,17 @@ public:
 	/** Server only. Dresses a hero of this player. */
 	void ApplyTo(AEIHeroCharacter* Hero);
 
-	/** Server only. The server chooses what this player gets, and prefers what the player does not have yet. */
-	void GrantReward(EEIRewardSource Source);
+	/** Server only. A contract was finished with this player near. */
+	void GrantContract(int32 Faction, int32 Gold, int32 Points);
+
+	/** Tells the player something in the middle of the screen. */
+	UFUNCTION(Client, Reliable)
+	void ClientShowNote(const FString& Text);
 
 	/** Server only. A fallen enemy brings a little experience, and very rarely an item. */
 	void GrantEnemyReward(float Experience, float ItemChance);
 
-	/** Server only. In the barge the loot is safe, without it it is gone. The experience stays either way. */
+	/** Server only. In the barge all of it is safe. Without the barge a share of the gold and points stays, and the items are gone. The experience stays either way. */
 	void EndRun(bool bEscaped);
 
 	/** Server only. A new run begins, and the data files are read again. */
@@ -112,7 +112,10 @@ private:
 	void ServerSendSetups(const FEIHeroSetup& ForBladewarden, const FEIHeroSetup& ForArcanist, const TArray<FEIWornItem>& Owned);
 
 	UFUNCTION(Client, Reliable)
-	void ClientReceiveReward(int32 Item, int32 Quality, int32 Experience, EEIRewardSource Source);
+	void ClientReceiveReward(int32 Item, int32 Quality, int32 Experience);
+
+	UFUNCTION(Client, Reliable)
+	void ClientReceiveContract(int32 Faction, int32 Gold, int32 Points);
 
 	UFUNCTION(Client, Reliable)
 	void ClientEndRun(bool bEscaped);
@@ -131,16 +134,20 @@ private:
 	FEISavedClass& GetSavedClass(bool bArcanist);
 	const FEISavedClass& GetSavedClass(bool bArcanist) const;
 	FString AddToSave(int32 Item, int32 Quality);
-	int32 RollItem(EEIRewardSource Source, int32 Quality);
+	int32 RollItem(int32 Quality);
 	int32 ScaleExperience(float Experience) const;
 	int32 GetCorruptionStage() const;
 
 	FEIItemTable Table;
+	FEIContractTable ContractTable;
 	FEISaveGame Save;
 	bool bSent = false;
 	bool bSentFree = false;
 	TArray<FEILootLine> Loot;
 	int32 RunExperience = 0;
+	int32 RunGold = 0;
+	TMap<FString, int32> RunPoints;
+	bool bLastRunEscaped = true;
 	float RewardNoteRemaining = 0.0f;
 	FString RewardText;
 

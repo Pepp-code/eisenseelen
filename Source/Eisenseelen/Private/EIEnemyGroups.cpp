@@ -51,9 +51,9 @@ namespace
 			|| !Line.TryGetStringField(TEXT("nachschub"), Out.Reinforcement)
 			|| !Line.TryGetStringField(TEXT("truhe"), Out.Chest)
 			|| !Line.TryGetStringField(TEXT("altar"), Out.AltarWave)
-			|| !Line.TryGetStringField(TEXT("leuchtfeuer"), Out.BeaconWave))
+			|| !Line.TryGetStringField(TEXT("fackel"), Out.FlareWave))
 		{
-			OutError = TEXT("Einer Stufe fehlt lager, nachschub, truhe, altar oder leuchtfeuer.");
+			OutError = TEXT("Einer Stufe fehlt lager, nachschub, truhe, altar oder fackel.");
 			return false;
 		}
 		return FEIDataFile::ReadNumber(Line, TEXT("nachschub_alle_s"), 0.0, 3600.0, Out.ReinforcementEverySeconds, OutError)
@@ -70,7 +70,7 @@ namespace
 			return false;
 		}
 		if (!FEIDataFile::ReadNumber(Root, TEXT("altar_welle_alle_s"), 0.1, 3600.0, Out.AltarWaveEverySeconds, OutError)
-			|| !FEIDataFile::ReadNumber(Root, TEXT("leuchtfeuer_welle_alle_s"), 0.1, 3600.0, Out.BeaconWaveEverySeconds, OutError))
+			|| !FEIDataFile::ReadNumber(Root, TEXT("fackel_welle_alle_s"), 0.1, 3600.0, Out.FlareWaveEverySeconds, OutError))
 		{
 			return false;
 		}

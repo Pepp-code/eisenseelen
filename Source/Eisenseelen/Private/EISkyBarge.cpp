@@ -14,6 +14,8 @@ namespace
 	constexpr float BoardingHeightCm = 500.0f;
 	constexpr float DeckEdgeKeepCm = 60.0f;
 	constexpr float ApproachEasing = 2.0f;
+	// With the prow, which sticks out over the deck.
+	const FVector RoomNeededCm(920.0f, 350.0f, 300.0f);
 	const FLinearColor DeckColor(0.2f, 0.13f, 0.07f);
 	const FLinearColor HullColor(0.11f, 0.08f, 0.05f);
 	const FLinearColor MastColor(0.15f, 0.1f, 0.06f);
@@ -130,6 +132,11 @@ FVector AEISkyBarge::GetDeckSpotNear(const FVector& Location, float HalfHeight) 
 		Center.X + FMath::Clamp(Location.X - Center.X, -MaxX, MaxX),
 		Center.Y + FMath::Clamp(Location.Y - Center.Y, -MaxY, MaxY),
 		GetDeckHeight() + HalfHeight);
+}
+
+FVector AEISkyBarge::GetRoomNeeded() const
+{
+	return RoomNeededCm;
 }
 
 float AEISkyBarge::GetDeckHeight() const

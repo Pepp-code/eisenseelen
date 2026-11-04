@@ -1,7 +1,6 @@
 #include "EIAltar.h"
 
 #include "Components/StaticMeshComponent.h"
-#include "EIDataFile.h"
 #include "EIVisuals.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
@@ -17,11 +16,8 @@ namespace
 	constexpr float ZoneDiscHeightCm = 3.0f;
 	const FLinearColor StoneColor(0.08f, 0.07f, 0.09f);
 	const FLinearColor DormantColor(0.1f, 0.08f, 0.12f);
-	const FLinearColor ActiveColor(0.55f, 0.1f, 1.0f);
 	const FLinearColor BrokenColor(0.03f, 0.03f, 0.03f);
-	const FLinearColor ShrineColor(0.1f, 0.85f, 0.65f);
-	constexpr float ActiveGlow = 10.0f;
-	constexpr float ShrineGlow = 1.5f;
+	constexpr float ActiveGlow = 1.5f;
 	constexpr float ZoneStrength = 0.14f;
 }
 
@@ -63,11 +59,6 @@ void AEIAltar::BeginPlay()
 {
 	Super::BeginPlay();
 
-	FString Error;
-	if (!FEIRunValues::LoadFromProjectFile(Values, Error))
-	{
-		FEIDataFile::ReportError(TEXT("lauf.json"), Error);
-	}
 	EIVisuals::SetColor(Stone, StoneColor);
 	CrystalMaterial = EIVisuals::SetColor(Crystal, DormantColor);
 	OnRep_State();
@@ -77,8 +68,8 @@ void AEIAltar::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AEIAltar, State);
-	DOREPLIFETIME(AEIAltar, ShrineLeft);
-	DOREPLIFETIME(AEIAltar, bShrineHeld);
+	DOREPLIFETIME(AEIAltar, ZoneMeters);
+	DOREPLIFETIME(AEIAltar, JobColor);
 }
 
 void AEIAltar::SetState(EEIAltarState NewState)
@@ -87,39 +78,39 @@ void AEIAltar::SetState(EEIAltarState NewState)
 	OnRep_State();
 }
 
-void AEIAltar::SetShrineHold(float SecondsLeft, bool bHeld)
+void AEIAltar::StartJob(float NewZoneMeters, const FLinearColor& Color)
 {
-	ShrineLeft = SecondsLeft;
-	bShrineHeld = bHeld;
+	ZoneMeters = NewZoneMeters;
+	JobColor = Color;
+	SetState(EEIAltarState::Active);
 }
 
 void AEIAltar::OnRep_State()
 {
 	const bool bActive = State == EEIAltarState::Active;
-	const bool bShrine = State == EEIAltarState::Shrine;
-	ZoneDisc->SetVisibility(bActive || bShrine);
-	if (bActive || bShrine)
+	ZoneDisc->SetVisibility(bActive);
+	if (bActive)
 	{
-		EIVisuals::SetGlow(ZoneDisc, bShrine ? ShrineColor : ActiveColor, ZoneStrength);
+		EIVisuals::SetGlow(ZoneDisc, JobColor, ZoneStrength);
 		// The engine's cylinder is 1 m wide, so its scale is its width in metres.
-		const float ZoneWidth = (bShrine ? Values.ShrineZoneMeters : Values.AltarZoneMeters) * 2.0f;
+		const float ZoneWidth = ZoneMeters * 2.0f;
 		ZoneDisc->SetRelativeScale3D(FVector(ZoneWidth, ZoneWidth, 0.02f));
 	}
 	if (CrystalMaterial != nullptr)
 	{
-		const FLinearColor Color = bActive ? ActiveColor : (bShrine ? ShrineColor : (State == EEIAltarState::Broken ? BrokenColor : DormantColor));
+		const FLinearColor Color = bActive ? JobColor : (State == EEIAltarState::Broken ? BrokenColor : DormantColor);
 		CrystalMaterial->SetVectorParameterValue(TEXT("Farbe"), Color);
-		CrystalMaterial->SetScalarParameterValue(TEXT("Leuchten"), bActive ? ActiveGlow : (bShrine ? ShrineGlow : 0.0f));
+		CrystalMaterial->SetScalarParameterValue(TEXT("Leuchten"), bActive ? ActiveGlow : 0.0f);
 	}
-	if (State == EEIAltarState::Broken)
+	if (State == EEIAltarState::Broken && ShownState != EEIAltarState::Broken)
 	{
 		EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), GetCrystalLocation());
 	}
+	ShownState = State;
 }
 
 bool AEIAltar::IsInZone(const AActor* Actor) const
 {
-	const float ZoneMeters = IsShrine() ? Values.ShrineZoneMeters : Values.AltarZoneMeters;
 	return FVector::Dist2D(Actor->GetActorLocation(), GetActorLocation()) <= ZoneMeters * CentimetersPerMeter;
 }
 
