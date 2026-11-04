@@ -4,11 +4,13 @@
 
 #include "EICasterComponent.h"
 #include "EIEnemy.h"
+#include "EIGameMode.h"
 #include "EIGearComponent.h"
 #include "EIHealthComponent.h"
 #include "EIItems.h"
 #include "EIProfileComponent.h"
 #include "EIProjectile.h"
+#include "EIRunDirector.h"
 #include "EIRuneComponent.h"
 #include "EISaveGame.h"
 #include "EISwordComponent.h"
@@ -33,6 +35,7 @@ namespace
 		"qualitaeten": [{ "name": "Einfach", "faktor": 1 }, { "name": "Doppelt", "faktor": 2 }],
 		"tempo_bonus_max": 0.3, "ruestung_max": 0.6, "abklingzeit_abzug_max": 0.5, "manakosten_abzug_max": 0.6, "waffe_element_bonus": 0.2,
 		"start_items": ["Probeschwert", "Probestab"],
+		"belohnung": { "ritual_erfahrung": 11, "anfuehrer_erfahrung": 12, "schrein_erfahrung": 13, "doppelt_erfahrung": 14, "umkreis_m": 15, "verderbnis_erfahrung_je_stufe": 0.5, "geschmiedet_ab_stufe": 2 },
 		"arten": [{ "name": "Probeart", "je_zwei_teile": { "leben": 10 } }],
 		"items": [
 			{ "name": "Probeschwert", "platz": "waffe", "grundform": "schwert", "element": "eis" },
@@ -140,6 +143,7 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	FEIItemTable Small;
 	TestTrue(TEXT("A complete table loads"), FEIItemTable::LoadFromStrings(SmallItems, SmallWeapons, Small, Error));
 	TestEqual(TEXT("All lines are there"), Small.Items.Num(), 3);
+	TestEqual(TEXT("The rewards count"), Small.Rewards.ShrineExperience, 13.0f);
 	const FEIItem& Sword = Small.Items[Small.FindItem(TEXT("Probeschwert"))];
 	TestTrue(TEXT("A sword is for the blade warden"), Sword.bForBladewarden && !Sword.bForArcanist);
 	TestEqual(TEXT("A weapon gives a bonus for its element"), Sword.Stats[0].Amount, 0.2f);
@@ -197,6 +201,7 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A new arcanist holds the staff"), Save.Classes[1].Slots[WeaponSlot], FString(TEXT("Feuerstab")));
 	TestEqual(TEXT("Both have the first rune on"), Save.Classes[1].Slots[RuneSlot], FString(TEXT("Frostrune")));
 
+	Save.Experience = 340;
 	Save.Items.Add(TEXT("Sturmrune"), 2);
 	Save.Classes[0].Slots[RuneSlot] = TEXT("Sturmrune");
 	Save.Classes[1].Slots[RuneSlot].Reset();
@@ -205,6 +210,7 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 
 	FEISaveGame Loaded = FEISaveGame::MakeNew(Table);
 	TestTrue(TEXT("What was written can be read"), Loaded.FromJson(Save.ToJson(), Error));
+	TestEqual(TEXT("The experience stays"), Loaded.Experience, 340);
 	TestEqual(TEXT("The quality stays"), Loaded.Items.FindRef(TEXT("Sturmrune")), 2);
 	TestEqual(TEXT("What is on stays on"), Loaded.Classes[0].Slots[RuneSlot], FString(TEXT("Sturmrune")));
 	TestTrue(TEXT("An empty slot stays empty"), Loaded.Classes[1].Slots[RuneSlot].IsEmpty());
@@ -434,6 +440,133 @@ bool FEIGearTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("A new hero keeps the weapon"), Gear(Context)->GetWorn(EEISlot::Weapon)->Name, FString(TEXT("Aschenzepter")));
 	}));
 	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEILootTest,
+	"Eisenseelen.Play.Run.Loot",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEILootTest::RunTest(const FString& Parameters)
+{
+	struct FState
+	{
+		FString Item;
+		int32 Experience = 0;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+	TArray<FEIPlayStep> Steps;
+	const auto Remember = [State](const FEIPlayContext& Context)
+	{
+		State->Experience = Profile(Context)->GetSave().Experience;
+		const TArray<FEILootLine>& Loot = Profile(Context)->GetLoot();
+		State->Item = Loot.IsEmpty() ? FString() : Profile(Context)->GetTable().Items[Loot.Last().Item].Name;
+	};
+
+	// A reward lands in the bag at once. The experience is safe, the item is not yet.
+	Steps.Add(Do([Remember](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("A new player has no experience"), Profile(Context)->GetSave().Experience, 0);
+		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Remember(Context);
+		const FEIRewardValues& Rewards = Profile(Context)->GetTable().Rewards;
+		const FEIItemTable& Table = Profile(Context)->GetTable();
+		Context.Test->TestEqual(TEXT("The ritual brings one item"), Profile(Context)->GetLoot().Num(), 1);
+		const FEIItem& Item = Table.Items[Profile(Context)->GetLoot()[0].Item];
+		Context.Test->TestTrue(TEXT("The ritual brings a weapon or a rune"), Item.Slot == EEISlot::Weapon || Item.Slot == EEISlot::Rune);
+		Context.Test->TestTrue(TEXT("It fits the class"), Item.FitsClass(false));
+		Context.Test->TestFalse(TEXT("It is not safe yet"), Profile(Context)->GetSave().Items.Contains(Item.Name));
+		Context.Test->TestEqual(TEXT("The experience is there at once"), Profile(Context)->GetSave().Experience, FMath::RoundToInt32(Rewards.RitualExperience));
+		Context.Test->TestTrue(TEXT("The screen says so"), Profile(Context)->GetRewardNote() > 0.0f);
+		Context.Test->TestTrue(TEXT("The note names the item"), Profile(Context)->GetRewardText().Contains(Item.Name));
+
+		// The next one is something else, as long as there is something else.
+		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Context.Test->TestNotEqual(TEXT("The second reward is another item"), Profile(Context)->GetLoot()[1].Item, Profile(Context)->GetLoot()[0].Item);
+
+		// Without the barge the loot is gone.
+		Profile(Context)->EndRun(false);
+		Context.Test->TestFalse(TEXT("A failed run loses the item"), Profile(Context)->GetSave().Items.Contains(Item.Name));
+		Context.Test->TestEqual(TEXT("The loot can still be read"), Profile(Context)->GetLoot()[0].Result, FString(TEXT("verloren")));
+		Context.Test->TestEqual(TEXT("A failed run keeps the experience"), Profile(Context)->GetSave().Experience, FMath::RoundToInt32(Rewards.RitualExperience * 2.0f));
+		Profile(Context)->StartFresh();
+		Context.Test->TestEqual(TEXT("A new run has an empty bag"), Profile(Context)->GetLoot().Num(), 0);
+		Context.Test->TestEqual(TEXT("A new run counts from nothing"), Profile(Context)->GetRunExperience(), 0);
+
+		// In the barge it is safe.
+		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Remember(Context);
+		Profile(Context)->EndRun(true);
+		Context.Test->TestTrue(TEXT("Getting away secures the item"), Profile(Context)->GetSave().Items.Contains(Profile(Context)->GetTable().Items[Profile(Context)->GetLoot()[0].Item].Name));
+		Context.Test->TestTrue(TEXT("The settlement says it is new"), Profile(Context)->GetLoot()[0].Result.StartsWith(TEXT("neu")));
+		Profile(Context)->StartFresh();
+
+		// Once all is owned, a find raises the quality.
+		FEISaveGame& Save = Profile(Context)->GetSave();
+		for (const FEIItem& Entry : Table.Items)
+		{
+			Save.Items.Add(Entry.Name, 0);
+		}
+		Profile(Context)->EquipByName(TEXT("Frostrune"));
+		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Profile(Context)->EndRun(true);
+		Context.Test->TestTrue(TEXT("A second find raises the quality"), Profile(Context)->GetLoot()[0].Result.Contains(Table.GetQualityName(1)));
+		Context.Test->TestEqual(TEXT("It counts in the save"), Save.Items.FindRef(Table.Items[Profile(Context)->GetLoot()[0].Item].Name), 1);
+		Profile(Context)->StartFresh();
+
+		// And when all of it is at its best, a find is worth experience.
+		for (const FEIItem& Entry : Table.Items)
+		{
+			Save.Items.Add(Entry.Name, Table.QualityFactors.Num() - 1);
+		}
+		Profile(Context)->EquipByName(TEXT("Frostrune"));
+		const int32 Before = Save.Experience;
+		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		Profile(Context)->EndRun(true);
+		Context.Test->TestEqual(TEXT("A find of the best is worth experience"), Save.Experience, Before + FMath::RoundToInt32(Rewards.RitualExperience + Rewards.DuplicateExperience));
+		Profile(Context)->StartFresh();
+		Save.Items.Reset();
+		for (const FString& Name : Table.StartItems)
+		{
+			Save.Items.Add(Name, 0);
+		}
+		Profile(Context)->EquipByName(TEXT("Frostrune"));
+	}));
+	Steps.Add(Wait(0.05));
+
+	// A late stage of the corruption pays more, and what is new comes forged.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		AEIGameMode* GameMode = Context.World->GetAuthGameMode<AEIGameMode>();
+		const FEIRewardValues& Rewards = Profile(Context)->GetTable().Rewards;
+		const int32 Stage = FMath::RoundToInt32(Rewards.ForgedFromStage);
+		GameMode->GetRun()->SetCorruptionStage(Stage);
+		const int32 Before = Profile(Context)->GetSave().Experience;
+		Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		const int32 Expected = FMath::RoundToInt32(Rewards.RitualExperience * (1.0f + Rewards.ExperiencePerStage * Stage));
+		Context.Test->TestEqual(TEXT("More corruption brings more experience"), Profile(Context)->GetSave().Experience - Before, Expected);
+		Context.Test->TestEqual(TEXT("From that stage on a new item comes forged"), Profile(Context)->GetLoot()[0].Quality, 1);
+		Profile(Context)->EndRun(true);
+		Context.Test->TestEqual(TEXT("It is forged in the save"), Profile(Context)->GetSave().Items.FindRef(Profile(Context)->GetTable().Items[Profile(Context)->GetLoot()[0].Item].Name), 1);
+		GameMode->GetRun()->SetCorruptionStage(0);
+		Profile(Context)->StartFresh();
+	}));
+
+	// The arcanist gets what an arcanist can use.
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		for (int32 Count = 0; Count < 4; ++Count)
+		{
+			Profile(Context)->GrantReward(EEIRewardSource::Ritual);
+		}
+		for (const FEILootLine& Line : Profile(Context)->GetLoot())
+		{
+			Context.Test->TestTrue(TEXT("It fits the arcanist"), Profile(Context)->GetTable().Items[Line.Item].FitsClass(true));
+		}
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
 }
 
 #endif

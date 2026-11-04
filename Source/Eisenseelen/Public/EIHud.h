@@ -24,6 +24,9 @@ private:
 	void DrawRun(const class AEIHeroCharacter* Hero, const class AEIGameState* State);
 	void DrawWorldMark(const FVector& Location, const FString& Label, const FLinearColor& Color);
 
+	/** What a run has brought, once it is over. */
+	void DrawSettlement(const class AEIHeroCharacter* Hero, const class AEIGameState* State, const FString& Clock);
+
 	/** The omens found so far, in a column going up from this height, and the note about a new one. */
 	void DrawOmens(const class AEIHeroCharacter* Hero, float BottomY);
 };

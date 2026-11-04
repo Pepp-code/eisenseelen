@@ -268,11 +268,16 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("Standing at the barge is not boarding yet"), GetState(Context)->GetRunPhase(), EEIRunPhase::BargeWaiting);
 	}));
 
-	// Right there it ends the run, and the barge carries the hero away.
+	// Right there it ends the run, and the barge carries the hero away. Whatever the hero found is safe now.
+	Steps.Add(Do([](const FEIPlayContext& Context) { Context.Player->GetProfile()->GrantReward(EEIRewardSource::Ritual); }));
 	AddTap(Steps, EKeys::F);
 	Steps.Add(WaitForPhase(TEXT("the hero gets away"), 1.0, EEIRunPhase::Escaped));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Context.Test->TestEqual(TEXT("The loot is still there"), Profile->GetLoot().Num(), 1);
+		Context.Test->TestFalse(TEXT("The loot came to something"), Profile->GetLoot()[0].Result.IsEmpty());
+		Context.Test->TestTrue(TEXT("The loot is safe"), Profile->GetSave().Items.Contains(Profile->GetTable().Items[Profile->GetLoot()[0].Item].Name));
 		Context.Test->TestTrue(TEXT("The hero stands on the barge"), Context.Hero->GetAttachParentActor() == GetBarge(Context));
 		Context.Test->TestFalse(TEXT("The hero is safe on the barge"), Context.Hero->CanBeDamaged());
 		State->Height = Context.Hero->GetActorLocation().Z;
@@ -957,6 +962,8 @@ bool FEIRitualTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestNull(TEXT("No altar burns any more"), GetGameMode(Context)->GetRun()->GetActiveAltar());
+		Context.Test->TestEqual(TEXT("The broken ritual brings its reward"), Context.Player->GetProfile()->GetLoot().Num(), 1);
+		Context.Test->TestTrue(TEXT("The broken ritual brings experience"), Context.Player->GetProfile()->GetRunExperience() > 0);
 		StandAtBeacon(Context, GetBeacons(Context)[0], 200.0f);
 	}));
 	Steps.Add(Wait(0.1));
@@ -1043,9 +1050,17 @@ bool FEIRunFailedTest::RunTest(const FString& Parameters)
 	TArray<FEIPlayStep> Steps;
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
+		Context.Player->GetProfile()->GrantReward(EEIRewardSource::Ritual);
 		Context.Hero->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 	}));
 	Steps.Add(WaitForPhase(TEXT("the run is lost"), 1.0, EEIRunPhase::Failed));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Context.Test->TestEqual(TEXT("The loot of a lost run is gone"), Profile->GetLoot()[0].Result, FString(TEXT("verloren")));
+		Context.Test->TestFalse(TEXT("It did not reach the save"), Profile->GetSave().Items.Contains(Profile->GetTable().Items[Profile->GetLoot()[0].Item].Name));
+		Context.Test->TestTrue(TEXT("The experience stays"), Profile->GetSave().Experience > 0);
+	}));
 	AddTap(Steps, EKeys::R);
 	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::OnBarge));
 	Steps.Add(Do([](const FEIPlayContext& Context)

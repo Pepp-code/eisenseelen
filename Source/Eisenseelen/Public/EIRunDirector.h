@@ -88,6 +88,7 @@ private:
 	void RefillEmptyCamps(const TArray<AEIHeroCharacter*>& LivingHeroes, const FString& Size);
 	bool SendGroup(const FString& Size, int32 HeroCount);
 	float GetPlayerFactor(int32 HeroCount) const;
+	void EndRunForAll(bool bEscaped);
 
 	UPROPERTY(Transient)
 	TObjectPtr<AEISkyBarge> Barge;

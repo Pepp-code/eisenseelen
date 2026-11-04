@@ -10,6 +10,8 @@
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIOmenComponent.h"
+#include "EIPlayerController.h"
+#include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
 #include "EISkyBarge.h"
 #include "EISwordComponent.h"
@@ -51,6 +53,12 @@ namespace
 	const FLinearColor BargeMarkColor(0.5f, 0.85f, 1.0f);
 	const FLinearColor WarningTextColor(1.0f, 0.25f, 0.15f);
 	constexpr float WorldMarkSize = 10.0f;
+	const FLinearColor PanelColor(0.0f, 0.0f, 0.0f, 0.72f);
+	const FLinearColor LostColor(0.65f, 0.65f, 0.65f);
+	constexpr float PanelWidth = 760.0f;
+	constexpr float PanelLine = 30.0f;
+	constexpr float PanelPadding = 26.0f;
+	constexpr float RewardNoteY = 230.0f;
 	constexpr float CentimetersPerMeter = 100.0f;
 }
 
@@ -112,8 +120,11 @@ void AEIHud::DrawHUD()
 	}
 	if (Hero->IsDead())
 	{
-		const bool bRunLost = State != nullptr && State->GetRunPhase() == EEIRunPhase::Failed;
-		DrawLine(bRunLost ? TEXT("Lauf gescheitert. R startet neu.") : TEXT("Gefallen. R startet neu."), Width / 2.0f - 170.0f, Height / 2.0f - 20.0f, TextColor, 2.0f);
+		// Once all have fallen the settlement says what happened.
+		if (State == nullptr || State->GetRunPhase() != EEIRunPhase::Failed)
+		{
+			DrawLine(TEXT("Gefallen. R startet neu."), Width / 2.0f - 170.0f, Height / 2.0f - 20.0f, TextColor, 2.0f);
+		}
 		return;
 	}
 	DrawThreats(Hero);
@@ -198,6 +209,41 @@ void AEIHud::DrawOmens(const AEIHeroCharacter* Hero, float BottomY)
 	}
 }
 
+void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* State, const FString& Clock)
+{
+	const AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner);
+	if (Player == nullptr)
+	{
+		return;
+	}
+	const UEIProfileComponent* Profile = Player->GetProfile();
+	const TArray<FEILootLine>& Loot = Profile->GetLoot();
+	const bool bEscaped = State->GetRunPhase() == EEIRunPhase::Escaped;
+	const float PanelHeight = PanelPadding * 2.0f + PanelLine * (6 + Loot.Num()) + 40.0f;
+	const float X = Canvas->SizeX / 2.0f - PanelWidth / 2.0f;
+	float Y = FMath::Max(Margin, Canvas->SizeY / 2.0f - PanelHeight / 2.0f);
+	DrawRect(PanelColor, X, Y, PanelWidth, PanelHeight);
+	const float TextX = X + PanelPadding;
+	Y += PanelPadding;
+	DrawLine(bEscaped ? TEXT("Entkommen!") : TEXT("Lauf gescheitert"), TextX, Y, bEscaped ? TextColor : WarningTextColor, 2.0f);
+	Y += 40.0f + PanelLine / 2.0f;
+	DrawLine(FString::Printf(TEXT("Laufzeit %s, %d Omen"), *Clock, Hero->GetOmens()->CountAll()), TextX, Y, TextColor);
+	Y += PanelLine;
+	DrawLine(FString::Printf(TEXT("Erfahrung: +%d, sie bleibt in jedem Fall"), Profile->GetRunExperience()), TextX, Y, TextColor);
+	Y += PanelLine;
+	DrawLine(Loot.IsEmpty() ? FString(TEXT("Keine Beute")) : FString(bEscaped ? TEXT("Beute:") : TEXT("Diese Beute ist verloren:")), TextX, Y, TextColor);
+	Y += PanelLine;
+	for (const FEILootLine& Line : Loot)
+	{
+		const FEIItemTable& Table = Profile->GetTable();
+		const FString Name = Table.Items.IsValidIndex(Line.Item) ? Table.Items[Line.Item].Name : FString();
+		DrawLine(FString::Printf(TEXT("%s: %s"), *Name, *Line.Result), TextX + PanelPadding, Y, bEscaped ? OmenColor : LostColor);
+		Y += PanelLine;
+	}
+	Y += PanelLine / 2.0f;
+	DrawLine(TEXT("R startet einen neuen Lauf"), TextX, Y, TextColor);
+}
+
 void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 {
 	const int32 Seconds = FMath::Max(0, FMath::FloorToInt(State->GetRunSeconds()));
@@ -216,6 +262,10 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	}
 	const float LineY = Margin + 48.0f;
 	const float CenterX = Canvas->SizeX / 2.0f;
+	if (const AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner); Player != nullptr && Player->GetProfile()->GetRewardNote() > 0.0f)
+	{
+		DrawLine(Player->GetProfile()->GetRewardText(), CenterX - 260.0f, RewardNoteY, OmenColor, 1.5f);
+	}
 	const float PromptY = Canvas->SizeY / 2.0f + 100.0f;
 	const auto DistanceLabel = [Hero](const TCHAR* Name, const FVector& Location)
 	{
@@ -324,8 +374,8 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 		break;
 
 	case EEIRunPhase::Escaped:
-		DrawLine(TEXT("Entkommen!"), CenterX - 95.0f, Canvas->SizeY / 2.0f - 90.0f, TextColor, 2.0f);
-		DrawLine(FString::Printf(TEXT("Laufzeit %s, %d Omen. R startet neu."), *Clock, Hero->GetOmens()->CountAll()), CenterX - 190.0f, Canvas->SizeY / 2.0f - 40.0f, TextColor, 1.5f);
+	case EEIRunPhase::Failed:
+		DrawSettlement(Hero, State, Clock);
 		break;
 
 	default:

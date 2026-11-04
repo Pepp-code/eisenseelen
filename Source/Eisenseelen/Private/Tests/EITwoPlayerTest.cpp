@@ -889,6 +889,26 @@ public:
 			}
 			Test->TestEqual(TEXT("The guest holds the new weapon"), Session.ClientHero->GetSword()->GetValues().Light.Damage, 50.0f);
 			Test->TestEqual(TEXT("The server knows the new weapon"), Session.ServerCopyOfClientHero->GetSword()->GetValues().Light.Damage, 50.0f);
+			// Each player gets their own reward, and it stays on their own machine.
+			if (const AEIPlayerController* ServerCopyOfGuest = Session.ServerCopyOfClientHero->GetController<AEIPlayerController>())
+			{
+				ServerCopyOfGuest->GetProfile()->GrantReward(EEIRewardSource::Ritual);
+				ServerCopyOfGuest->GetProfile()->EndRun(true);
+			}
+			EnterStep(8);
+			return false;
+		case 8:
+			if (Now - StepAt < 0.3)
+			{
+				return false;
+			}
+			{
+				const UEIProfileComponent* Guest = Session.ClientPlayer->GetProfile();
+				Test->TestEqual(TEXT("The guest gets the reward"), Guest->GetLoot().Num(), 1);
+				Test->TestTrue(TEXT("The guest's save has the item"), Guest->GetLoot().Num() == 1 && Guest->GetSave().Items.Contains(Guest->GetTable().Items[Guest->GetLoot()[0].Item].Name));
+				const AEIPlayerController* Host = Cast<AEIPlayerController>(ServerWorld->GetFirstPlayerController());
+				Test->TestEqual(TEXT("The host gets nothing of it"), Host->GetProfile()->GetLoot().Num(), 0);
+			}
 			return true;
 		default:
 			return true;

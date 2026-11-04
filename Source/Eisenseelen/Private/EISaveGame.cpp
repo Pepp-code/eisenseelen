@@ -70,6 +70,7 @@ FString FEISaveGame::ToJson() const
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetNumberField(TEXT("version"), 1);
+	Root->SetNumberField(TEXT("erfahrung"), Experience);
 
 	const TSharedRef<FJsonObject> Owned = MakeShared<FJsonObject>();
 	for (const TPair<FString, int32>& Pair : Items)
@@ -107,6 +108,11 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 		return false;
 	}
 	FEISaveGame Loaded = *this;
+	double Number = 0.0;
+	if (Root->TryGetNumberField(TEXT("erfahrung"), Number))
+	{
+		Loaded.Experience = FMath::RoundToInt32(Number);
+	}
 	Loaded.Items.Reset();
 	for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Owned)->Values)
 	{

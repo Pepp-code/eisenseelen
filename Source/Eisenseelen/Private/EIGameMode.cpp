@@ -5,6 +5,7 @@
 #include "EIHordeDirector.h"
 #include "EIHud.h"
 #include "EIPlayerController.h"
+#include "EIProfileComponent.h"
 #include "EIRunDirector.h"
 #include "Engine/World.h"
 
@@ -53,6 +54,10 @@ void AEIGameMode::RestartRun()
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		APlayerController* Player = It->Get();
+		if (const AEIPlayerController* OurPlayer = Cast<AEIPlayerController>(Player))
+		{
+			OurPlayer->GetProfile()->StartFresh();
+		}
 		if (APawn* Pawn = Player->GetPawn())
 		{
 			Player->UnPossess();

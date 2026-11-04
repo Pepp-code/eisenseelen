@@ -18,6 +18,8 @@ struct EISENSEELEN_API FEISavedClass
  */
 struct EISENSEELEN_API FEISaveGame
 {
+	int32 Experience = 0;
+
 	/** Name of an item and its quality. Whatever stands in here is owned. */
 	TMap<FString, int32> Items;
 

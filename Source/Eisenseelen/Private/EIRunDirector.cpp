@@ -12,6 +12,8 @@
 #include "EIHeroCharacter.h"
 #include "EIHordeDirector.h"
 #include "EIOmenComponent.h"
+#include "EIPlayerController.h"
+#include "EIProfileComponent.h"
 #include "EISkyBarge.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -252,6 +254,24 @@ void UEIRunDirector::HoldAltar(const TArray<AEIHeroCharacter*>& LivingHeroes, fl
 	else
 	{
 		State->SetRunPhase(EEIRunPhase::RitualDone);
+		for (const AEIHeroCharacter* Hero : LivingHeroes)
+		{
+			if (const AEIPlayerController* Player = Hero->GetController<AEIPlayerController>())
+			{
+				Player->GetProfile()->GrantReward(EEIRewardSource::Ritual);
+			}
+		}
+	}
+}
+
+void UEIRunDirector::EndRunForAll(bool bEscaped)
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get()))
+		{
+			Player->GetProfile()->EndRun(bEscaped);
+		}
 	}
 }
 
@@ -388,6 +408,7 @@ void UEIRunDirector::LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingH
 		AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 		State->StopRunClock();
 		State->SetRunPhase(EEIRunPhase::Escaped);
+		EndRunForAll(true);
 		Barge->Depart(Values.BargeDepartMetersPerSecond * CentimetersPerMeter);
 		CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(false);
 	}
@@ -426,6 +447,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		{
 			State->StopRunClock();
 			State->SetRunPhase(EEIRunPhase::Failed);
+			EndRunForAll(false);
 			CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(false);
 		}
 		return;

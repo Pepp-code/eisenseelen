@@ -4,12 +4,26 @@
 #include "EIGameState.h"
 #include "EIGearComponent.h"
 #include "EIPlayerController.h"
+#include "EIVisuals.h"
 #include "Engine/World.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 
 namespace
 {
+	constexpr float RewardNoteSeconds = 5.0f;
+
+	const TCHAR* RewardSourceName(EEIRewardSource Source)
+	{
+		switch (Source)
+		{
+		case EEIRewardSource::Ritual: return TEXT("Ritual gest\u00F6rt");
+		case EEIRewardSource::Leader: return TEXT("Anf\u00FChrer besiegt");
+		case EEIRewardSource::Shrine: return TEXT("Schrein gehalten");
+		default: return TEXT("Gefunden");
+		}
+	}
+
 	bool AllowsGearChange(EEIRunPhase Phase)
 	{
 		return Phase == EEIRunPhase::None || Phase == EEIRunPhase::OnBarge || Phase == EEIRunPhase::Escaped || Phase == EEIRunPhase::Failed;
@@ -93,6 +107,7 @@ void UEIProfileComponent::WriteSave() const
 void UEIProfileComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	RewardNoteRemaining = FMath::Max(0.0f, RewardNoteRemaining - DeltaTime);
 	if (!IsOwnerSide() || GetWorld()->GetGameState<AEIGameState>() == nullptr)
 	{
 		return;
@@ -242,15 +257,30 @@ FEIHeroSetup UEIProfileComponent::BuildSetup(bool bArcanist) const
 
 void UEIProfileComponent::SendSetups()
 {
-	ServerSendSetups(BuildSetup(false), BuildSetup(true));
+	TArray<FEIWornItem> Owned;
+	for (const TPair<FString, int32>& Pair : Save.Items)
+	{
+		FEIWornItem Entry;
+		Entry.Item = Table.FindItem(Pair.Key);
+		Entry.Quality = Pair.Value;
+		if (Table.Items.IsValidIndex(Entry.Item))
+		{
+			Owned.Add(Entry);
+		}
+	}
+	ServerSendSetups(BuildSetup(false), BuildSetup(true), Owned);
 }
 
-void UEIProfileComponent::ServerSendSetups_Implementation(const FEIHeroSetup& ForBladewarden, const FEIHeroSetup& ForArcanist)
+void UEIProfileComponent::ServerSendSetups_Implementation(const FEIHeroSetup& ForBladewarden, const FEIHeroSetup& ForArcanist, const TArray<FEIWornItem>& Owned)
 {
+	const bool bFirst = !bHasSetups;
 	ServerSetups[0] = ForBladewarden;
 	ServerSetups[1] = ForArcanist;
+	ServerOwned = Owned;
 	bHasSetups = true;
-	if (AEIHeroCharacter* Hero = GetPlayer()->GetPawn<AEIHeroCharacter>())
+	// During a run a hero keeps what they flew out with. Only somebody joining late still needs to get dressed.
+	AEIHeroCharacter* Hero = GetPlayer()->GetPawn<AEIHeroCharacter>();
+	if (Hero != nullptr && (bFirst || CanChangeGear()))
 	{
 		ApplyTo(Hero);
 	}
@@ -260,4 +290,146 @@ void UEIProfileComponent::ApplyTo(AEIHeroCharacter* Hero)
 {
 	const bool bArcanist = Hero->GetHeroClass() == EEIHeroClass::Arcanist;
 	Hero->GetGear()->SetSetup(bHasSetups ? ServerSetups[bArcanist ? 1 : 0] : MakeStartSetup(bArcanist));
+}
+
+int32 UEIProfileComponent::GetCorruptionStage() const
+{
+	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	return State != nullptr ? State->GetCorruptionStage() : 0;
+}
+
+int32 UEIProfileComponent::ScaleExperience(float Experience) const
+{
+	return FMath::RoundToInt32(Experience * (1.0f + Table.Rewards.ExperiencePerStage * GetCorruptionStage()));
+}
+
+int32 UEIProfileComponent::RollItem(EEIRewardSource Source, int32 Quality)
+{
+	const AEIHeroCharacter* Hero = GetPlayer()->GetPawn<AEIHeroCharacter>();
+	const bool bArcanist = Hero != nullptr && Hero->GetHeroClass() == EEIHeroClass::Arcanist;
+	const int32 MaxQuality = FMath::Max(Table.QualityFactors.Num() - 1, 0);
+	TArray<int32> Fitting;
+	TArray<int32> CanRise;
+	TArray<int32> New;
+	for (int32 Index = 0; Index < Table.Items.Num(); ++Index)
+	{
+		const FEIItem& Item = Table.Items[Index];
+		const bool bWeaponOrRune = Item.Slot == EEISlot::Weapon || Item.Slot == EEISlot::Rune;
+		const bool bArmor = Item.Slot == EEISlot::Helmet || Item.Slot == EEISlot::Chest || Item.Slot == EEISlot::Gloves || Item.Slot == EEISlot::Boots;
+		const bool bKind = Source == EEIRewardSource::Ritual ? bWeaponOrRune : (Source == EEIRewardSource::Enemy ? bWeaponOrRune || bArmor : bArmor);
+		if (!bKind || !Item.FitsClass(bArcanist))
+		{
+			continue;
+		}
+		Fitting.Add(Index);
+		const FEIWornItem* Owned = ServerOwned.FindByPredicate([Index](const FEIWornItem& Entry) { return Entry.Item == Index; });
+		if (Owned == nullptr)
+		{
+			New.Add(Index);
+		}
+		else if (Owned->Quality < MaxQuality)
+		{
+			CanRise.Add(Index);
+		}
+	}
+	const TArray<int32>& Choice = !New.IsEmpty() ? New : (!CanRise.IsEmpty() ? CanRise : Fitting);
+	if (Choice.IsEmpty())
+	{
+		return INDEX_NONE;
+	}
+	const int32 Picked = Choice[FMath::RandRange(0, Choice.Num() - 1)];
+
+	// The next reward of this run should know about this one, long before the owner has it for good.
+	if (FEIWornItem* Owned = ServerOwned.FindByPredicate([Picked](const FEIWornItem& Entry) { return Entry.Item == Picked; }))
+	{
+		Owned->Quality = FMath::Min(Owned->Quality + 1, MaxQuality);
+	}
+	else
+	{
+		FEIWornItem Entry;
+		Entry.Item = Picked;
+		Entry.Quality = Quality;
+		ServerOwned.Add(Entry);
+	}
+	return Picked;
+}
+
+void UEIProfileComponent::GrantReward(EEIRewardSource Source)
+{
+	const float Experience = Source == EEIRewardSource::Ritual ? Table.Rewards.RitualExperience : (Source == EEIRewardSource::Leader ? Table.Rewards.LeaderExperience : Table.Rewards.ShrineExperience);
+	const int32 Quality = GetCorruptionStage() >= FMath::RoundToInt32(Table.Rewards.ForgedFromStage) ? 1 : 0;
+	ClientReceiveReward(RollItem(Source, Quality), Quality, ScaleExperience(Experience), Source);
+}
+
+void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Item, int32 Quality, int32 Experience, EEIRewardSource Source)
+{
+	Save.Experience += Experience;
+	RunExperience += Experience;
+	if (Table.Items.IsValidIndex(Item))
+	{
+		FEILootLine Line;
+		Line.Item = Item;
+		Line.Quality = Quality;
+		Line.Source = Source;
+		Loot.Add(Line);
+		RewardText = FString::Printf(TEXT("%s: %s, +%d Erfahrung"), RewardSourceName(Source), *Table.Items[Item].Name, Experience);
+	}
+	else
+	{
+		RewardText = FString::Printf(TEXT("%s: +%d Erfahrung"), RewardSourceName(Source), Experience);
+	}
+	RewardNoteRemaining = RewardNoteSeconds;
+	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
+}
+
+FString UEIProfileComponent::AddToSave(int32 Item, int32 Quality)
+{
+	const FEIItem& Entry = Table.Items[Item];
+	const int32 MaxQuality = FMath::Max(Table.QualityFactors.Num() - 1, 0);
+	int32* Owned = Save.Items.Find(Entry.Name);
+	if (Owned == nullptr)
+	{
+		Save.Items.Add(Entry.Name, Quality);
+		return FString::Printf(TEXT("neu, %s"), *Table.GetQualityName(Quality));
+	}
+	if (*Owned < MaxQuality)
+	{
+		*Owned = FMath::Max(*Owned + 1, Quality);
+		return FString::Printf(TEXT("steigt auf %s"), *Table.GetQualityName(*Owned));
+	}
+	const int32 Experience = FMath::RoundToInt32(Table.Rewards.DuplicateExperience);
+	Save.Experience += Experience;
+	RunExperience += Experience;
+	return FString::Printf(TEXT("schon %s, +%d Erfahrung"), *Table.GetQualityName(*Owned), Experience);
+}
+
+void UEIProfileComponent::EndRun(bool bEscaped)
+{
+	ClientEndRun(bEscaped);
+}
+
+void UEIProfileComponent::ClientEndRun_Implementation(bool bEscaped)
+{
+	for (FEILootLine& Line : Loot)
+	{
+		Line.Result = bEscaped ? AddToSave(Line.Item, Line.Quality) : FString(TEXT("verloren"));
+	}
+	WriteSave();
+	SendSetups();
+}
+
+void UEIProfileComponent::StartFresh()
+{
+	LoadTable();
+	ClientStartFresh();
+}
+
+void UEIProfileComponent::ClientStartFresh_Implementation()
+{
+	LoadTable();
+	Loot.Reset();
+	RunExperience = 0;
+	RewardNoteRemaining = 0.0f;
+	WriteSave();
+	SendSetups();
 }

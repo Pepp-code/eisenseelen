@@ -110,8 +110,21 @@ struct EISENSEELEN_API FEIArmorSet
 	TArray<FEIStatLine> PerTwoPieces;
 };
 
+/** What deeds bring, from the section belohnung of Data/items.json. */
+struct EISENSEELEN_API FEIRewardValues
+{
+	float RitualExperience = 100.0f;
+	float LeaderExperience = 40.0f;
+	float ShrineExperience = 40.0f;
+	float DuplicateExperience = 30.0f;
+	float RadiusMeters = 40.0f;
+	float ExperiencePerStage = 0.1f;
+	float ForgedFromStage = 3.0f;
+};
+
 struct EISENSEELEN_API FEIItemTable
 {
+	FEIRewardValues Rewards;
 	TArray<FEIItem> Items;
 	TArray<FEIWeaponForm> Forms;
 	TArray<FEIArmorSet> Sets;
