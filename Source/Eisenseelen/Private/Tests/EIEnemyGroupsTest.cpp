@@ -40,7 +40,7 @@ bool FEIEnemyGroupsTest::RunTest(const FString& Parameters)
 	for (int32 Stage = 0; Stage < Table.Stages.Num(); ++Stage)
 	{
 		const FEIGroupStage& Row = Table.GetStage(Stage);
-		for (const FString* Size : { &Row.Camp, &Row.Chest, &Row.AltarWave, &Row.FlareWave })
+		for (const FString* Size : { &Row.Camp, &Row.Chest, &Row.AltarWave, &Row.SignalWave })
 		{
 			TestNotNull(*FString::Printf(TEXT("Stage %d has a group of the size %s"), Stage, **Size), Table.Pick(*Size, Stage));
 		}
@@ -53,10 +53,10 @@ bool FEIEnemyGroupsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("From the first stage on reinforcements come"), Table.GetStage(1).ReinforcementEverySeconds > 0.0f);
 
 	// A small table, to see that the rules are kept.
-	const FString Valid = TEXT("{\"altar_welle_alle_s\": 5, \"fackel_welle_alle_s\": 6, ")
+	const FString Valid = TEXT("{\"altar_welle_alle_s\": 5, \"signalfeuer_welle_alle_s\": 6, ")
 		TEXT("\"gruppen\": [{\"name\": \"Probe\", \"groesse\": \"klein\", \"ab_stufe\": 1, \"bis_stufe\": 2, \"knochenlaeufer\": 3, \"schildtraeger\": 1}], ")
-		TEXT("\"stufen\": [{\"lager\": \"klein\", \"nachschub\": \"\", \"nachschub_alle_s\": 0, \"truhe\": \"klein\", \"altar\": \"klein\", \"fackel\": \"klein\", \"obergrenze\": 9},")
-		TEXT("{\"lager\": \"klein\", \"nachschub\": \"klein\", \"nachschub_alle_s\": 30, \"truhe\": \"klein\", \"altar\": \"klein\", \"fackel\": \"klein\", \"obergrenze\": 12}]}");
+		TEXT("\"stufen\": [{\"lager\": \"klein\", \"nachschub\": \"\", \"nachschub_alle_s\": 0, \"truhe\": \"klein\", \"altar\": \"klein\", \"signalfeuer\": \"klein\", \"obergrenze\": 9},")
+		TEXT("{\"lager\": \"klein\", \"nachschub\": \"klein\", \"nachschub_alle_s\": 30, \"truhe\": \"klein\", \"altar\": \"klein\", \"signalfeuer\": \"klein\", \"obergrenze\": 12}]}");
 	FEIEnemyGroups Small;
 	TestTrue(TEXT("A complete table loads"), FEIEnemyGroups::LoadFromString(Valid, Small, Error));
 	TestEqual(TEXT("The wave time counts"), Small.AltarWaveEverySeconds, 5.0f);

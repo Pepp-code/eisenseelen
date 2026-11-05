@@ -13,7 +13,7 @@ enum class EEIContractKind : uint8
 	Altar
 };
 
-/** One line of the section aufgaben of Data/vertraege.json. */
+/** One line of the section aufgaben of Data/nebenauftraege.json. */
 struct EISENSEELEN_API FEIContractTask
 {
 	EEIContractKind Kind = EEIContractKind::Leader;
@@ -30,7 +30,7 @@ struct EISENSEELEN_API FEIFaction
 	FLinearColor Color = FLinearColor::White;
 };
 
-/** One job of a run. Every player knows the list from the barge on. */
+/** A small job on the side, which pays in gold and in the points of its faction. Every player sees the list from the arrival on. */
 USTRUCT()
 struct EISENSEELEN_API FEIContract
 {
@@ -61,14 +61,13 @@ struct EISENSEELEN_API FEIContract
 	TObjectPtr<AActor> Target;
 };
 
-/** The numbers of the contracts from Data/vertraege.json. */
+/** The numbers of the side jobs from Data/nebenauftraege.json. */
 struct EISENSEELEN_API FEIContractTable
 {
-	float ContractsPerRun = 6.0f;
-	float ContractsToFlare = 4.0f;
+	float ContractsPerRun = 3.0f;
 	float MinDistanceMeters = 40.0f;
 	float Gold = 100.0f;
-	float Points = 10.0f;
+	float Points = 25.0f;
 	float CorruptionBonusPerStage = 0.1f;
 	float KeptOnFailure = 0.3f;
 
@@ -88,7 +87,7 @@ struct EISENSEELEN_API FEIContractTable
 	/** What is left of an amount after a failed run. */
 	int32 GetKeptOnFailure(int32 Amount) const;
 
-	/** The jobs of a run, sorted by faction and without a place yet. Tasks and factions take turns, so each comes about equally often. */
+	/** The jobs of a run, sorted by faction and without a place yet. Tasks take turns, so the same one only comes twice once all others have been there. Factions are pure chance. */
 	TArray<FEIContract> RollContracts() const;
 
 	/** OutTable only changes when the whole text is valid. */

@@ -56,28 +56,36 @@ def stand_looking_at(location, target, height=STAND_HEIGHT):
 def scenario():
     with open(os.path.join(unreal.Paths.project_dir(), "Data", "lauf.json"), encoding="utf-8") as file:
         run_values = json.load(file)
-    with open(os.path.join(unreal.Paths.project_dir(), "Data", "laufkarte.json"), encoding="utf-8") as file:
-        open_space = json.load(file)["freiflaechen"][0]
-    hold_seconds = run_values["fackel_halten_s"]
+    hold_seconds = run_values["signalfeuer_halten_s"]
 
     yield SHADER_WAIT_SECONDS
-    player().preview_invulnerable()
 
-    # On the deck, along the barge, and then down over the map.
+    # The dock: from the middle of it, and then right at the barge, where the use key works.
     shot()
     yield AFTER_SHOT_SECONDS
-    player().set_control_rotation(unreal.Rotator(0, -40, 0))
+    barge = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EISkyBarge)[0]
+    spot = barge.get_actor_location()
+    pawn().set_actor_location(unreal.Vector(spot.x, spot.y - 500, spot.z + STAND_HEIGHT), False, True)
+    player().set_control_rotation(unreal.Rotator(0, 0, 90))
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
 
-    # The jump: off the deck and down in a dive.
-    player().preview_key("W", True)
-    yield 3.5
+    # Aboard, and the barge casts off.
+    yield from tap("F")
+    yield 1.5
+    shot()
+    yield 2.0
+
+    # The way across, in the dark, and the arrival: the team stands at the edge, and the barge leaves.
+    shot()
+    yield 3.0
     shot()
     yield AFTER_SHOT_SECONDS
-    player().preview_key("W", False)
-    yield 6.0
+    player().preview_invulnerable()
+    yield 1.0
+    shot()
+    yield AFTER_SHOT_SECONDS
 
     # The sky on the way to the blood moon, and back for the rest of the pictures.
     stand_looking_at((0, 0), (4000, 0, 900))
@@ -89,82 +97,81 @@ def scenario():
     player().preview_corruption(0)
     yield 6.0
 
-    # The overview of the contracts, down on the ground.
+    # The overview of the side jobs.
     yield from tap("M")
     yield 0.2
     shot()
     yield AFTER_SHOT_SECONDS
     yield from tap("M")
 
-    # A chest: sealed from outside its circle, with its guards in it, free once they have fallen, and open.
-    chest = next(c for c in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIChest) if c.is_in_use())
-    spot = chest.get_actor_location()
-    front = chest.get_actor_forward_vector()
-    stand_looking_at((spot.x + 1500 * front.x, spot.y + 1500 * front.y), (spot.x, spot.y, 100))
+    # A chest, if this run has one: sealed from outside its circle, with its guards in it, free once they have fallen, and open.
+    chest = next((c for c in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIChest) if c.is_in_use()), None)
+    if chest is not None:
+        spot = chest.get_actor_location()
+        front = chest.get_actor_forward_vector()
+        stand_looking_at((spot.x + 1500 * front.x, spot.y + 1500 * front.y), (spot.x, spot.y, 100))
+        yield SETTLE_SECONDS
+        shot()
+        yield AFTER_SHOT_SECONDS
+        stand_looking_at((spot.x + 900 * front.x, spot.y + 900 * front.y), (spot.x, spot.y, 100))
+        yield 0.6
+        shot()
+        yield AFTER_SHOT_SECONDS
+        player().preview_defeat_guards()
+        stand_looking_at((spot.x + 220 * front.x, spot.y + 220 * front.y), (spot.x, spot.y, 60))
+        yield SETTLE_SECONDS
+        shot()
+        yield AFTER_SHOT_SECONDS
+        yield from tap("F")
+        yield SETTLE_SECONDS
+        shot()
+        yield AFTER_SHOT_SECONDS
+
+    # An altar or a shrine, if this run has one, from afar and from inside its zone.
+    altar = next((a for a in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar) if a.is_active()), None)
+    if altar is not None:
+        spot = altar.get_actor_location()
+        stand_looking_at((spot.x + 1800, spot.y + 300), (spot.x, spot.y, 200))
+        yield SETTLE_SECONDS
+        shot()
+        yield AFTER_SHOT_SECONDS
+        stand_looking_at((spot.x + 350, spot.y), (spot.x, spot.y, 200))
+        yield SETTLE_SECONDS
+        shot()
+        yield AFTER_SHOT_SECONDS
+
+    # A leader in its camp, if this run has one, from afar.
+    leader = next((e for e in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIEnemy) if e.is_leader()), None)
+    if leader is not None:
+        spot = leader.get_actor_location()
+        stand_looking_at((spot.x + 1600, spot.y), (spot.x, spot.y, 150))
+        yield 0.4
+        shot()
+        yield AFTER_SHOT_SECONDS
+
+    # The fire from afar, and from right beside it.
+    fire = next(f for f in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EISignalFire) if f.is_in_use())
+    spot = fire.get_actor_location()
+    outward = math.hypot(spot.x, spot.y)
+    in_x, in_y = -spot.x / outward, -spot.y / outward
+    stand_looking_at((spot.x + in_x * 3400, spot.y + in_y * 3400), (spot.x, spot.y, 950))
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
-    stand_looking_at((spot.x + 900 * front.x, spot.y + 900 * front.y), (spot.x, spot.y, 100))
-    yield 0.6
-    shot()
-    yield AFTER_SHOT_SECONDS
-    player().preview_defeat_guards()
-    stand_looking_at((spot.x + 220 * front.x, spot.y + 220 * front.y), (spot.x, spot.y, 60))
+    behind = (spot.x - in_x * 300, spot.y - in_y * 300)
+    stand_looking_at(behind, (spot.x, spot.y, 300))
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
+
+    # Lit: the zone shows, the wave comes and the barge is on its way.
     yield from tap("F")
-    yield SETTLE_SECONDS
-    shot()
-    yield AFTER_SHOT_SECONDS
-
-    # An altar or a shrine of a contract, from afar and from inside its zone.
-    altar = next(a for a in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAltar) if a.is_active())
-    spot = altar.get_actor_location()
-    stand_looking_at((spot.x + 1800, spot.y + 300), (spot.x, spot.y, 200))
-    yield SETTLE_SECONDS
-    shot()
-    yield AFTER_SHOT_SECONDS
-    stand_looking_at((spot.x + 350, spot.y), (spot.x, spot.y, 200))
-    yield SETTLE_SECONDS
-    shot()
-    yield AFTER_SHOT_SECONDS
-
-    # A leader in its camp, from afar.
-    leader = next(e for e in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIEnemy) if e.is_leader())
-    spot = leader.get_actor_location()
-    stand_looking_at((spot.x + 1600, spot.y), (spot.x, spot.y, 150))
-    yield 0.4
-    shot()
-    yield AFTER_SHOT_SECONDS
-
-    # Enough contracts: the note about the flare, with the overview at the place where it will fly from.
-    player().preview_skip_contracts(4)
-    open_x, open_y = open_space["x_m"] * 100, open_space["y_m"] * 100
-    stand_looking_at((open_x, open_y), (0, 0, 300))
-    yield from tap("M")
-    yield SETTLE_SECONDS
-    shot()
-    yield AFTER_SHOT_SECONDS
-    yield from tap("M")
-
-    # The flare climbs, and then the circle shows, the wave comes and the barge is on its way.
-    yield from tap("G")
-    stand_looking_at((open_x + 400, open_y + 400), (open_x, open_y, 900))
-    yield 0.5
-    shot()
-    yield AFTER_SHOT_SECONDS
-    stand_looking_at((open_x + 400, open_y + 400), (open_x, open_y, 2800))
-    yield SETTLE_SECONDS
-    shot()
-    yield AFTER_SHOT_SECONDS
-    stand_looking_at((open_x + 400, open_y + 400), (0, 0, -300))
+    stand_looking_at(behind, (0, 0, -300))
     yield SETTLE_SECONDS
     shot()
     yield hold_seconds * 0.6
-    barge = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EISkyBarge)[0]
     target = barge.get_actor_location()
-    stand_looking_at((open_x + 400, open_y + 400), (target.x, target.y, target.z))
+    stand_looking_at(behind, (target.x, target.y, target.z))
     yield SETTLE_SECONDS
     shot()
     yield hold_seconds * 0.4

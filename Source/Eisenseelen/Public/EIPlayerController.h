@@ -49,6 +49,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewCorruption(int32 Stage);
 
+	/** For preview pictures: the run begins at once, without the way there. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewBeginRun();
+
 	/** For preview pictures: so many open contracts count as done. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewSkipContracts(int32 Count);
@@ -91,14 +95,10 @@ private:
 	void HandleRuneSpell();
 	void HandleClass();
 	void HandleMenu();
-	void HandleFlare();
 	void HandleMap();
 
 	UFUNCTION(Server, Reliable)
 	void ServerInteract();
-
-	UFUNCTION(Server, Reliable)
-	void ServerFireFlare();
 
 	UFUNCTION(Server, Reliable)
 	void ServerToggleClass();
@@ -158,9 +158,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> MenuAction;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UInputAction> FlareAction;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> MapAction;

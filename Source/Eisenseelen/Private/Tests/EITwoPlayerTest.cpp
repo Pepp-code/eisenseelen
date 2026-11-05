@@ -4,7 +4,6 @@
 
 #include "EICasterComponent.h"
 #include "EIChest.h"
-#include "EIFlare.h"
 #include "EIEnemy.h"
 #include "EIGearComponent.h"
 #include "EIGameMode.h"
@@ -17,6 +16,7 @@
 #include "EIProjectile.h"
 #include "EIRunDirector.h"
 #include "EIRuneComponent.h"
+#include "EISignalFire.h"
 #include "EIRuneField.h"
 #include "EISkyBarge.h"
 #include "EITrainingDummy.h"
@@ -397,8 +397,9 @@ private:
 };
 
 /**
- * The guest plays a run alone, the host has fallen: a chest calls its guards on the server, the use key opens it once
- * they have fallen and lights a beacon, the guest sees how the run goes on, and the barge takes the guest home.
+ * Guest and host board together at the dock and arrive together. Then the guest plays alone, the host has fallen: a chest
+ * calls its guards on the server, the use key opens it once they have fallen and lights the fire, the guest sees how the
+ * run goes on, and the barge takes the guest home.
  */
 class FEITwoPlayerRunCommand : public IAutomationLatentCommand
 {
@@ -436,22 +437,81 @@ public:
 		{
 		case 0:
 		{
-			Test->TestEqual(TEXT("The guest knows the run has not begun"), GuestState->GetRunPhase(), EEIRunPhase::OnBarge);
+			Test->TestEqual(TEXT("The guest knows the run has not begun"), GuestState->GetRunPhase(), EEIRunPhase::AtDock);
 			FEIRunValues Short = GameMode->GetRun()->GetValues();
-			Short.FlareHoldSeconds = 1.0f;
+			Short.SignalHoldSeconds = 1.0f;
 			Short.CampFactor = 0.0f;
+			Short.CastOffSeconds = 0.3f;
+			Short.CrossingSeconds = 0.3f;
 			GameMode->GetRun()->ApplyValues(Short);
-			FEIContractTable& Contracts = GameMode->GetRun()->GetContractTable();
-			Contracts.ContractsToFlare = 1.0f;
-			Contracts.Tasks.RemoveAll([](const FEIContractTask& Task) { return Task.Kind != EEIContractKind::Chest; });
+			GameMode->GetRun()->GetContractTable().Tasks.RemoveAll([](const FEIContractTask& Task) { return Task.Kind != EEIContractKind::Chest; });
 			GameMode->GetRun()->ResetRun();
+
+			// Both walk up to the barge, and the guest goes first.
+			const FVector Barge = GameMode->GetRun()->GetBarge()->GetActorLocation();
+			Session.ServerCopyOfClientHero->TeleportTo(FVector(Barge.X - 300.0f, Barge.Y - 500.0f, Barge.Z + 100.0f), FRotator::ZeroRotator);
 			for (FConstPlayerControllerIterator It = ServerWorld->GetPlayerControllerIterator(); It; ++It)
 			{
 				if (It->Get()->IsLocalController())
 				{
-					It->Get()->GetPawn()->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+					HostHero = It->Get()->GetPawn<AEIHeroCharacter>();
+					HostHero->TeleportTo(FVector(Barge.X + 300.0f, Barge.Y - 500.0f, Barge.Z + 100.0f), FRotator::ZeroRotator);
 				}
 			}
+			EnterStep(100);
+			return false;
+		}
+		case 100:
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Pressed);
+			EnterStep(101);
+			return false;
+		case 101:
+			if (Now - StepAt < 0.05)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Released);
+			EnterStep(102);
+			return false;
+		case 102:
+		{
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			Test->TestTrue(TEXT("The server takes the guest aboard"), Session.ServerCopyOfClientHero->IsAboard());
+			Test->TestTrue(TEXT("The guest knows about it"), Session.ClientHero->IsAboard());
+			Test->TestTrue(TEXT("The guest rides the barge"), Session.ClientHero->GetAttachParentActor() != nullptr);
+			Test->TestEqual(TEXT("The barge waits for the host"), GuestState->GetRunPhase(), EEIRunPhase::AtDock);
+			Test->TestFalse(TEXT("It does not cast off yet"), GuestState->IsCastingOff());
+
+			// Now the host goes aboard too, and they leave together.
+			GameMode->GetRun()->Interact(HostHero);
+			EnterStep(103);
+			return false;
+		}
+		case 103:
+		{
+			if (GuestState->GetRunPhase() != EEIRunPhase::Exploring)
+			{
+				return false;
+			}
+			if (Now - StepAt < 1.0)
+			{
+				return false;
+			}
+			Test->TestFalse(TEXT("The guest is off the barge"), Session.ClientHero->IsAboard());
+			Test->TestNull(TEXT("The guest rides nothing any more"), Session.ClientHero->GetAttachParentActor());
+			Test->TestTrue(TEXT("The team stands together"), FVector::Dist(Session.ServerCopyOfClientHero->GetActorLocation(), HostHero->GetActorLocation()) < 1000.0);
+			Test->TestTrue(TEXT("The guest sees the same place as the server"), FVector::Dist(Session.ClientHero->GetActorLocation(), Session.ServerCopyOfClientHero->GetActorLocation()) < 200.0);
+			Test->TestEqual(TEXT("The guest knows the side jobs"), GuestState->GetContracts().Num(), 3);
+
+			// From here on the guest is alone: the host has fallen.
+			HostHero->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 			Session.ServerCopyOfClientHero->SetCanBeDamaged(false);
 			for (TActorIterator<AEIChest> Chest(ServerWorld); Chest; ++Chest)
 			{
@@ -471,8 +531,6 @@ public:
 			{
 				return false;
 			}
-			Test->TestEqual(TEXT("The guest sees the run begin"), GuestState->GetRunPhase(), EEIRunPhase::Contracts);
-			Test->TestEqual(TEXT("The guest knows the contracts"), GuestState->GetContracts().Num(), 6);
 			int32 GuardsTheGuestSees = 0;
 			for (TActorIterator<AEIChest> Chest(Session.ClientWorld); Chest; ++Chest)
 			{
@@ -543,16 +601,24 @@ public:
 			Test->TestTrue(TEXT("The guest is told"), GuestProfile->GetRewardNote() > 0.0f);
 			const AEIPlayerController* Host = Cast<AEIPlayerController>(ServerWorld->GetFirstPlayerController());
 			Test->TestEqual(TEXT("The fallen host earns nothing"), Host->GetProfile()->GetRunGold(), 0);
-			EISendTestKey(Session.ClientPlayer, EKeys::G, IE_Pressed);
+			Session.ServerCopyOfClientHero->TeleportTo(GameMode->GetRun()->GetActiveFire()->GetActorLocation() + FVector(200.0f, 0.0f, 100.0f), FRotator::ZeroRotator);
 			EnterStep(7);
 			return false;
 		}
 		case 7:
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Pressed);
+			EnterStep(8);
+			return false;
+		case 8:
 			if (Now - StepAt < 0.05)
 			{
 				return false;
 			}
-			EISendTestKey(Session.ClientPlayer, EKeys::G, IE_Released);
+			EISendTestKey(Session.ClientPlayer, EKeys::F, IE_Released);
 			EnterStep(9);
 			return false;
 		case 9:
@@ -561,9 +627,13 @@ public:
 			{
 				return false;
 			}
-			Test->TestEqual(TEXT("The guest's key fires the flare"), GuestState->GetRunPhase(), EEIRunPhase::FlareLit);
-			TActorIterator<AEIFlare> GuestFlare(Session.ClientWorld);
-			Test->TestTrue(TEXT("The guest sees the flare"), static_cast<bool>(GuestFlare));
+			Test->TestEqual(TEXT("The guest's use key lights the fire"), GuestState->GetRunPhase(), EEIRunPhase::SignalLit);
+			bool bAnyLit = false;
+			for (TActorIterator<AEISignalFire> GuestFire(Session.ClientWorld); GuestFire; ++GuestFire)
+			{
+				bAnyLit = bAnyLit || GuestFire->IsLit();
+			}
+			Test->TestTrue(TEXT("The guest sees the fire"), bAnyLit);
 			EnterStep(10);
 			return false;
 		}
@@ -621,6 +691,7 @@ private:
 	double StepAt = 0.0;
 	double HeightAtBoarding = 0.0;
 	const AEIChest* OpenedChest = nullptr;
+	AEIHeroCharacter* HostHero = nullptr;
 };
 
 /**

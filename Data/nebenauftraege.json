@@ -1,9 +1,8 @@
 {
-	"vertraege_pro_lauf": 6,
-	"vertraege_bis_zur_fackel": 4,
+	"auftraege_pro_lauf": 3,
 	"mindestabstand_m": 40,
 	"gold": 100,
-	"punkte": 10,
+	"punkte": 25,
 	"verderbnis_bonus_je_stufe": 0.1,
 	"beim_scheitern_bleibt": 0.3,
 	"fraktionen": [

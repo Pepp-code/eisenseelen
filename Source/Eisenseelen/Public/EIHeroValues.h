@@ -16,9 +16,6 @@ struct EISENSEELEN_API FEIHeroValues
 	float LifeBackAfterSeconds = 6.0f;
 	float LifeBackSharePerSecond = 0.1f;
 	float JumpBufferSeconds = 0.12f;
-	float DiveFromHeightMeters = 20.0f;
-	float DiveSpeedMetersPerSecond = 20.0f;
-	float DiveFallSpeedMetersPerSecond = 25.0f;
 
 	/** OutValues only changes when the whole file is valid. */
 	static bool LoadFromString(const FString& Json, FEIHeroValues& OutValues, FString& OutError);

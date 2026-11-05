@@ -109,8 +109,7 @@ bool FEIHandMotion::LoadFromProjectFile(FEIHandMotion& OutMotion, FString& OutEr
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("maus_nachziehen_grad_je_grad_pro_s"), 0.0, 1.0, Loaded.LookLag, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("maus_nachziehen_max_grad"), 0.0, 45.0, Loaded.LookLagMaxDegrees, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("sichtfeld_grad"), 30.0, 150.0, Loaded.FieldOfViewDegrees, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("sichtfeld_sprint_plus_grad"), 0.0, 60.0, Loaded.SprintFieldOfViewPlusDegrees, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("sichtfeld_sturzflug_plus_grad"), 0.0, 60.0, Loaded.DiveFieldOfViewPlusDegrees, OutError))
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("sichtfeld_sprint_plus_grad"), 0.0, 60.0, Loaded.SprintFieldOfViewPlusDegrees, OutError))
 	{
 		return false;
 	}

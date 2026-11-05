@@ -6,13 +6,13 @@
 #include "EIDataFile.h"
 #include "EIEnemy.h"
 #include "EIEnemyCamp.h"
-#include "EIFlare.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
 #include "EIHordeDirector.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
+#include "EISignalFire.h"
 #include "EISkyBarge.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -20,15 +20,45 @@
 namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
-	// Falling this far below the deck counts as having jumped.
-	constexpr float LeftBargeBelowCm = 300.0f;
 	constexpr float BargeHoverHeightCm = 140.0f;
-	constexpr int32 BargeSpotTries = 8;
-	constexpr float GroundSearchUpCm = 1000.0f;
-	constexpr float GroundSearchDownCm = 3000.0f;
-	// On a different level than the flare the barge could not be reached from its circle.
-	constexpr float BargeSpotHeightDifferenceCm = 150.0f;
-	constexpr float BargeRoomAboveGroundCm = 20.0f;
+	// Ahead and to the right of the team, so that everybody sees it leave.
+	const FVector BargeAtArrivalCm(800.0f, 1400.0f, 300.0f);
+	constexpr float GroundSearchCm = 5000.0f;
+	constexpr float AboveGroundCm = 5.0f;
+
+	bool LoadArrivals(TArray<FEIArrivalPoint>& OutArrivals, FString& OutError)
+	{
+		const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("laufkarte.json"), OutError);
+		const TArray<TSharedPtr<FJsonValue>>* Lines = nullptr;
+		if (!Root.IsValid())
+		{
+			return false;
+		}
+		if (!Root->TryGetArrayField(TEXT("ankunft"), Lines) || Lines->IsEmpty())
+		{
+			OutError = TEXT("Die Liste ankunft fehlt oder ist leer.");
+			return false;
+		}
+		TArray<FEIArrivalPoint> Loaded;
+		for (const TSharedPtr<FJsonValue>& Line : *Lines)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			float X = 0.0f;
+			float Y = 0.0f;
+			FEIArrivalPoint Arrival;
+			if (!Line->TryGetObject(Object)
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("x_m"), -100000.0, 100000.0, X, OutError)
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("y_m"), -100000.0, 100000.0, Y, OutError)
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("blick_grad"), -360.0, 360.0, Arrival.YawDegrees, OutError))
+			{
+				return false;
+			}
+			Arrival.Location = FVector(X, Y, 0.0f) * CentimetersPerMeter;
+			Loaded.Add(Arrival);
+		}
+		OutArrivals = Loaded;
+		return true;
+	}
 
 	/** The first place far enough from all others, or else simply the first one. It leaves the list. */
 	template <typename TPlace>
@@ -59,8 +89,13 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_reichweite_m"), 0.5, 100.0, Loaded.ChestReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_zone_m"), 1.0, 100.0, Loaded.ChestZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_waechter_abstand_m"), 1.0, 100.0, Loaded.ChestGuardDistanceMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("fackel_halten_s"), 0.1, 3600.0, Loaded.FlareHoldSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("fackel_zone_m"), 1.0, 200.0, Loaded.FlareZoneMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("ablegen_s"), 0.0, 600.0, Loaded.CastOffSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("ueberfahrt_s"), 0.0, 600.0, Loaded.CrossingSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("ankunft_abstand_m"), 0.5, 100.0, Loaded.ArrivalSpacingMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("ankunft_abflug_tempo_m_pro_s"), 0.1, 200.0, Loaded.ArrivalDepartMetersPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("signalfeuer_halten_s"), 0.1, 3600.0, Loaded.SignalHoldSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("signalfeuer_reichweite_m"), 0.5, 100.0, Loaded.SignalReachMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("signalfeuer_zone_m"), 1.0, 200.0, Loaded.SignalZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abstand_m"), 1.0, 100.0, Loaded.BargeDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abflug_tempo_m_pro_s"), 0.1, 100.0, Loaded.BargeDepartMetersPerSecond, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_leben_faktor"), 0.1, 100.0, Loaded.LeaderLifeFactor, OutError)
@@ -110,7 +145,11 @@ void UEIRunDirector::LoadValues()
 	}
 	if (!FEIContractTable::LoadFromProjectFile(ContractTable, Error))
 	{
-		FEIDataFile::ReportError(TEXT("vertraege.json"), Error);
+		FEIDataFile::ReportError(TEXT("nebenauftraege.json"), Error);
+	}
+	if (!LoadArrivals(Arrivals, Error))
+	{
+		FEIDataFile::ReportError(TEXT("laufkarte.json"), Error);
 	}
 }
 
@@ -119,14 +158,12 @@ void UEIRunDirector::ResetRun()
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	TActorIterator<AEISkyBarge> FoundBarge(GetWorld());
 	Barge = FoundBarge ? *FoundBarge : nullptr;
-	if (Flare != nullptr)
-	{
-		Flare->Destroy();
-		Flare = nullptr;
-	}
 	HoldLeft = 0.0f;
+	CastOffLeft = Values.CastOffSeconds;
+	CrossingLeft = Values.CrossingSeconds;
 	State->ResetRunClock();
-	State->SetFlareHold(0.0f, false);
+	State->SetSignalHold(0.0f, false);
+	State->SetCastingOff(false);
 	SetCorruptionStage(0);
 	WaveLeft = 0.0f;
 	ReinforcementLeft = 0.0f;
@@ -134,13 +171,97 @@ void UEIRunDirector::ResetRun()
 	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetEnemyStrength(1.0f);
 
 	PrepareContracts();
+	PrepareSignalFire();
 	if (Barge == nullptr)
 	{
 		State->SetRunPhase(EEIRunPhase::None);
 		return;
 	}
 	Barge->ReturnToStart();
-	State->SetRunPhase(EEIRunPhase::OnBarge);
+	State->SetRunPhase(EEIRunPhase::AtDock);
+}
+
+void UEIRunDirector::PrepareSignalFire()
+{
+	TArray<AEISignalFire*> Fires;
+	for (TActorIterator<AEISignalFire> It(GetWorld()); It; ++It)
+	{
+		It->SetLit(false);
+		It->SetInUse(false);
+		Fires.Add(*It);
+	}
+	ActiveFire = Barge != nullptr && !Fires.IsEmpty() ? Fires[FMath::RandRange(0, Fires.Num() - 1)] : nullptr;
+	if (ActiveFire != nullptr)
+	{
+		ActiveFire->SetInUse(true);
+	}
+}
+
+void UEIRunDirector::UpdateDock(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+{
+	// The team stays together: the barge only leaves with everybody aboard. Whoever steps off in time brings it back.
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (LivingHeroes.ContainsByPredicate([](const AEIHeroCharacter* Hero) { return !Hero->IsAboard(); }))
+	{
+		if (State->IsCastingOff())
+		{
+			State->SetCastingOff(false);
+			CastOffLeft = Values.CastOffSeconds;
+			Barge->ReturnToStart();
+		}
+		return;
+	}
+	if (!State->IsCastingOff())
+	{
+		State->SetCastingOff(true);
+		Barge->Depart(Values.BargeDepartMetersPerSecond * CentimetersPerMeter);
+	}
+	CastOffLeft -= DeltaTime;
+	if (CastOffLeft <= 0.0f)
+	{
+		State->SetRunPhase(EEIRunPhase::Crossing);
+	}
+}
+
+void UEIRunDirector::BeginRunNow()
+{
+	if (Barge == nullptr || Arrivals.IsEmpty())
+	{
+		return;
+	}
+	TArray<AEIHeroCharacter*> LivingHeroes;
+	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsDead())
+		{
+			LivingHeroes.Add(*It);
+		}
+	}
+	const FEIArrivalPoint& Arrival = Arrivals[FMath::RandRange(0, Arrivals.Num() - 1)];
+	FVector Ground = Arrival.Location;
+	FindGround(Arrival.Location, Ground);
+	const FRotator Facing(0.0f, Arrival.YawDegrees, 0.0f);
+	const FVector Side = FRotationMatrix(Facing).GetUnitAxis(EAxis::Y);
+	const float Spacing = Values.ArrivalSpacingMeters * CentimetersPerMeter;
+	for (int32 Index = 0; Index < LivingHeroes.Num(); ++Index)
+	{
+		const float FromMiddle = (Index - (LivingHeroes.Num() - 1) / 2.0f) * Spacing;
+		const float HalfHeight = LivingHeroes[Index]->GetSimpleCollisionHalfHeight();
+		LivingHeroes[Index]->ArriveAt(Ground + Side * FromMiddle + FVector(0.0f, 0.0f, HalfHeight + AboveGroundCm), Arrival.YawDegrees);
+	}
+	Barge->ArriveAt(Ground + Facing.RotateVector(BargeAtArrivalCm));
+	Barge->Depart(Values.ArrivalDepartMetersPerSecond * CentimetersPerMeter);
+
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	State->SetCastingOff(false);
+	State->StartRunClock();
+	State->SetRunPhase(EEIRunPhase::Exploring);
+	for (TActorIterator<AEIEnemyCamp> Camp(GetWorld()); Camp; ++Camp)
+	{
+		FillCamp(*Camp, Camp->GetStartSize(), LivingHeroes.Num());
+	}
+	SpawnLeaders();
+	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(true);
 }
 
 void UEIRunDirector::PrepareContracts()
@@ -198,7 +319,7 @@ void UEIRunDirector::PrepareContracts()
 		}
 	}
 	Contracts.RemoveAll([](const FEIContract& Contract) { return Contract.Target == nullptr; });
-	GetWorld()->GetGameState<AEIGameState>()->SetContracts(Contracts, FMath::RoundToInt32(ContractTable.ContractsToFlare));
+	GetWorld()->GetGameState<AEIGameState>()->SetContracts(Contracts);
 }
 
 void UEIRunDirector::SpawnLeaders()
@@ -411,13 +532,30 @@ void UEIRunDirector::EndRunForAll(bool bEscaped)
 
 void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 {
-	const EEIRunPhase Phase = GetWorld()->GetGameState<AEIGameState>()->GetRunPhase();
-	const bool bRunning = Phase != EEIRunPhase::None && Phase != EEIRunPhase::OnBarge && Phase != EEIRunPhase::Escaped && Phase != EEIRunPhase::Failed;
+	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	const EEIRunPhase Phase = State->GetRunPhase();
+	if (Phase == EEIRunPhase::AtDock)
+	{
+		if (!Hero->IsAboard() && Barge->IsInBoardingZone(Hero))
+		{
+			Hero->BoardBarge(Barge);
+		}
+		else if (Hero->IsAboard())
+		{
+			Hero->ArriveAt(Hero->GetLocationBeforeBoarding(), static_cast<float>(Hero->GetActorRotation().Yaw));
+		}
+		return;
+	}
+	const bool bRunning = Phase == EEIRunPhase::Exploring || Phase == EEIRunPhase::SignalLit || Phase == EEIRunPhase::BargeWaiting;
 	if (bRunning && OpenChest(Hero))
 	{
 		return;
 	}
-	if (Phase == EEIRunPhase::BargeWaiting && !Hero->IsAboard() && Barge->IsInBoardingZone(Hero))
+	if (State->CanLightSignal() && ActiveFire != nullptr && ActiveFire->IsInReach(Hero))
+	{
+		LightSignal();
+	}
+	else if (Phase == EEIRunPhase::BargeWaiting && !Hero->IsAboard() && Barge->IsInBoardingZone(Hero))
 	{
 		Hero->BoardBarge(Barge);
 	}
@@ -426,8 +564,8 @@ void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 bool UEIRunDirector::FindGround(const FVector& Location, FVector& OutGround) const
 {
 	FHitResult Hit;
-	const FVector Start = Location + FVector(0.0f, 0.0f, GroundSearchUpCm);
-	const FVector End = Location - FVector(0.0f, 0.0f, GroundSearchDownCm);
+	const FVector Start = Location + FVector(0.0f, 0.0f, GroundSearchCm);
+	const FVector End = Location - FVector(0.0f, 0.0f, GroundSearchCm);
 	if (!GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, FCollisionObjectQueryParams(ECC_WorldStatic)))
 	{
 		return false;
@@ -436,58 +574,18 @@ bool UEIRunDirector::FindGround(const FVector& Location, FVector& OutGround) con
 	return true;
 }
 
-bool UEIRunDirector::FindBargeSpot(const FVector& FlareGround, FVector& OutHover) const
-{
-	// Towards the middle of the map first, where it is usually open.
-	const FVector Inwards = (-FlareGround).GetSafeNormal2D();
-	const FVector First = Inwards.IsNearlyZero() ? FVector::ForwardVector : Inwards;
-	const FVector Room = Barge->GetRoomNeeded();
-	const FCollisionShape Box = FCollisionShape::MakeBox(Room);
-	for (int32 Try = 0; Try < BargeSpotTries; ++Try)
-	{
-		const FVector Direction = First.RotateAngleAxis(Try * 360.0f / BargeSpotTries, FVector::UpVector);
-		FVector Ground;
-		if (!FindGround(FlareGround + Direction * Values.BargeDistanceMeters * CentimetersPerMeter, Ground)
-			|| FMath::Abs(Ground.Z - FlareGround.Z) > BargeSpotHeightDifferenceCm)
-		{
-			continue;
-		}
-		const FVector BoxCenter = Ground + FVector(0.0f, 0.0f, BargeRoomAboveGroundCm + Room.Z);
-		if (!GetWorld()->OverlapAnyTestByObjectType(BoxCenter, FQuat::Identity, FCollisionObjectQueryParams(ECC_WorldStatic), Box))
-		{
-			OutHover = Ground + FVector(0.0f, 0.0f, BargeHoverHeightCm);
-			return true;
-		}
-	}
-	return false;
-}
-
-void UEIRunDirector::FireFlare(AEIHeroCharacter* Hero)
+void UEIRunDirector::LightSignal()
 {
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	const AEIPlayerController* Player = Hero->GetController<AEIPlayerController>();
-	if (State->GetRunPhase() != EEIRunPhase::Contracts || Player == nullptr)
-	{
-		return;
-	}
-	if (!State->CanFireFlare())
-	{
-		Player->GetProfile()->ClientShowNote(FString::Printf(TEXT("Die Leuchtfackel geht erst nach %d erf\u00FCllten Vertr\u00E4gen."), State->GetContractsToFlare()));
-		return;
-	}
-	FVector Ground;
-	FVector Hover;
-	if (!FindGround(Hero->GetActorLocation(), Ground) || !FindBargeSpot(Ground, Hover))
-	{
-		Player->GetProfile()->ClientShowNote(TEXT("Hier hat die Barke keinen Platz. Geh ins Freie."));
-		return;
-	}
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	Flare = GetWorld()->SpawnActor<AEIFlare>(Ground, FRotator::ZeroRotator, Params);
-	HoldLeft = Values.FlareHoldSeconds;
-	State->SetFlareHold(HoldLeft, true);
-	State->SetRunPhase(EEIRunPhase::FlareLit);
+	ActiveFire->SetLit(true);
+	HoldLeft = Values.SignalHoldSeconds;
+	State->SetSignalHold(HoldLeft, true);
+	State->SetRunPhase(EEIRunPhase::SignalLit);
+
+	// The barge comes down on the side towards the middle of the map, where it is open.
+	const FVector FireLocation = ActiveFire->GetActorLocation();
+	FVector Hover = FireLocation - FireLocation.GetSafeNormal2D() * Values.BargeDistanceMeters * CentimetersPerMeter;
+	Hover.Z = FireLocation.Z + BargeHoverHeightCm;
 	Barge->BeginApproach(Hover);
 }
 
@@ -544,31 +642,31 @@ void UEIRunDirector::UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCh
 		}
 	}
 
-	// Waves attack whoever holds an altar or the circle of the flare. Whoever comes back gets the next one at once.
+	// Waves attack whoever holds an altar or the fire. Whoever comes back gets the next one at once.
 	const bool bAtAltar = State->IsContractHeld();
-	const bool bAtFlare = Phase == EEIRunPhase::FlareLit && State->IsFlareHeld();
-	if (!bAtAltar && !bAtFlare)
+	const bool bAtFire = Phase == EEIRunPhase::SignalLit && State->IsSignalHeld();
+	if (!bAtAltar && !bAtFire)
 	{
 		WaveLeft = 0.0f;
 		return;
 	}
 	WaveLeft -= DeltaTime;
-	if (WaveLeft <= 0.0f && SendGroup(bAtFlare ? Row.FlareWave : Row.AltarWave, HeroCount))
+	if (WaveLeft <= 0.0f && SendGroup(bAtFire ? Row.SignalWave : Row.AltarWave, HeroCount))
 	{
-		WaveLeft = bAtFlare ? Groups.FlareWaveEverySeconds : Groups.AltarWaveEverySeconds;
+		WaveLeft = bAtFire ? Groups.SignalWaveEverySeconds : Groups.AltarWaveEverySeconds;
 	}
 }
 
-void UEIRunDirector::HoldFlare(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+void UEIRunDirector::HoldSignal(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
 {
-	const bool bHeld = LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return Flare->IsInZone(Hero); });
+	const bool bHeld = LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return ActiveFire->IsInZone(Hero); });
 	if (bHeld)
 	{
 		HoldLeft = FMath::Max(0.0f, HoldLeft - DeltaTime);
 	}
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	State->SetFlareHold(HoldLeft, bHeld);
-	Barge->SetApproachFraction(1.0f - HoldLeft / FMath::Max(Values.FlareHoldSeconds, KINDA_SMALL_NUMBER));
+	State->SetSignalHold(HoldLeft, bHeld);
+	Barge->SetApproachFraction(1.0f - HoldLeft / FMath::Max(Values.SignalHoldSeconds, KINDA_SMALL_NUMBER));
 	if (HoldLeft <= 0.0f)
 	{
 		State->SetRunPhase(EEIRunPhase::BargeWaiting);
@@ -628,7 +726,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		return;
 	}
 
-	if (Phase != EEIRunPhase::OnBarge)
+	if (Phase != EEIRunPhase::AtDock && Phase != EEIRunPhase::Crossing)
 	{
 		UpdateCorruption();
 		UpdateEnemyGroups(Phase, LivingHeroes, DeltaTime);
@@ -637,26 +735,20 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 	switch (Phase)
 	{
-	case EEIRunPhase::OnBarge:
-		for (const AEIHeroCharacter* Hero : LivingHeroes)
+	case EEIRunPhase::AtDock:
+		UpdateDock(LivingHeroes, DeltaTime);
+		break;
+
+	case EEIRunPhase::Crossing:
+		CrossingLeft -= DeltaTime;
+		if (CrossingLeft <= 0.0f)
 		{
-			if (Hero->GetActorLocation().Z < Barge->GetDeckHeight() - LeftBargeBelowCm)
-			{
-				State->StartRunClock();
-				State->SetRunPhase(EEIRunPhase::Contracts);
-				for (TActorIterator<AEIEnemyCamp> Camp(GetWorld()); Camp; ++Camp)
-				{
-					FillCamp(*Camp, Camp->GetStartSize(), LivingHeroes.Num());
-				}
-				SpawnLeaders();
-				CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(true);
-				break;
-			}
+			BeginRunNow();
 		}
 		break;
 
-	case EEIRunPhase::FlareLit:
-		HoldFlare(LivingHeroes, DeltaTime);
+	case EEIRunPhase::SignalLit:
+		HoldSignal(LivingHeroes, DeltaTime);
 		break;
 
 	case EEIRunPhase::BargeWaiting:

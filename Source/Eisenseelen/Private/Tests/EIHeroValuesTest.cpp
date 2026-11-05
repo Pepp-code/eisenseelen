@@ -18,7 +18,7 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 		return FEIHeroValues::LoadFromString(Json, OutValues, OutError);
 	};
 	const FString Valid = TEXT("{\"lauftempo_m_pro_s\": 7, \"sprint_tempo_m_pro_s\": 9, \"blocken_tempo_m_pro_s\": 2, \"sprunghoehe_m\": 3, \"schwerkraft_faktor\": 2, \"luftkontrolle_0_bis_1\": 0.25, \"luft_lenkung_grad_pro_s\": 150, \"maus_faktor\": 2, ")
-		TEXT("\"leben_erholung_nach_s\": 4, \"leben_erholung_anteil_pro_s\": 0.2, \"sprung_puffer_s\": 0.2, \"absprung_ab_hoehe_m\": 30, \"absprung_tempo_m_pro_s\": 15, \"absprung_fall_tempo_m_pro_s\": 18}");
+		TEXT("\"leben_erholung_nach_s\": 4, \"leben_erholung_anteil_pro_s\": 0.2, \"sprung_puffer_s\": 0.2}");
 
 	FEIHeroValues Values;
 	FString Error;
@@ -34,9 +34,6 @@ bool FEIHeroValuesParseTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Life back after"), Values.LifeBackAfterSeconds, 4.0f);
 	TestEqual(TEXT("Life back per second"), Values.LifeBackSharePerSecond, 0.2f);
 	TestEqual(TEXT("Jump buffer"), Values.JumpBufferSeconds, 0.2f);
-	TestEqual(TEXT("Dive height"), Values.DiveFromHeightMeters, 30.0f);
-	TestEqual(TEXT("Dive speed"), Values.DiveSpeedMetersPerSecond, 15.0f);
-	TestEqual(TEXT("Dive fall speed"), Values.DiveFallSpeedMetersPerSecond, 18.0f);
 
 	FEIHeroValues Untouched;
 	TestFalse(TEXT("Broken JSON is refused"), Parse(TEXT("{ lauftempo"), Untouched, Error));

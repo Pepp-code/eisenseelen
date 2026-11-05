@@ -21,10 +21,10 @@ void AEIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIGameState, RunPhase);
 	DOREPLIFETIME(AEIGameState, RunStartedAt);
 	DOREPLIFETIME(AEIGameState, RunEndedAfter);
-	DOREPLIFETIME(AEIGameState, FlareHoldLeft);
-	DOREPLIFETIME(AEIGameState, bFlareHeld);
+	DOREPLIFETIME(AEIGameState, SignalHoldLeft);
+	DOREPLIFETIME(AEIGameState, bSignalHeld);
+	DOREPLIFETIME(AEIGameState, bCastingOff);
 	DOREPLIFETIME(AEIGameState, Contracts);
-	DOREPLIFETIME(AEIGameState, ContractsToFlare);
 	DOREPLIFETIME(AEIGameState, CorruptionStage);
 	DOREPLIFETIME(AEIGameState, CorruptionShare);
 	DOREPLIFETIME(AEIGameState, bBloodMoon);
@@ -56,16 +56,15 @@ void AEIGameState::StopRunClock()
 	RunEndedAfter = RunStartedAt < 0.0 ? 0.0f : GetRunSeconds();
 }
 
-void AEIGameState::SetFlareHold(float SecondsLeft, bool bHeld)
+void AEIGameState::SetSignalHold(float SecondsLeft, bool bHeld)
 {
-	FlareHoldLeft = SecondsLeft;
-	bFlareHeld = bHeld;
+	SignalHoldLeft = SecondsLeft;
+	bSignalHeld = bHeld;
 }
 
-void AEIGameState::SetContracts(const TArray<FEIContract>& NewContracts, int32 ToFlare)
+void AEIGameState::SetContracts(const TArray<FEIContract>& NewContracts)
 {
 	Contracts = NewContracts;
-	ContractsToFlare = ToFlare;
 }
 
 int32 AEIGameState::CountContractsDone() const
@@ -83,9 +82,9 @@ bool AEIGameState::IsContractHeld() const
 	return Contracts.ContainsByPredicate([](const FEIContract& Contract) { return Contract.bHeld; });
 }
 
-bool AEIGameState::CanFireFlare() const
+bool AEIGameState::CanLightSignal() const
 {
-	return RunPhase == EEIRunPhase::Contracts && CountContractsDone() >= ContractsToFlare;
+	return RunPhase == EEIRunPhase::Exploring;
 }
 
 void AEIGameState::SetCorruption(int32 Stage, float Share, bool bIsBloodMoon)

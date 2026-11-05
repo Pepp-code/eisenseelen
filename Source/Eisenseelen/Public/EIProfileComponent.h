@@ -85,7 +85,7 @@ public:
 	/** Server only. Dresses a hero of this player. */
 	void ApplyTo(AEIHeroCharacter* Hero);
 
-	/** Server only. A contract was finished with this player near. */
+	/** Server only. A side job was finished with this player near. */
 	void GrantContract(int32 Faction, int32 Gold, int32 Points);
 
 	/** Tells the player something in the middle of the screen. */

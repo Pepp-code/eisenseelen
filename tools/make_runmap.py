@@ -17,16 +17,21 @@ CUBE_MESH = "/Engine/BasicShapes/Cube.Cube"
 
 CM_PER_M = 100
 EDGE_THICKNESS_M = 2
-# High enough that nobody leaves the map during the jump from the barge.
+# High enough that nobody leaves the map from a launch pad.
 EDGE_BLOCKER_HEIGHT_M = 300
+DOCK_RAILING_HEIGHT_M = 1
+DOCK_BLOCKER_HEIGHT_M = 20
+DOCK_RAILING_THICKNESS_M = 0.5
+BARGE_HALF_WIDTH_M = 3.5
+PLAYER_STARTS = 4
+PLAYER_START_SPACING_M = 3
+PLAYER_START_ABOVE_FLOOR_CM = 120
 TOWER_SIZE_M = 4
 TOWER_DISTANCE_M = 3.5
 PLACE_WALL_LENGTH_M = 10
 PLACE_WALL_THICKNESS_M = 1
 PLACE_WALL_HEIGHT_M = 3
 PLACE_SIZE_M = 7
-# Just above the deck for a capsule with a half height of 88 cm.
-START_ABOVE_DECK_CM = 120
 COVER_CLEAR_M = 22
 COVER_MIN_SIZE_M = 2
 COVER_MAX_SIZE_M = 5
@@ -61,19 +66,34 @@ def add_box(actors, label, center_m, size_m, rotation=(0, 0, 0)):
     return box
 
 
-def add_edge(actors, floor_size, height):
-    """A low visible wall around the map, and an invisible one above it."""
-    half = floor_size / 2
+def add_walls(actors, label, center, length, width, floor_z, height, thickness, blocker_height):
+    """A low visible wall around a rectangle, and an invisible one above it."""
+    center_x, center_y = center
+    half_x, half_y = length / 2, width / 2
     sides = [
-        ((0, half), (floor_size + EDGE_THICKNESS_M, EDGE_THICKNESS_M)),
-        ((0, -half), (floor_size + EDGE_THICKNESS_M, EDGE_THICKNESS_M)),
-        ((half, 0), (EDGE_THICKNESS_M, floor_size + EDGE_THICKNESS_M)),
-        ((-half, 0), (EDGE_THICKNESS_M, floor_size + EDGE_THICKNESS_M)),
+        ((center_x, center_y + half_y), (length + thickness, thickness)),
+        ((center_x, center_y - half_y), (length + thickness, thickness)),
+        ((center_x + half_x, center_y), (thickness, width + thickness)),
+        ((center_x - half_x, center_y), (thickness, width + thickness)),
     ]
     for (x, y), (size_x, size_y) in sides:
-        add_box(actors, "Rand", (x, y, height / 2), (size_x, size_y, height))
-        blocker = add_box(actors, "Randsperre", (x, y, EDGE_BLOCKER_HEIGHT_M / 2), (size_x, size_y, EDGE_BLOCKER_HEIGHT_M))
+        add_box(actors, label, (x, y, floor_z + height / 2), (size_x, size_y, height))
+        blocker = add_box(actors, f"{label}sperre", (x, y, floor_z + blocker_height / 2), (size_x, size_y, blocker_height))
         blocker.set_actor_hidden_in_game(True)
+
+
+def add_dock(actors, dock):
+    """The platform above the clouds where a run starts, with the barge moored at its long side."""
+    x, y, height = dock["x_m"], dock["y_m"], dock["hoehe_m"]
+    length, width = dock["laenge_m"], dock["breite_m"]
+    add_box(actors, "Anlegestelle", (x, y, height - 0.5), (length, width, 1))
+    add_walls(actors, "Geländer", (x, y), length, width, height, DOCK_RAILING_HEIGHT_M, DOCK_RAILING_THICKNESS_M, DOCK_BLOCKER_HEIGHT_M)
+    barge_location = (x * CM_PER_M, (y + width / 2 + BARGE_HALF_WIDTH_M) * CM_PER_M, height * CM_PER_M)
+    spawn(actors, unreal.load_class(None, "/Script/Eisenseelen.EISkyBarge"), location=barge_location, label="Himmelsbarke")
+    for index in range(PLAYER_STARTS):
+        start_x = x + (index - (PLAYER_STARTS - 1) / 2) * PLAYER_START_SPACING_M
+        location = (start_x * CM_PER_M, y * CM_PER_M, height * CM_PER_M + PLAYER_START_ABOVE_FLOOR_CM)
+        spawn(actors, unreal.PlayerStart, location=location, rotation=(0, 0, 90), label="Start")
 
 
 def add_place(actors, place, index):
@@ -89,10 +109,11 @@ def add_place(actors, place, index):
 
 
 def add_cover(actors, layout):
-    """Loose blocks that give cover and break the view. They keep clear of the places and the open spaces."""
+    """Loose blocks that give cover and break the view. They keep clear of the places, the fires and the middle of the map."""
     rng = random.Random(layout["deckung_zufall"])
     half = layout["boden_m"] / 2 - COVER_CLEAR_M
-    taken = [(p["x_m"], p["y_m"]) for p in layout["orte"] + layout["freiflaechen"] + layout["sprungfelder"]]
+    taken = [(p["x_m"], p["y_m"]) for p in layout["orte"] + layout["signalfeuer"] + layout["ankunft"] + layout["sprungfelder"]]
+    taken.append((0, 0))
     placed = 0
     while placed < layout["deckung_anzahl"]:
         x, y = rng.uniform(-half, half), rng.uniform(-half, half)
@@ -121,7 +142,7 @@ def add_chests(actors, layout, cover):
     rng = random.Random(layout["deckung_zufall"] + 1)
     half = layout["boden_m"] / 2 - CHEST_CLEAR_EDGE_M
     keep_clear = [(point, CHEST_CLEAR_COVER_M) for point in cover]
-    keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PLACE_M) for p in layout["orte"] + layout["freiflaechen"]]
+    keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PLACE_M) for p in layout["orte"] + layout["signalfeuer"] + layout["ankunft"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PAD_M) for p in layout["sprungfelder"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_CAMP_M) for p in layout["lager"]]
     keep_clear.append(((0, 0), CHEST_CLEAR_PLACE_M))
@@ -161,7 +182,7 @@ def main():
 
     floor_size = layout["boden_m"]
     add_box(actors, "Boden", (0, 0, -0.5), (floor_size, floor_size, 1))
-    add_edge(actors, floor_size, layout["rand_hoehe_m"])
+    add_walls(actors, "Rand", (0, 0), floor_size, floor_size, 0, layout["rand_hoehe_m"], EDGE_THICKNESS_M, EDGE_BLOCKER_HEIGHT_M)
     altar_class = unreal.load_class(None, "/Script/Eisenseelen.EIAltar")
     for index, place in enumerate(layout["orte"]):
         add_place(actors, place, index)
@@ -175,11 +196,11 @@ def main():
     scale = floor_size / VOLUME_BRUSH_M
     navigation.set_actor_scale3d(unreal.Vector(scale, scale, NAVIGATION_HEIGHT_M / VOLUME_BRUSH_M))
 
-    barge = layout["barke"]
-    barge_location = [barge["x_m"] * CM_PER_M, barge["y_m"] * CM_PER_M, barge["hoehe_m"] * CM_PER_M]
-    spawn(actors, unreal.load_class(None, "/Script/Eisenseelen.EISkyBarge"), location=barge_location, label="Himmelsbarke")
-    start = (barge_location[0], barge_location[1], barge_location[2] + START_ABOVE_DECK_CM)
-    spawn(actors, unreal.PlayerStart, location=start, label="Start")
+    fire_class = unreal.load_class(None, "/Script/Eisenseelen.EISignalFire")
+    for fire in layout["signalfeuer"]:
+        spawn(actors, fire_class, location=(fire["x_m"] * CM_PER_M, fire["y_m"] * CM_PER_M, 0), label="Signalfeuer")
+
+    add_dock(actors, layout["anlegestelle"])
 
     sun = spawn(actors, unreal.DirectionalLight, location=(0, 0, 1000), rotation=(0, -50, 30), label="Sonne")
     sun.light_component.set_editor_property("atmosphere_sun_light", True)

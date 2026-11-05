@@ -21,6 +21,7 @@ public:
 
 	/** Server only. */
 	void ReturnToStart();
+	void ArriveAt(const FVector& Location);
 	void BeginApproach(const FVector& HoverLocation);
 	void SetApproachFraction(float Fraction);
 	void Depart(float SpeedCmPerSecond);
@@ -31,9 +32,6 @@ public:
 	FVector GetDeckSpotNear(const FVector& Location, float HalfHeight) const;
 	float GetDeckHeight() const;
 	const FVector& GetStartLocation() const { return StartLocation; }
-
-	/** Half of the room it needs on the ground, along the axes of the world. */
-	FVector GetRoomNeeded() const;
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -71,6 +69,7 @@ private:
 
 	FVector StartLocation = FVector::ZeroVector;
 	FVector ApproachFrom = FVector::ZeroVector;
+	double DepartUpToHeight = 0.0;
 	FVector ApproachTo = FVector::ZeroVector;
 	float DepartSpeedCm = 0.0f;
 };

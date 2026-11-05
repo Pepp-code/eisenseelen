@@ -119,6 +119,7 @@ void AEIHeroCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AEIHeroCharacter, HeroClass);
+	DOREPLIFETIME(AEIHeroCharacter, bAboard);
 }
 
 void AEIHeroCharacter::PossessedBy(AController* NewController)
@@ -298,11 +299,7 @@ void AEIHeroCharacter::UpdateFieldOfView(float DeltaSeconds)
 {
 	const UEIHeroMovementComponent* Movement = GetHeroMovement();
 	float Target = HandMotion.FieldOfViewDegrees;
-	if (Movement->IsDiving())
-	{
-		Target += HandMotion.DiveFieldOfViewPlusDegrees;
-	}
-	else if (Movement->IsMovingOnGround() && GetVelocity().Size2D() > Movement->MaxWalkSpeed * SprintFromRunShare)
+	if (Movement->IsMovingOnGround() && GetVelocity().Size2D() > Movement->MaxWalkSpeed * SprintFromRunShare)
 	{
 		Target += HandMotion.SprintFieldOfViewPlusDegrees;
 	}
@@ -382,7 +379,7 @@ UEIHeroMovementComponent* AEIHeroCharacter::GetHeroMovement() const
 
 bool AEIHeroCharacter::CanJumpWhileFalling() const
 {
-	return JumpCurrentCount == 0 && !GetHeroMovement()->IsDiving();
+	return JumpCurrentCount == 0;
 }
 
 void AEIHeroCharacter::PressJump()
@@ -400,8 +397,33 @@ void AEIHeroCharacter::PressJump()
 void AEIHeroCharacter::BoardBarge(AEISkyBarge* Barge)
 {
 	bAboard = true;
+	LocationBeforeBoarding = GetActorLocation();
+	bDamageableBeforeBoarding = CanBeDamaged();
 	SetCanBeDamaged(false);
 	MulticastBoardBarge(Barge);
+}
+
+void AEIHeroCharacter::ArriveAt(const FVector& Location, float YawDegrees)
+{
+	if (bAboard)
+	{
+		bAboard = false;
+		SetCanBeDamaged(bDamageableBeforeBoarding);
+	}
+	MulticastArriveAt(Location, YawDegrees);
+}
+
+void AEIHeroCharacter::MulticastArriveAt_Implementation(const FVector& Location, float YawDegrees)
+{
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	const FRotator Facing(0.0f, YawDegrees, 0.0f);
+	SetActorLocationAndRotation(Location, Facing, false, nullptr, ETeleportType::TeleportPhysics);
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	if (AController* Player = GetController())
+	{
+		Player->SetControlRotation(Facing);
+	}
 }
 
 void AEIHeroCharacter::MulticastBoardBarge_Implementation(AEISkyBarge* Barge)
@@ -423,7 +445,7 @@ void AEIHeroCharacter::Landed(const FHitResult& Hit)
 	{
 		GetViewModel()->NoteLanding(FMath::Clamp(static_cast<float>(-GetVelocity().Z) / HardLandingSpeedCm, 0.0f, 1.0f));
 	}
-	// Landing from the barge hits hard for the eye and the ear, but it does no damage.
+	// Landing from high up hits hard for the eye and the ear, but it does no damage.
 	if (IsLocallyControlled() && !bClientUpdating && GetVelocity().Z < -HardLandingSpeedCm)
 	{
 		AddCameraKick(HardLandingKickDegrees);

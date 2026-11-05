@@ -38,7 +38,6 @@ struct EISENSEELEN_API FEIHandMotion
 	float LookLagMaxDegrees = 4.0f;
 	float FieldOfViewDegrees = 90.0f;
 	float SprintFieldOfViewPlusDegrees = 6.0f;
-	float DiveFieldOfViewPlusDegrees = 14.0f;
 
 	static bool LoadFromProjectFile(FEIHandMotion& OutMotion, FString& OutError);
 };

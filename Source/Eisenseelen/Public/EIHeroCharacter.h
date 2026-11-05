@@ -82,6 +82,10 @@ public:
 	/** Server only: from now on this hero stands on the barge and rides it. */
 	void BoardBarge(AEISkyBarge* Barge);
 	bool IsAboard() const { return bAboard; }
+	const FVector& GetLocationBeforeBoarding() const { return LocationBeforeBoarding; }
+
+	/** Server only: this hero stands here now, off the barge if it was on it, and looks that way. */
+	void ArriveAt(const FVector& Location, float YawDegrees);
 	void PressSpell();
 	void PressRuneSpell();
 	const FEIPoseLibrary& GetPoses() const { return Poses; }
@@ -124,6 +128,9 @@ private:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastBoardBarge(AEISkyBarge* Barge);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastArriveAt(const FVector& Location, float YawDegrees);
 
 	void HandleDied();
 
@@ -168,5 +175,9 @@ private:
 	double BufferedJumpUntil = -1.0;
 	bool bJumpOnGround = false;
 	bool bSprintKeyHeld = false;
+	bool bDamageableBeforeBoarding = true;
+	FVector LocationBeforeBoarding = FVector::ZeroVector;
+
+	UPROPERTY(Replicated)
 	bool bAboard = false;
 };

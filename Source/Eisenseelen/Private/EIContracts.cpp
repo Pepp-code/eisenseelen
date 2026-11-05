@@ -76,8 +76,7 @@ namespace
 
 	bool ReadTable(const FJsonObject& Root, FEIContractTable& Out, FString& OutError)
 	{
-		if (!FEIDataFile::ReadNumber(Root, TEXT("vertraege_pro_lauf"), 0.0, 100.0, Out.ContractsPerRun, OutError)
-			|| !FEIDataFile::ReadNumber(Root, TEXT("vertraege_bis_zur_fackel"), 0.0, 100.0, Out.ContractsToFlare, OutError)
+		if (!FEIDataFile::ReadNumber(Root, TEXT("auftraege_pro_lauf"), 0.0, 100.0, Out.ContractsPerRun, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("mindestabstand_m"), 0.0, 1000.0, Out.MinDistanceMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("gold"), 0.0, 1000000.0, Out.Gold, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("punkte"), 0.0, 1000000.0, Out.Points, OutError)
@@ -168,13 +167,12 @@ TArray<FEIContract> FEIContractTable::RollContracts() const
 	}
 	const int32 Count = FMath::RoundToInt32(ContractsPerRun);
 	const TArray<int32> TaskTurns = ShuffledTurns(Tasks.Num(), Count);
-	const TArray<int32> FactionTurns = ShuffledTurns(Factions.Num(), Count);
 	for (int32 Index = 0; Index < Count; ++Index)
 	{
 		const FEIContractTask& Task = Tasks[TaskTurns[Index]];
 		FEIContract Contract;
 		Contract.Kind = Task.Kind;
-		Contract.Faction = FactionTurns[Index];
+		Contract.Faction = FMath::RandRange(0, Factions.Num() - 1);
 		Contract.HoldLeft = Task.HoldSeconds;
 		Contracts.Add(Contract);
 	}
@@ -196,7 +194,7 @@ bool FEIContractTable::LoadFromString(const FString& Json, FEIContractTable& Out
 
 bool FEIContractTable::LoadFromProjectFile(FEIContractTable& OutTable, FString& OutError)
 {
-	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("vertraege.json"), OutError);
+	const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("nebenauftraege.json"), OutError);
 	const TSharedPtr<FJsonObject> Map = Root.IsValid() ? FEIDataFile::Load(TEXT("laufkarte.json"), OutError) : nullptr;
 	FEIContractTable Loaded;
 	if (!Root.IsValid() || !Map.IsValid() || !ReadTable(*Root, Loaded, OutError)

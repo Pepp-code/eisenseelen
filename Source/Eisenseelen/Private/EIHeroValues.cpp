@@ -17,10 +17,7 @@ namespace
 			&& FEIDataFile::ReadNumber(Root, TEXT("maus_faktor"), 0.1, 5.0, OutValues.MouseFactor, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("leben_erholung_nach_s"), 0.0, 600.0, OutValues.LifeBackAfterSeconds, OutError)
 			&& FEIDataFile::ReadNumber(Root, TEXT("leben_erholung_anteil_pro_s"), 0.0, 10.0, OutValues.LifeBackSharePerSecond, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("sprung_puffer_s"), 0.0, 1.0, OutValues.JumpBufferSeconds, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("absprung_ab_hoehe_m"), 1.0, 1000.0, OutValues.DiveFromHeightMeters, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("absprung_tempo_m_pro_s"), 1.0, 100.0, OutValues.DiveSpeedMetersPerSecond, OutError)
-			&& FEIDataFile::ReadNumber(Root, TEXT("absprung_fall_tempo_m_pro_s"), 1.0, 100.0, OutValues.DiveFallSpeedMetersPerSecond, OutError);
+			&& FEIDataFile::ReadNumber(Root, TEXT("sprung_puffer_s"), 0.0, 1.0, OutValues.JumpBufferSeconds, OutError);
 	}
 }
 

@@ -9,8 +9,5 @@
 	"maus_faktor": 1.0,
 	"leben_erholung_nach_s": 6,
 	"leben_erholung_anteil_pro_s": 0.1,
-	"sprung_puffer_s": 0.12,
-	"absprung_ab_hoehe_m": 20,
-	"absprung_tempo_m_pro_s": 20,
-	"absprung_fall_tempo_m_pro_s": 25
+	"sprung_puffer_s": 0.12
 }

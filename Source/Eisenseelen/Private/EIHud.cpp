@@ -4,7 +4,6 @@
 #include "EIChest.h"
 #include "EIContracts.h"
 #include "EIEnemy.h"
-#include "EIFlare.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
@@ -12,6 +11,7 @@
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
+#include "EISignalFire.h"
 #include "EISkyBarge.h"
 #include "EISwordComponent.h"
 #include "Engine/Canvas.h"
@@ -41,7 +41,8 @@ namespace
 	constexpr float ThreatInViewDot = 0.6f;
 	constexpr float ThreatMarkSize = 18.0f;
 	constexpr float ThreatEdgeShare = 0.42f;
-	const FLinearColor FlareMarkColor(1.0f, 0.55f, 0.1f);
+	const FLinearColor FireMarkColor(1.0f, 0.55f, 0.1f);
+	constexpr float CrossingFadePerSecond = 2.0f;
 	const FLinearColor TextShadowColor(0.0f, 0.0f, 0.0f, 0.75f);
 	constexpr float TextShadowOffset = 1.5f;
 	constexpr float ContractMarkAboveCm = 220.0f;
@@ -85,7 +86,30 @@ void AEIHud::DrawLine(const FString& Text, float X, float Y, const FLinearColor&
 void AEIHud::DrawHUD()
 {
 	Super::DrawHUD();
+	DrawScreen();
+	if (const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>())
+	{
+		DrawCrossing(State);
+	}
+}
 
+void AEIHud::DrawCrossing(const AEIGameState* State)
+{
+	const bool bCrossing = State->GetRunPhase() == EEIRunPhase::Crossing;
+	CrossingFade = FMath::FInterpConstantTo(CrossingFade, bCrossing ? 1.0f : 0.0f, RenderDelta, CrossingFadePerSecond);
+	if (CrossingFade <= 0.0f)
+	{
+		return;
+	}
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, CrossingFade), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
+	if (bCrossing && CrossingFade >= 1.0f)
+	{
+		DrawLine(TEXT("Die Barke bringt euch ins Gebiet ..."), Canvas->SizeX / 2.0f - 220.0f, Canvas->SizeY / 2.0f - 20.0f, TextColor, 2.0f);
+	}
+}
+
+void AEIHud::DrawScreen()
+{
 	const AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(GetOwningPawn());
 	const float Width = Canvas->SizeX;
 	const float Height = Canvas->SizeY;
@@ -366,16 +390,60 @@ void AEIHud::DrawContractBoard(const AEIHeroCharacter* Hero, const AEIGameState*
 		ListY += BoardLine * 1.25f;
 	}
 
-	for (TActorIterator<AEIFlare> It(GetWorld()); It; ++It)
+	for (TActorIterator<AEISignalFire> It(GetWorld()); It; ++It)
 	{
-		const FVector2D Mark = ToMap(It->GetActorLocation());
-		DrawRect(FlareMarkColor, Mark.X - BoardMarkSize / 2.0f, Mark.Y - BoardMarkSize / 2.0f, BoardMarkSize, BoardMarkSize);
+		if (It->IsInUse())
+		{
+			const FVector2D Mark = ToMap(It->GetActorLocation());
+			DrawRect(FireMarkColor, Mark.X - BoardMarkSize / 2.0f, Mark.Y - BoardMarkSize / 2.0f, BoardMarkSize, BoardMarkSize);
+			DrawLine(TEXT("S"), Mark.X + BoardMarkSize / 2.0f + 2.0f, Mark.Y - BoardMarkSize, TextColor);
+			DrawLine(FString::Printf(TEXT("S  Signalfeuer, %.0f m"), FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), ListX, ListY, FireMarkColor);
+		}
 	}
 	const FVector2D HeroMark = ToMap(Hero->GetActorLocation());
 	const FVector Ahead = Hero->GetViewRotation().Vector().GetSafeNormal2D();
 	const FVector2D AheadMark = HeroMark + FVector2D(Ahead.Y, -Ahead.X) * BoardHeroAheadDistance;
 	DrawRect(FLinearColor::White, HeroMark.X - BoardHeroSize / 2.0f, HeroMark.Y - BoardHeroSize / 2.0f, BoardHeroSize, BoardHeroSize);
 	DrawRect(FLinearColor::White, AheadMark.X - BoardHeroAheadSize / 2.0f, AheadMark.Y - BoardHeroAheadSize / 2.0f, BoardHeroAheadSize, BoardHeroAheadSize);
+}
+
+void AEIHud::DrawDock(const AEIHeroCharacter* Hero, const AEIGameState* State, float LineY, float PromptY)
+{
+	const float CenterX = Canvas->SizeX / 2.0f;
+	int32 Heroes = 0;
+	int32 Aboard = 0;
+	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsDead())
+		{
+			++Heroes;
+			Aboard += It->IsAboard() ? 1 : 0;
+		}
+	}
+	DrawLine(TEXT("Steig in die Barke, dann beginnt der Lauf. Vorher w\u00E4hlst du mit C die Klasse und mit I die Ausr\u00FCstung."), Margin, LineY, TextColor);
+	if (State->IsCastingOff())
+	{
+		DrawLine(TEXT("Die Barke legt ab"), CenterX - 110.0f, PromptY - 40.0f, RewardColor, 1.5f);
+	}
+	else if (Aboard > 0)
+	{
+		DrawLine(FString::Printf(TEXT("An Bord: %d von %d"), Aboard, Heroes), Margin, LineY + 24.0f, RewardColor);
+	}
+	for (TActorIterator<AEISkyBarge> It(GetWorld()); It; ++It)
+	{
+		if (Hero->IsAboard())
+		{
+			DrawLine(TEXT("F: Aussteigen"), CenterX - 70.0f, PromptY, TextColor, 1.5f);
+		}
+		else if (It->IsInBoardingZone(Hero))
+		{
+			DrawLine(TEXT("F: Einsteigen"), CenterX - 70.0f, PromptY, TextColor, 1.5f);
+		}
+		else
+		{
+			DrawWorldMark(It->GetActorLocation(), FString::Printf(TEXT("Barke %.0f m"), FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), BargeMarkColor);
+		}
+	}
 }
 
 void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
@@ -410,10 +478,10 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	};
 
 	const EEIRunPhase Phase = State->GetRunPhase();
-	if (Phase != EEIRunPhase::Escaped && Phase != EEIRunPhase::Failed)
+	if (Phase == EEIRunPhase::Exploring || Phase == EEIRunPhase::SignalLit || Phase == EEIRunPhase::BargeWaiting)
 	{
 		DrawContracts(Hero, State, Table, PromptY);
-		if (Phase == EEIRunPhase::OnBarge || Player->IsMapOpen())
+		if (Player->IsMapOpen())
 		{
 			DrawContractBoard(Hero, State, Table);
 		}
@@ -436,32 +504,38 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 
 	switch (Phase)
 	{
-	case EEIRunPhase::OnBarge:
-		DrawLine(TEXT("Spring von der Barke, dann beginnt der Lauf. Mit C w\u00E4hlst du vorher die Klasse, mit I die Ausr\u00FCstung."), Margin, LineY, TextColor);
-		DrawLine(FString::Printf(TEXT("Nach %d Vertr\u00E4gen kannst du die Barke rufen. Erst in der Barke ist die Beute sicher."), State->GetContractsToFlare()), Margin, LineY + 24.0f, RewardColor);
+	case EEIRunPhase::AtDock:
+		DrawDock(Hero, State, LineY, PromptY);
 		break;
 
-	case EEIRunPhase::Contracts:
-		if (!State->CanFireFlare())
+	case EEIRunPhase::Exploring:
+		DrawLine(FString::Printf(TEXT("%s   Nebenauftr\u00E4ge: %d von %d   %s"), *Clock, State->CountContractsDone(), State->GetContracts().Num(), *Purse), Margin, LineY, TextColor);
+		DrawLine(TEXT("Entz\u00FCnde das Signalfeuer, dann holt dich die Barke ab. M zeigt die Karte."), Margin, LineY + 24.0f, RewardColor);
+		for (TActorIterator<AEISignalFire> It(GetWorld()); It; ++It)
 		{
-			DrawLine(FString::Printf(TEXT("%s   Vertr\u00E4ge: %d von %d   %s"), *Clock, State->CountContractsDone(), State->GetContractsToFlare(), *Purse), Margin, LineY, TextColor);
-		}
-		else
-		{
-			DrawLine(FString::Printf(TEXT("%s   Vertr\u00E4ge: %d erf\u00FCllt   %s"), *Clock, State->CountContractsDone(), *Purse), Margin, LineY, TextColor);
-			DrawLine(TEXT("G schie\u00DFt die Leuchtfackel und ruft die Barke, oder du machst weiter."), Margin, LineY + 24.0f, RewardColor);
+			if (It->IsInUse())
+			{
+				DrawWorldMark(It->GetFireLocation(), DistanceLabel(TEXT("Signalfeuer"), It->GetActorLocation()), FireMarkColor);
+				if (It->IsInReach(Hero))
+				{
+					DrawLine(TEXT("F: Signalfeuer entz\u00FCnden"), CenterX - 125.0f, PromptY, TextColor, 1.5f);
+				}
+			}
 		}
 		break;
 
-	case EEIRunPhase::FlareLit:
-		DrawLine(FString::Printf(TEXT("%s   Halte den Kreis noch %.0f s, bis die Barke da ist   %s"), *Clock, State->GetFlareHoldLeft(), *Purse), Margin, LineY, TextColor);
-		for (TActorIterator<AEIFlare> It(GetWorld()); It; ++It)
+	case EEIRunPhase::SignalLit:
+		DrawLine(FString::Printf(TEXT("%s   Halte das Feuer noch %.0f s, bis die Barke da ist   %s"), *Clock, State->GetSignalHoldLeft(), *Purse), Margin, LineY, TextColor);
+		for (TActorIterator<AEISignalFire> It(GetWorld()); It; ++It)
 		{
-			DrawWorldMark(It->GetLightLocation(), DistanceLabel(TEXT("Leuchtfackel"), It->GetActorLocation()), FlareMarkColor);
+			if (It->IsLit())
+			{
+				DrawWorldMark(It->GetFireLocation(), DistanceLabel(TEXT("Signalfeuer"), It->GetActorLocation()), FireMarkColor);
+			}
 		}
-		if (!State->IsFlareHeld())
+		if (!State->IsSignalHeld())
 		{
-			DrawLine(TEXT("Zur\u00FCck zur Leuchtfackel!"), CenterX - 140.0f, PromptY, WarningTextColor, 1.5f);
+			DrawLine(TEXT("Zur\u00FCck zum Signalfeuer!"), CenterX - 130.0f, PromptY, WarningTextColor, 1.5f);
 		}
 		break;
 

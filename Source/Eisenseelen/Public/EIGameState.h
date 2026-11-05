@@ -10,9 +10,10 @@ UENUM()
 enum class EEIRunPhase : uint8
 {
 	None,
-	OnBarge,
-	Contracts,
-	FlareLit,
+	AtDock,
+	Crossing,
+	Exploring,
+	SignalLit,
 	BargeWaiting,
 	Escaped,
 	Failed
@@ -32,18 +33,20 @@ public:
 
 	EEIRunPhase GetRunPhase() const { return RunPhase; }
 	float GetRunSeconds() const;
-	float GetFlareHoldLeft() const { return FlareHoldLeft; }
-	bool IsFlareHeld() const { return bFlareHeld; }
+	float GetSignalHoldLeft() const { return SignalHoldLeft; }
+	bool IsSignalHeld() const { return bSignalHeld; }
+
+	/** Everybody is aboard, and the barge is about to leave the dock. */
+	bool IsCastingOff() const { return bCastingOff; }
 
 	const TArray<FEIContract>& GetContracts() const { return Contracts; }
 	int32 CountContractsDone() const;
-	int32 GetContractsToFlare() const { return ContractsToFlare; }
 
 	/** Whether somebody stands in the zone of a contract right now. */
 	bool IsContractHeld() const;
 
-	/** Enough contracts are done, and the flare has not been fired yet. */
-	bool CanFireFlare() const;
+	/** The run is on, and the fire does not burn yet. */
+	bool CanLightSignal() const;
 
 	int32 GetCorruptionStage() const { return CorruptionStage; }
 	bool IsBloodMoon() const { return bBloodMoon; }
@@ -56,8 +59,9 @@ public:
 	void ResetRunClock();
 	void StartRunClock();
 	void StopRunClock();
-	void SetFlareHold(float SecondsLeft, bool bHeld);
-	void SetContracts(const TArray<FEIContract>& NewContracts, int32 ToFlare);
+	void SetSignalHold(float SecondsLeft, bool bHeld);
+	void SetCastingOff(bool bNewCastingOff) { bCastingOff = bNewCastingOff; }
+	void SetContracts(const TArray<FEIContract>& NewContracts);
 	TArray<FEIContract>& EditContracts() { return Contracts; }
 
 	/** Share is how far along the way to the worst the sky should be, from 0 to 1. */
@@ -85,16 +89,16 @@ private:
 	float RunEndedAfter = 0.0f;
 
 	UPROPERTY(Replicated)
-	float FlareHoldLeft = 0.0f;
+	float SignalHoldLeft = 0.0f;
 
 	UPROPERTY(Replicated)
-	bool bFlareHeld = false;
+	bool bSignalHeld = false;
+
+	UPROPERTY(Replicated)
+	bool bCastingOff = false;
 
 	UPROPERTY(Replicated)
 	TArray<FEIContract> Contracts;
-
-	UPROPERTY(Replicated)
-	int32 ContractsToFlare = 0;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CorruptionStage)
 	int32 CorruptionStage = 0;

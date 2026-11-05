@@ -21,14 +21,13 @@ bool FEIContractDataTest::RunTest(const FString& Parameters)
 	{
 		AddError(Error);
 	}
-	TestEqual(TEXT("Six contracts in a run"), FMath::RoundToInt32(Table.ContractsPerRun), 6);
-	TestEqual(TEXT("Four contracts until the flare"), FMath::RoundToInt32(Table.ContractsToFlare), 4);
+	TestEqual(TEXT("Three side jobs in a run"), FMath::RoundToInt32(Table.ContractsPerRun), 3);
 	TestEqual(TEXT("Four kinds of task"), Table.Tasks.Num(), 4);
 	TestEqual(TEXT("A failed run keeps 30 percent"), Table.KeptOnFailure, 0.3f);
 	TestEqual(TEXT("The overview knows the map"), Table.MapMeters, 300.0f);
 
 	// A small table, to see that the rules are kept.
-	const FString Valid = TEXT("{\"vertraege_pro_lauf\": 6, \"vertraege_bis_zur_fackel\": 4, \"mindestabstand_m\": 40, \"gold\": 100, \"punkte\": 10, ")
+	const FString Valid = TEXT("{\"auftraege_pro_lauf\": 3, \"mindestabstand_m\": 40, \"gold\": 100, \"punkte\": 10, ")
 		TEXT("\"verderbnis_bonus_je_stufe\": 0.1, \"beim_scheitern_bleibt\": 0.3, ")
 		TEXT("\"fraktionen\": [{\"name\": \"Eins\", \"farbe\": [1, 0, 0]}, {\"name\": \"Zwei\", \"farbe\": [0, 1, 0]}, {\"name\": \"Drei\", \"farbe\": [0, 0, 1]}], ")
 		TEXT("\"aufgaben\": [{\"art\": \"anfuehrer\", \"name\": \"Jagen\", \"kurz\": \"J\"}, {\"art\": \"schrein\", \"name\": \"Schrein\", \"kurz\": \"S\", \"halten_s\": 15, \"zone_m\": 6}, ")
@@ -48,22 +47,16 @@ bool FEIContractDataTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A failed run keeps its share"), Small.GetKeptOnFailure(100), 30);
 	TestEqual(TEXT("And never rounds up"), Small.GetKeptOnFailure(25), 7);
 
-	// Whatever the dice say: every faction has its turn, and so does every task.
-	const auto CheckRoll = [this](const FEIContractTable& Rolled, int32 MostOfFaction, int32 LeastOfFaction)
+	// Whatever the dice say: no task comes twice before all others have been there, and the list is in order.
+	const auto CheckRoll = [this](const FEIContractTable& Rolled)
 	{
 		const TArray<FEIContract> Contracts = Rolled.RollContracts();
-		TestEqual(TEXT("A roll brings all contracts"), Contracts.Num(), FMath::RoundToInt32(Rolled.ContractsPerRun));
-		for (int32 Faction = 0; Faction < Rolled.Factions.Num(); ++Faction)
-		{
-			const int32 Count = Algo::CountIf(Contracts, [Faction](const FEIContract& Contract) { return Contract.Faction == Faction; });
-			TestTrue(TEXT("No faction has too many"), Count <= MostOfFaction);
-			TestTrue(TEXT("No faction has too few"), Count >= LeastOfFaction);
-		}
+		TestEqual(TEXT("A roll brings all side jobs"), Contracts.Num(), FMath::RoundToInt32(Rolled.ContractsPerRun));
+		const int32 MostOfTask = FMath::DivideAndRoundUp(Contracts.Num(), Rolled.Tasks.Num());
 		for (const FEIContractTask& Task : Rolled.Tasks)
 		{
 			const int32 Count = Algo::CountIf(Contracts, [&Task](const FEIContract& Contract) { return Contract.Kind == Task.Kind; });
-			TestTrue(TEXT("Every task comes up"), Count >= 1);
-			TestTrue(TEXT("No task comes up more than twice"), Count <= 2);
+			TestTrue(TEXT("No task comes up too often"), Count <= MostOfTask);
 		}
 		for (int32 Index = 1; Index < Contracts.Num(); ++Index)
 		{
@@ -71,22 +64,36 @@ bool FEIContractDataTest::RunTest(const FString& Parameters)
 		}
 		for (const FEIContract& Contract : Contracts)
 		{
-			TestEqual(TEXT("A contract starts with the time of its task"), Contract.HoldLeft, Rolled.FindTask(Contract.Kind)->HoldSeconds);
+			TestEqual(TEXT("A side job starts with the time of its task"), Contract.HoldLeft, Rolled.FindTask(Contract.Kind)->HoldSeconds);
+			TestNotNull(TEXT("A side job has a faction"), Rolled.FindFaction(Contract.Faction));
 		}
 	};
 	for (int32 Roll = 0; Roll < 20; ++Roll)
 	{
-		CheckRoll(Small, 2, 2);
+		CheckRoll(Small);
 	}
 
-	// A fourth faction is one more line in the file, and then two factions have one contract less.
+	// The factions are pure chance, so that nobody knows beforehand what the map pays. Over many rolls both show up.
+	bool bSameFactionTwice = false;
+	bool bAllDifferent = false;
+	for (int32 Roll = 0; Roll < 100; ++Roll)
+	{
+		const TArray<FEIContract> Contracts = Small.RollContracts();
+		const bool bTwice = Contracts[0].Faction == Contracts[1].Faction || Contracts[1].Faction == Contracts[2].Faction;
+		bSameFactionTwice = bSameFactionTwice || bTwice;
+		bAllDifferent = bAllDifferent || !bTwice;
+	}
+	TestTrue(TEXT("Sometimes two jobs share a faction"), bSameFactionTwice);
+	TestTrue(TEXT("Sometimes all three differ"), bAllDifferent);
+
+	// A fourth faction is one more line in the file.
 	FEIContractTable WithWind = Small;
 	FEIFaction Wind;
 	Wind.Name = TEXT("Wind");
 	WithWind.Factions.Add(Wind);
 	for (int32 Roll = 0; Roll < 20; ++Roll)
 	{
-		CheckRoll(WithWind, 2, 1);
+		CheckRoll(WithWind);
 	}
 
 	// What must not pass.

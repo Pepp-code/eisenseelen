@@ -24,7 +24,7 @@ struct EISENSEELEN_API FEIGroupStage
 	float ReinforcementEverySeconds = 0.0f;
 	FString Chest;
 	FString AltarWave;
-	FString FlareWave;
+	FString SignalWave;
 	float ThreatCap = 0.0f;
 };
 
@@ -34,7 +34,7 @@ struct EISENSEELEN_API FEIEnemyGroups
 	TArray<FEIEnemyGroup> Groups;
 	TArray<FEIGroupStage> Stages;
 	float AltarWaveEverySeconds = 12.0f;
-	float FlareWaveEverySeconds = 15.0f;
+	float SignalWaveEverySeconds = 15.0f;
 
 	/** A random group of this size that fits this stage, or null if there is none. */
 	const FEIEnemyGroup* Pick(const FString& Size, int32 Stage) const;

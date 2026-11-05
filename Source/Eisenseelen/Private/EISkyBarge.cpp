@@ -10,12 +10,12 @@ namespace
 	constexpr float DeckLengthCm = 1400.0f;
 	constexpr float DeckWidthCm = 700.0f;
 	constexpr float DeckThicknessCm = 40.0f;
-	constexpr float BoardingMarginCm = 150.0f;
+	constexpr float BoardingMarginCm = 250.0f;
+	// Far enough to be out of the way, and no further than a flight back can make up for.
+	constexpr float HighestAboveDepartureCm = 30000.0f;
 	constexpr float BoardingHeightCm = 500.0f;
 	constexpr float DeckEdgeKeepCm = 60.0f;
 	constexpr float ApproachEasing = 2.0f;
-	// With the prow, which sticks out over the deck.
-	const FVector RoomNeededCm(920.0f, 350.0f, 300.0f);
 	const FLinearColor DeckColor(0.2f, 0.13f, 0.07f);
 	const FLinearColor HullColor(0.11f, 0.08f, 0.05f);
 	const FLinearColor MastColor(0.15f, 0.1f, 0.06f);
@@ -88,8 +88,17 @@ void AEISkyBarge::ReturnToStart()
 	SetActorLocation(StartLocation);
 }
 
+void AEISkyBarge::ArriveAt(const FVector& Location)
+{
+	DepartSpeedCm = 0.0f;
+	bFlying = true;
+	OnRep_Flying();
+	SetActorLocation(Location);
+}
+
 void AEISkyBarge::BeginApproach(const FVector& HoverLocation)
 {
+	DepartSpeedCm = 0.0f;
 	ApproachFrom = GetActorLocation();
 	ApproachTo = HoverLocation;
 	bFlying = true;
@@ -104,12 +113,13 @@ void AEISkyBarge::SetApproachFraction(float Fraction)
 void AEISkyBarge::Depart(float SpeedCmPerSecond)
 {
 	DepartSpeedCm = SpeedCmPerSecond;
+	DepartUpToHeight = GetActorLocation().Z + HighestAboveDepartureCm;
 }
 
 void AEISkyBarge::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (DepartSpeedCm > 0.0f && HasAuthority())
+	if (DepartSpeedCm > 0.0f && HasAuthority() && GetActorLocation().Z < DepartUpToHeight)
 	{
 		AddActorWorldOffset(FVector(0.0f, 0.0f, DepartSpeedCm * DeltaSeconds));
 	}
@@ -132,11 +142,6 @@ FVector AEISkyBarge::GetDeckSpotNear(const FVector& Location, float HalfHeight) 
 		Center.X + FMath::Clamp(Location.X - Center.X, -MaxX, MaxX),
 		Center.Y + FMath::Clamp(Location.Y - Center.Y, -MaxY, MaxY),
 		GetDeckHeight() + HalfHeight);
-}
-
-FVector AEISkyBarge::GetRoomNeeded() const
-{
-	return RoomNeededCm;
 }
 
 float AEISkyBarge::GetDeckHeight() const

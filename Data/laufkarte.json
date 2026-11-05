@@ -1,10 +1,18 @@
 {
 	"boden_m": 300,
 	"rand_hoehe_m": 3,
-	"barke": { "x_m": 0, "y_m": 0, "hoehe_m": 120 },
-	"freiflaechen": [
+	"anlegestelle": { "x_m": 0, "y_m": -6000, "hoehe_m": 150, "laenge_m": 40, "breite_m": 24 },
+	"signalfeuer": [
 		{ "x_m": -105, "y_m": 95 },
-		{ "x_m": 105, "y_m": -95 }
+		{ "x_m": 105, "y_m": -95 },
+		{ "x_m": 125, "y_m": 135 },
+		{ "x_m": -125, "y_m": -125 }
+	],
+	"ankunft": [
+		{ "x_m": -60, "y_m": -138, "blick_grad": 90 },
+		{ "x_m": 138, "y_m": 55, "blick_grad": 180 },
+		{ "x_m": 55, "y_m": 138, "blick_grad": 270 },
+		{ "x_m": -138, "y_m": 18, "blick_grad": 0 }
 	],
 	"orte": [
 		{ "x_m": 0, "y_m": 110 },

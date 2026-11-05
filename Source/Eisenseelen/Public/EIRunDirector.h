@@ -9,8 +9,8 @@
 class AEIChest;
 class AEIEnemy;
 class AEIEnemyCamp;
-class AEIFlare;
 class AEIHeroCharacter;
+class AEISignalFire;
 class AEISkyBarge;
 enum class EEIRunPhase : uint8;
 
@@ -23,8 +23,13 @@ struct EISENSEELEN_API FEIRunValues
 	float ChestReachMeters = 3.0f;
 	float ChestZoneMeters = 10.0f;
 	float ChestGuardDistanceMeters = 6.0f;
-	float FlareHoldSeconds = 60.0f;
-	float FlareZoneMeters = 15.0f;
+	float CastOffSeconds = 3.0f;
+	float CrossingSeconds = 4.0f;
+	float ArrivalSpacingMeters = 2.5f;
+	float ArrivalDepartMetersPerSecond = 14.0f;
+	float SignalHoldSeconds = 60.0f;
+	float SignalReachMeters = 4.0f;
+	float SignalZoneMeters = 15.0f;
 	float BargeDistanceMeters = 12.0f;
 	float BargeDepartMetersPerSecond = 6.0f;
 	EEIEnemyKind LeaderKind = EEIEnemyKind::ShieldBearer;
@@ -38,9 +43,16 @@ struct EISENSEELEN_API FEIRunValues
 	static bool LoadFromProjectFile(FEIRunValues& OutValues, FString& OutError);
 };
 
+/** A place at the edge of the map where the barge sets the team down, from Data/laufkarte.json. */
+struct EISENSEELEN_API FEIArrivalPoint
+{
+	FVector Location = FVector::ZeroVector;
+	float YawDegrees = 0.0f;
+};
+
 /**
- * Leads a run from the jump off the barge to the flight home. Lives on the game mode, so only the server has it, and
- * only does anything on a map with a barge. What the players need to know goes through the game state.
+ * Leads a run from the dock to the flight home. Lives on the game mode, so only the server has it, and only does anything
+ * on a map with a barge. What the players need to know goes through the game state.
  */
 UCLASS()
 class EISENSEELEN_API UEIRunDirector : public UActorComponent
@@ -60,20 +72,22 @@ public:
 	/** Which contracts a run offers. Tests may change it, and it counts from the next reset on. */
 	FEIContractTable& GetContractTable() { return ContractTable; }
 
-	/** Puts everything back to the start of a run, with new contracts. */
+	const TArray<FEIArrivalPoint>& GetArrivals() const { return Arrivals; }
+
+	/** Puts everything back to the dock, with new contracts. */
 	void ResetRun();
 
 	/** A hero pressed the use key. */
 	void Interact(AEIHeroCharacter* Hero);
 
-	/** A hero pressed the key for the flare. It works once enough contracts are done and the barge has room to land. */
-	void FireFlare(AEIHeroCharacter* Hero);
-
 	/** Whoever stood near when an enemy fell has earned something. */
 	void NoteEnemyDied(const AEIEnemy& Enemy);
 
 	AEISkyBarge* GetBarge() const { return Barge; }
-	AEIFlare* GetFlare() const { return Flare; }
+	AEISignalFire* GetActiveFire() const { return ActiveFire; }
+
+	/** The crossing is over: the barge sets everybody who lives down at the edge of the map. Tests and preview pictures call it directly, to skip the way there. */
+	void BeginRunNow();
 
 	/** The clock raises it by itself. Directly only for preview pictures. */
 	void SetCorruptionStage(int32 Stage);
@@ -85,14 +99,16 @@ public:
 
 private:
 	void PrepareContracts();
+	void PrepareSignalFire();
 	void SpawnLeaders();
+	void UpdateDock(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void UpdateContracts(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void UpdateChest(AEIChest* Chest, const TArray<AEIHeroCharacter*>& LivingHeroes);
 	void CompleteContract(int32 Index);
 	bool OpenChest(AEIHeroCharacter* Hero);
 	bool FindGround(const FVector& Location, FVector& OutGround) const;
-	bool FindBargeSpot(const FVector& FlareGround, FVector& OutHover) const;
-	void HoldFlare(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	void LightSignal();
+	void HoldSignal(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingHeroes);
 	void UpdateCorruption();
 	void UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
@@ -106,12 +122,15 @@ private:
 	TObjectPtr<AEISkyBarge> Barge;
 
 	UPROPERTY(Transient)
-	TObjectPtr<AEIFlare> Flare;
+	TObjectPtr<AEISignalFire> ActiveFire;
 
 	FEIRunValues Values;
 	FEIEnemyGroups Groups;
 	FEIContractTable ContractTable;
+	TArray<FEIArrivalPoint> Arrivals;
 	bool bPrepared = false;
+	float CastOffLeft = 0.0f;
+	float CrossingLeft = 0.0f;
 	float HoldLeft = 0.0f;
 	float WaveLeft = 0.0f;
 	float ReinforcementLeft = 0.0f;

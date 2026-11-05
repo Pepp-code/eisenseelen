@@ -15,7 +15,7 @@ namespace
 
 	bool AllowsGearChange(EEIRunPhase Phase)
 	{
-		return Phase == EEIRunPhase::None || Phase == EEIRunPhase::OnBarge || Phase == EEIRunPhase::Escaped || Phase == EEIRunPhase::Failed;
+		return Phase == EEIRunPhase::None || Phase == EEIRunPhase::AtDock || Phase == EEIRunPhase::Escaped || Phase == EEIRunPhase::Failed;
 	}
 }
 
@@ -63,7 +63,7 @@ void UEIProfileComponent::LoadTable()
 	}
 	if (!FEIContractTable::LoadFromProjectFile(ContractTable, Error))
 	{
-		FEIDataFile::ReportError(TEXT("vertraege.json"), Error);
+		FEIDataFile::ReportError(TEXT("nebenauftraege.json"), Error);
 	}
 }
 
@@ -438,7 +438,7 @@ void UEIProfileComponent::ClientReceiveContract_Implementation(int32 Faction, in
 	}
 	RunGold += Gold;
 	RunPoints.FindOrAdd(Found->Name) += Points;
-	ClientShowNote_Implementation(FString::Printf(TEXT("%s-Vertrag erf\u00FCllt: +%d Gold, +%d %spunkte"), *Found->Name, Gold, Points, *Found->Name));
+	ClientShowNote_Implementation(FString::Printf(TEXT("%s-Auftrag erf\u00FCllt: +%d Gold, +%d %spunkte"), *Found->Name, Gold, Points, *Found->Name));
 	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
 }
 
