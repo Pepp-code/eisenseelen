@@ -552,14 +552,13 @@ bool FEIForgeTest::RunTest(const FString& Parameters)
 		Context.Test->TestFalse(TEXT("It cannot be bought twice"), Player->Buy(Blade));
 		Context.Test->TestEqual(TEXT("Nothing more is paid"), Save.Gold, 7);
 		Context.Test->TestFalse(TEXT("Something unknown cannot be bought"), Player->BuyByName(TEXT("Holzschwert")));
-		Player->EquipByName(TEXT("Frostklinge"));
 	}));
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		UEIProfileComponent* Player = Profile(Context);
 		const FEIItemTable& Table = Player->GetTable();
-		Context.Test->TestEqual(TEXT("What was bought can go on"), Gear(Context)->GetWorn(EEISlot::Weapon)->Name, FString(TEXT("Frostklinge")));
+		Context.Test->TestEqual(TEXT("What is bought goes on at once"), Gear(Context)->GetWorn(EEISlot::Weapon)->Name, FString(TEXT("Frostklinge")));
 
 		// The forge lists what fits the class, in the order it opens.
 		const TArray<int32> Weapons = Player->ListOffers(EEISlot::Weapon);

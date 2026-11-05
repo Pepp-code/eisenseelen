@@ -247,6 +247,8 @@ bool UEIProfileComponent::Buy(int32 Item)
 	Save.Gold -= Bought.Price;
 	Save.Items.Add(Bought.Name);
 	WriteSave();
+	// What is bought goes on at once, if it fits the hero who stands at the forge.
+	Equip(Bought.Slot, Item);
 	ClientShowNote_Implementation(FString::Printf(TEXT("Gekauft: %s"), *Bought.Name));
 	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
 	return true;

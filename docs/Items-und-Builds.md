@@ -263,7 +263,7 @@ Der Platz für den Kristall ist schon im Menü. Er bleibt leer, bis die Kristall
 
 Erfahrung bekommst du nur von normalen Gegnern, denn die bringen sonst nichts ein. Nebenaufträge geben keine. Das höchste Level ist 20, und es gilt für beide Klassen. Ein Level macht dich nicht stärker. Es öffnet neue Waffen, Runen und Rüstungsteile in der Schmiede, und dort kaufst du sie mit Gold. Stärker wirst du also nur durch das, was du kaufst und trägst.
 
-Die Schmiede steht an der Anlegestelle. Mit F öffnest du sie direkt, oder du wählst im Menü (Taste I) oben den Reiter „Schmiede“. Links stehen die Plätze, daneben alle Teile für diesen Platz: gekauft, kaufbar mit Preis, zu wenig Gold oder ab welchem Level. Gekauftes legst du im Reiter „Ausrüstung“ an. Kaufen geht nur an der Anlegestelle, nicht im Lauf. In der Testarena ist alles frei, dort musst du nichts kaufen.
+Die Schmiede steht an der Anlegestelle. Mit F öffnest du sie direkt, oder du wählst im Menü (Taste I) oben den Reiter „Schmiede“. Links stehen die Plätze, daneben alle Teile für diesen Platz: gekauft, kaufbar mit Preis, zu wenig Gold oder ab welchem Level. Was du kaufst, trägst du sofort. Im Reiter „Ausrüstung“ wechselst du jederzeit zurück. Kaufen geht nur an der Anlegestelle, nicht im Lauf. In der Testarena ist alles frei, dort musst du nichts kaufen.
 
 Was wann kommt, steht in Data/items.json bei jedem Teil unter `ab_level` und `preis_gold`. Die ersten Werte:
 
@@ -376,5 +376,5 @@ Von mir festgelegt, du kannst es ändern:
 - **Beutebuch:** Eine Zutat gilt als gefunden, sobald sie fällt, nicht erst nach der Flucht.
 - **Weniger Briefe:** Solange es nur 2 Bosse gibt, hängen nur 2 Jagdbriefe am Brett, denn jeder Brief zeigt einen anderen Boss.
 - **Umkreis:** Für Nebenaufträge und normale Gegner zählt, wer im Umkreis von 40 m steht.
-- **Schmiede:** Preise und Level der Teile sind erste Annahmen. Ein gekauftes Teil legst du selbst an, es wird nicht sofort getragen.
+- **Schmiede:** Preise und Level der Teile sind erste Annahmen.
 - **Level:** Level 2 braucht 100 Erfahrung, jede weitere Stufe 50 mehr. Level 20 liegt damit bei rund 10.500 Erfahrung.
