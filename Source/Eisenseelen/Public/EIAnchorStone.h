@@ -4,7 +4,6 @@
 #include "GameFramework/Actor.h"
 #include "EIAnchorStone.generated.h"
 
-class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 
 /**
@@ -53,9 +52,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> ZoneDisc;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> CrystalMaterial;
 
 	UPROPERTY(Replicated)
 	FVector ChainEnd = FVector::ZeroVector;

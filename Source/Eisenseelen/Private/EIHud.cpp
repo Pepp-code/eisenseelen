@@ -295,7 +295,7 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 	Y += PanelPadding;
 	DrawLine(bEscaped ? TEXT("Entkommen!") : TEXT("Lauf gescheitert"), TextX, Y, bEscaped ? TextColor : WarningTextColor, 2.0f);
 	Y += 40.0f + PanelLine / 2.0f;
-	DrawLine(FString::Printf(TEXT("Laufzeit %s, %d von %d Vertr\u00E4gen erf\u00FCllt"), *Clock, State->CountContractsDone(), State->GetContracts().Num()), TextX, Y, TextColor);
+	DrawLine(FString::Printf(TEXT("Laufzeit %s, %d von %d Nebenauftr\u00E4gen erf\u00FCllt"), *Clock, State->CountContractsDone(), State->GetContracts().Num()), TextX, Y, TextColor);
 	Y += PanelLine;
 	for (const FString& Line : Earned)
 	{
@@ -322,7 +322,7 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 		Y += PanelLine;
 	}
 	Y += PanelLine / 2.0f;
-	DrawLine(TEXT("I Ausr\u00FCstung   R startet einen neuen Lauf"), TextX, Y, TextColor);
+	DrawLine(TEXT("I Ausr\u00FCstung   R zur\u00FCck zur Anlegestelle"), TextX, Y, TextColor);
 }
 
 void AEIHud::DrawContracts(const AEIHeroCharacter* Hero, const AEIGameState* State, const FEIContractTable& Table, float PromptY)

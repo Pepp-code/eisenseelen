@@ -10,6 +10,7 @@ namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
 	const FVector StoneSizeCm(260.0f, 260.0f, 170.0f);
+	constexpr float RubbleHeightShare = 0.2f;
 	constexpr float CrystalSizeCm = 90.0f;
 	constexpr float ChainThicknessCm = 22.0f;
 	constexpr float ZoneDiscHeightCm = 3.0f;
@@ -19,7 +20,6 @@ namespace
 	const FLinearColor StoneColor(0.1f, 0.09f, 0.11f);
 	const FLinearColor ChainColor(0.16f, 0.16f, 0.18f);
 	const FLinearColor BoundColor(0.65f, 0.2f, 1.0f);
-	const FLinearColor BrokenColor(0.03f, 0.03f, 0.03f);
 }
 
 AEIAnchorStone::AEIAnchorStone()
@@ -75,7 +75,7 @@ void AEIAnchorStone::BeginPlay()
 
 	EIVisuals::SetColor(Stone, StoneColor);
 	EIVisuals::SetColor(Chain, ChainColor);
-	CrystalMaterial = EIVisuals::SetColor(Crystal, BoundColor, CrystalGlow);
+	EIVisuals::SetColor(Crystal, BoundColor, CrystalGlow);
 	EIVisuals::SetGlow(ZoneDisc, BoundColor, ZoneStrength);
 	// The engine's cylinder is 1 m wide, so its scale is its width in metres.
 	const float ZoneWidth = ZoneMeters * 2.0f;
@@ -119,13 +119,13 @@ void AEIAnchorStone::OnRep_Broken()
 {
 	Chain->SetVisibility(!bBroken);
 	ZoneDisc->SetVisibility(!bBroken);
-	if (CrystalMaterial != nullptr)
-	{
-		CrystalMaterial->SetVectorParameterValue(TEXT("Farbe"), bBroken ? BrokenColor : BoundColor);
-		CrystalMaterial->SetScalarParameterValue(TEXT("Leuchten"), bBroken ? 0.0f : CrystalGlow);
-	}
+	Crystal->SetVisibility(!bBroken);
 	if (bBroken)
 	{
+		// It falls to rubble, which blocks nobody, so that the fight around the boss does not get stuck on it.
+		SetActorEnableCollision(false);
+		Stone->SetRelativeLocation(FVector(0.0f, 0.0f, StoneSizeCm.Z * RubbleHeightShare / 2.0f));
+		Stone->SetRelativeScale3D(FVector(StoneSizeCm.X, StoneSizeCm.Y, StoneSizeCm.Z * RubbleHeightShare) / 100.0f);
 		EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), GetMarkLocation());
 	}
 }

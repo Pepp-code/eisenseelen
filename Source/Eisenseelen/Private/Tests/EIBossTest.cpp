@@ -282,6 +282,8 @@ bool FEIBossRunTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestEqual(TEXT("One of three is done"), GetState(Context)->GetBannbruchDone(), 1);
+		Context.Test->TestFalse(TEXT("A broken stone blocks nobody"), GetRun(Context)->GetAnchors()[0]->GetActorEnableCollision());
+		Context.Test->TestTrue(TEXT("A whole stone stands in the way"), GetRun(Context)->GetAnchors()[1]->GetActorEnableCollision());
 		Context.Test->TestTrue(TEXT("Two chains still hold it"), GetBoss(Context)->IsBound());
 		StandBeside(Context, GetRun(Context)->GetAnchors()[1], 200.0f);
 	}));
