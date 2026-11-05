@@ -115,8 +115,6 @@ struct EISENSEELEN_API FEIRewardValues
 {
 	float DuplicateExperience = 30.0f;
 	float RadiusMeters = 40.0f;
-	float ExperiencePerStage = 0.1f;
-	float ForgedFromStage = 3.0f;
 };
 
 /** What a point of experience can buy, from the list attribute of Data/items.json. */

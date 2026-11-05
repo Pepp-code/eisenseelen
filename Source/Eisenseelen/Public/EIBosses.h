@@ -63,8 +63,6 @@ struct EISENSEELEN_API FEIBossTable
 	float LeashMeters = 32.0f;
 	float RecoverySharePerSecond = 0.05f;
 	float LifePerExtraPlayer = 0.65f;
-	float FightWaveEverySeconds = 20.0f;
-	float PursuitWaveEverySeconds = 12.0f;
 	float FireMinDistanceMeters = 100.0f;
 	TArray<FEIBossValues> Bosses;
 

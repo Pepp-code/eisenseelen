@@ -53,19 +53,16 @@ public:
 	/** During a run hunters far behind everyone make way, without any horde. */
 	void SetRemovingLeftBehind(bool bActive) { bRemovingLeftBehind = bActive; }
 
-	/** How strong the enemies are that spawn from now on. */
-	void SetEnemyStrength(float Factor) { EnemyStrength = Factor; }
-
 	/** Spawns one bone runner out of sight around a random hero. Returns null if no place worked out this time. */
 	AEIEnemy* SpawnOne();
 
 	/** Spawns a group in a circle around a place, in plain sight. Places where it did not work out stay empty. */
 	TArray<AEIEnemy*> SpawnGroup(const FEIEnemyGroup& Group, float CountFactor, const FVector& Center, float RadiusCm);
 
-	/** Spawns a group out of sight around a random hero. Empty if no place worked out this time. */
 	/** Server only. One enemy of this kind at this place, if there is ground. */
 	AEIEnemy* SpawnKind(EEIEnemyKind Kind, const FVector& Center);
 
+	/** Spawns a group out of sight, on any side of a random hero. Empty if no place worked out this time. */
 	TArray<AEIEnemy*> SpawnReinforcement(const FEIEnemyGroup& Group, float CountFactor);
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -82,6 +79,5 @@ private:
 	bool bHordeActive = false;
 	bool bRemovingLeftBehind = false;
 	float SpawnBudget = 0.0f;
-	float EnemyStrength = 1.0f;
 	float LeftBehindCheckRemaining = 0.0f;
 };

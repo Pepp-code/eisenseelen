@@ -23,7 +23,7 @@ namespace EIVisuals
 	EISENSEELEN_API UMaterialInstanceDynamic* SetGlow(UMeshComponent* Mesh, const FLinearColor& Color, float Strength);
 
 	/** Turns the sky, the sun and the fog of the map towards the blood moon, from 0 for a clear day to 1. */
-	EISENSEELEN_API void ApplyCorruptionLook(UWorld* World, float Share);
+	EISENSEELEN_API void ApplyBloodMoonLook(UWorld* World, float Share);
 
 	/** Plays S_<Name> from /Game/Audio. A missing sound stays silent and logs a warning once. */
 	EISENSEELEN_API void PlaySound2D(const UObject* WorldContext, const TCHAR* Name, float Volume = 1.0f);

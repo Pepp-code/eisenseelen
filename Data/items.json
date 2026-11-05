@@ -12,9 +12,7 @@
 	"start_items": ["Flammenschwert", "Feuerstab", "Frostrune"],
 	"belohnung": {
 		"doppelt_erfahrung": 30,
-		"umkreis_m": 40,
-		"verderbnis_erfahrung_je_stufe": 0.1,
-		"geschmiedet_ab_stufe": 3
+		"umkreis_m": 40
 	},
 	"erfahrung": {
 		"level_max": 20,

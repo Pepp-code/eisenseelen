@@ -391,7 +391,6 @@ void AEIHud::DrawContractBoard(const AEIHeroCharacter* Hero, const AEIGameState*
 
 	const float ListX = MapX + BoardMapSize + PanelPadding;
 	float ListY = MapY;
-	const int32 Stage = State->GetCorruptionStage();
 	for (int32 Index = 0; Index < Contracts.Num(); ++Index)
 	{
 		const FEIContract& Contract = Contracts[Index];
@@ -409,7 +408,7 @@ void AEIHud::DrawContractBoard(const AEIHeroCharacter* Hero, const AEIGameState*
 		const float Distance = static_cast<float>(FVector::Dist(Hero->GetActorLocation(), Contract.Location)) / CentimetersPerMeter;
 		DrawLine(FString::Printf(TEXT("%d  %s: %s, %.0f m"), Index + 1, *Faction->Name, *Task->Name, Distance), ListX, ListY, Color);
 		ListY += BoardLine;
-		const FString Pay = Contract.bDone ? FString(TEXT("erf\u00FCllt")) : FString::Printf(TEXT("%d Gold, %d %spunkte"), Table.GetGold(Stage), Table.GetPoints(Stage), *Faction->Name);
+		const FString Pay = Contract.bDone ? FString(TEXT("erf\u00FCllt")) : FString::Printf(TEXT("%d Gold, %d %spunkte"), Table.GetGold(), Table.GetPoints(), *Faction->Name);
 		DrawLine(Pay, ListX + 22.0f, ListY, Contract.bDone ? LostColor : TextColor);
 		ListY += BoardLine * 1.25f;
 	}
@@ -540,13 +539,9 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	{
 		Clock += TEXT("   Blutmond");
 	}
-	else if (State->GetCorruptionStage() > 0)
+	if (State->GetBloodMoonNote() > 0.0f)
 	{
-		Clock += FString::Printf(TEXT("   Verderbnis %d"), State->GetCorruptionStage());
-	}
-	if (State->GetCorruptionNote() > 0.0f)
-	{
-		DrawLine(State->IsBloodMoon() ? TEXT("Der Blutmond steigt auf") : TEXT("Die Verderbnis w\u00E4chst"), Canvas->SizeX / 2.0f - 140.0f, 110.0f, WarningTextColor, 1.5f);
+		DrawLine(TEXT("Der Blutmond steigt auf"), Canvas->SizeX / 2.0f - 140.0f, 110.0f, WarningTextColor, 1.5f);
 	}
 	const float LineY = Margin + 48.0f;
 	const float CenterX = Canvas->SizeX / 2.0f;

@@ -119,7 +119,6 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 	if (!Root.IsValid()
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_faktor"), 0.0, 100.0, Loaded.CampFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_radius_m"), 0.5, 100.0, Loaded.CampRadiusMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("lager_nachschub_ab_abstand_m"), 0.0, 1000.0, Loaded.CampRefillFromMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_reichweite_m"), 0.5, 100.0, Loaded.ChestReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_zone_m"), 1.0, 100.0, Loaded.ChestZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("truhe_waechter_abstand_m"), 1.0, 100.0, Loaded.ChestGuardDistanceMeters, OutError)
@@ -134,10 +133,7 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abflug_tempo_m_pro_s"), 0.1, 100.0, Loaded.BargeDepartMetersPerSecond, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_leben_faktor"), 0.1, 100.0, Loaded.LeaderLifeFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_schaden_faktor"), 0.1, 100.0, Loaded.LeaderDamageFactor, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_groesse_faktor"), 0.1, 10.0, Loaded.LeaderScaleFactor, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_alle_s"), 0.1, 3600.0, Loaded.CorruptionEverySeconds, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_stufen"), 1.0, 100.0, Loaded.CorruptionMaxStage, OutError)
-		|| !FEIDataFile::ReadNumber(*Root, TEXT("verderbnis_gegner_staerke_je_stufe"), 0.0, 10.0, Loaded.CorruptionStrengthPerStage, OutError))
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_groesse_faktor"), 0.1, 10.0, Loaded.LeaderScaleFactor, OutError))
 	{
 		return false;
 	}
@@ -202,11 +198,9 @@ void UEIRunDirector::ResetRun()
 	State->ResetRunClock();
 	State->SetSignalHold(0.0f, false);
 	State->SetCastingOff(false);
-	SetCorruptionStage(0);
+	State->SetBloodMoon(bForcedBloodMoon);
 	WaveLeft = 0.0f;
-	ReinforcementLeft = 0.0f;
-	LastStage = 0;
-	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetEnemyStrength(1.0f);
+	BloodMoonLeft = 0.0f;
 
 	PrepareBoss();
 	PrepareContracts();
@@ -304,7 +298,7 @@ void UEIRunDirector::BreakBossFree(int32 HeroCount)
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	State->SetBossStage(EEIBossStage::Awake);
 	WaveLeft = 0.0f;
-	Boss->BreakFree(1.0f + Values.CorruptionStrengthPerStage * State->GetCorruptionStage(), HeroCount);
+	Boss->BreakFree(HeroCount);
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		if (const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get()))
@@ -344,14 +338,13 @@ void UEIRunDirector::BossFell()
 	State->SetBossStage(EEIBossStage::Down);
 	WaveLeft = 0.0f;
 	const FEIBossValues& Fallen = BossTable.Bosses[BossIndex];
-	const float Bonus = 1.0f + ContractTable.CorruptionBonusPerStage * State->GetCorruptionStage();
 
 	// Everybody rolls for themselves, and whoever has fallen in the fight still has a share of it.
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		if (const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get()))
 		{
-			Player->GetProfile()->GrantBossLoot(Fallen.Name, FMath::RoundToInt32(Fallen.RollGold() * Bonus), Fallen.RollLoot());
+			Player->GetProfile()->GrantBossLoot(Fallen.Name, Fallen.RollGold(), Fallen.RollLoot());
 		}
 	}
 }
@@ -539,7 +532,7 @@ float UEIRunDirector::GetPlayerFactor(int32 HeroCount) const
 
 void UEIRunDirector::FillCamp(AEIEnemyCamp* Camp, const FString& Size, int32 HeroCount)
 {
-	const FEIEnemyGroup* Group = Groups.Pick(Size, GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage());
+	const FEIEnemyGroup* Group = Groups.Pick(Size);
 	if (Group == nullptr)
 	{
 		return;
@@ -554,23 +547,6 @@ void UEIRunDirector::FillCamp(AEIEnemyCamp* Camp, const FString& Size, int32 Her
 	Camp->SetMembers(Members);
 }
 
-void UEIRunDirector::RefillEmptyCamps(const TArray<AEIHeroCharacter*>& LivingHeroes, const FString& Size)
-{
-	const double NotCloserThan = Values.CampRefillFromMeters * CentimetersPerMeter;
-	for (TActorIterator<AEIEnemyCamp> It(GetWorld()); It; ++It)
-	{
-		const AEIEnemyCamp* Camp = *It;
-		const bool bHeroNear = LivingHeroes.ContainsByPredicate([Camp, NotCloserThan](const AEIHeroCharacter* Hero)
-		{
-			return FVector::Dist2D(Hero->GetActorLocation(), Camp->GetActorLocation()) < NotCloserThan;
-		});
-		if (Camp->CountMembers() == 0 && !bHeroNear)
-		{
-			FillCamp(*It, Size, LivingHeroes.Num());
-		}
-	}
-}
-
 void UEIRunDirector::UpdateChest(AEIChest* Chest, const TArray<AEIHeroCharacter*>& LivingHeroes)
 {
 	if (Chest->GetState() == EEIChestState::Guarded)
@@ -581,9 +557,8 @@ void UEIRunDirector::UpdateChest(AEIChest* Chest, const TArray<AEIHeroCharacter*
 		&& LivingHeroes.ContainsByPredicate([Chest](const AEIHeroCharacter* Hero) { return Chest->IsInZone(Hero); }))
 	{
 		UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
-		const int32 Stage = GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage();
 		TArray<AEIEnemy*> Guards;
-		if (const FEIEnemyGroup* Group = Groups.Pick(Groups.GetStage(Stage).Chest, Stage))
+		if (const FEIEnemyGroup* Group = Groups.Pick(Groups.ChestGuards))
 		{
 			Guards = Horde->SpawnGroup(*Group, GetPlayerFactor(LivingHeroes.Num()), Chest->GetActorLocation(), Values.ChestGuardDistanceMeters * CentimetersPerMeter);
 		}
@@ -638,14 +613,13 @@ void UEIRunDirector::CompleteContract(int32 Index)
 	}
 
 	// Everybody near gets their own pay, so nobody has to fight over the last hit.
-	const int32 Stage = State->GetCorruptionStage();
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get());
 		const AEIHeroCharacter* Hero = Player != nullptr ? Player->GetPawn<AEIHeroCharacter>() : nullptr;
 		if (Hero != nullptr && !Hero->IsDead() && FVector::Dist2D(Hero->GetActorLocation(), Contract.Location) <= Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter)
 		{
-			Player->GetProfile()->GrantContract(Contract.Faction, ContractTable.GetGold(Stage), ContractTable.GetPoints(Stage));
+			Player->GetProfile()->GrantContract(Contract.Faction, ContractTable.GetGold(), ContractTable.GetPoints());
 		}
 	}
 }
@@ -713,6 +687,7 @@ void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
 
 void UEIRunDirector::EndRunForAll(bool bEscaped)
 {
+	GetWorld()->GetGameState<AEIGameState>()->SetBloodMoon(bForcedBloodMoon);
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		if (const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get()))
@@ -778,6 +753,7 @@ void UEIRunDirector::LightSignal()
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	ActiveFire->SetLit(true);
 	HoldLeft = Values.SignalHoldSeconds;
+	WaveLeft = 0.0f;
 	State->SetSignalHold(HoldLeft, true);
 	State->SetRunPhase(EEIRunPhase::SignalLit);
 
@@ -788,75 +764,55 @@ void UEIRunDirector::LightSignal()
 	Barge->BeginApproach(Hover);
 }
 
-void UEIRunDirector::SetCorruptionStage(int32 Stage)
-{
-	const int32 MaxStage = FMath::Max(1, FMath::RoundToInt(Values.CorruptionMaxStage));
-	GetWorld()->GetGameState<AEIGameState>()->SetCorruption(Stage, static_cast<float>(Stage) / MaxStage, Stage >= MaxStage);
-}
-
-void UEIRunDirector::UpdateCorruption()
-{
-	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	const int32 MaxStage = FMath::Max(1, FMath::RoundToInt(Values.CorruptionMaxStage));
-	const int32 Stage = FMath::Min(MaxStage, FMath::FloorToInt(State->GetRunSeconds() / FMath::Max(Values.CorruptionEverySeconds, KINDA_SMALL_NUMBER)));
-	if (Stage > State->GetCorruptionStage())
-	{
-		SetCorruptionStage(Stage);
-	}
-}
-
 bool UEIRunDirector::SendGroup(const FString& Size, int32 HeroCount)
 {
-	const int32 Stage = GetWorld()->GetGameState<AEIGameState>()->GetCorruptionStage();
 	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
-	const FEIEnemyGroup* Group = Groups.Pick(Size, Stage);
-	if (Group == nullptr || Horde->CountThreat() >= Groups.GetStage(Stage).ThreatCap * GetPlayerFactor(HeroCount))
+	const FEIEnemyGroup* Group = Groups.Pick(Size);
+	if (Group == nullptr || Horde->CountThreat() >= Groups.ThreatCap * GetPlayerFactor(HeroCount))
 	{
 		return true;
 	}
 	return !Horde->SpawnReinforcement(*Group, GetPlayerFactor(HeroCount)).IsEmpty();
 }
 
-void UEIRunDirector::UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+const FEIWaveRule* UEIRunDirector::FindCurrentWave(EEIRunPhase Phase) const
 {
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	const int32 Stage = State->GetCorruptionStage();
-	const FEIGroupStage& Row = Groups.GetStage(Stage);
-	const int32 HeroCount = LivingHeroes.Num();
-	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetEnemyStrength(1.0f + Values.CorruptionStrengthPerStage * Stage);
-
-	// A new stage brings life back to empty camps and sends its first group at once.
-	if (Stage != LastStage)
+	if (Phase == EEIRunPhase::SignalLit && State->IsSignalHeld())
 	{
-		LastStage = Stage;
-		ReinforcementLeft = 0.0f;
-		RefillEmptyCamps(LivingHeroes, Row.Camp);
+		return &Groups.FireWave;
 	}
-	if (Row.ReinforcementEverySeconds > 0.0f)
+	if (State->GetBossStage() == EEIBossStage::Down)
 	{
-		ReinforcementLeft -= DeltaTime;
-		if (ReinforcementLeft <= 0.0f && SendGroup(Row.Reinforcement, HeroCount))
-		{
-			ReinforcementLeft = Row.ReinforcementEverySeconds;
-		}
+		return &Groups.PursuitWave;
 	}
-
-	// Waves attack whoever holds something, whoever fights the boss, and everybody after it has fallen. Whoever comes back gets the next one at once.
-	const bool bAtAltar = State->IsContractHeld() || IsAnchorHeld();
-	const bool bAtFire = Phase == EEIRunPhase::SignalLit && State->IsSignalHeld();
-	const bool bPursuit = State->GetBossStage() == EEIBossStage::Down;
-	const bool bFight = State->GetBossStage() == EEIBossStage::Awake;
-	if (!bAtAltar && !bAtFire && !bPursuit && !bFight)
+	if (State->GetBossStage() == EEIBossStage::Awake)
 	{
-		WaveLeft = 0.0f;
+		return &Groups.FightWave;
+	}
+	if (IsAnchorHeld())
+	{
+		return &Groups.StoneWave;
+	}
+	return State->IsContractHeld() ? &Groups.AltarWave : nullptr;
+}
+
+void UEIRunDirector::UpdateBloodMoon(EEIRunPhase Phase, const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+{
+	// Nothing rises by itself. The blood moon stands as long as a task calls it, and a little longer, so that the sky does not flicker on the edge of a zone.
+	const FEIWaveRule* Wave = FindCurrentWave(Phase);
+	BloodMoonLeft = Wave != nullptr ? Groups.BloodMoonLingerSeconds : FMath::Max(0.0f, BloodMoonLeft - DeltaTime);
+	GetWorld()->GetGameState<AEIGameState>()->SetBloodMoon(bForcedBloodMoon || Wave != nullptr || BloodMoonLeft > 0.0f);
+	if (Wave == nullptr)
+	{
+		// Stepping out of a zone neither brings the next wave nor saves it. Only once the sky has cleared the next one comes at once.
+		WaveLeft = BloodMoonLeft > 0.0f ? WaveLeft : 0.0f;
 		return;
 	}
-	const bool bBigWave = bAtFire || bPursuit;
-	const float EverySeconds = bAtFire ? Groups.SignalWaveEverySeconds : (bPursuit ? BossTable.PursuitWaveEverySeconds : (bFight ? BossTable.FightWaveEverySeconds : Groups.AltarWaveEverySeconds));
 	WaveLeft -= DeltaTime;
-	if (WaveLeft <= 0.0f && SendGroup(bBigWave ? Row.SignalWave : Row.AltarWave, HeroCount))
+	if (WaveLeft <= 0.0f && SendGroup(Wave->Size, LivingHeroes.Num()))
 	{
-		WaveLeft = EverySeconds;
+		WaveLeft = Wave->EverySeconds;
 	}
 }
 
@@ -931,8 +887,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 	if (Phase != EEIRunPhase::AtDock && Phase != EEIRunPhase::Crossing)
 	{
-		UpdateCorruption();
-		UpdateEnemyGroups(Phase, LivingHeroes, DeltaTime);
+		UpdateBloodMoon(Phase, LivingHeroes, DeltaTime);
 		UpdateContracts(LivingHeroes, DeltaTime);
 		UpdateBannbruch(LivingHeroes, DeltaTime);
 	}

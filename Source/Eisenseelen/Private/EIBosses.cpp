@@ -109,8 +109,6 @@ namespace
 		if (!FEIDataFile::ReadNumber(Root, TEXT("platz_leine_m"), 1.0, 1000.0, Out.LeashMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("erholung_anteil_pro_s"), 0.0, 10.0, Out.RecoverySharePerSecond, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("leben_je_weiterem_spieler"), 0.0, 10.0, Out.LifePerExtraPlayer, OutError)
-			|| !FEIDataFile::ReadNumber(Root, TEXT("kampf_welle_alle_s"), 0.1, 3600.0, Out.FightWaveEverySeconds, OutError)
-			|| !FEIDataFile::ReadNumber(Root, TEXT("verfolgung_welle_alle_s"), 0.1, 3600.0, Out.PursuitWaveEverySeconds, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("signalfeuer_mindestabstand_m"), 0.0, 10000.0, Out.FireMinDistanceMeters, OutError))
 		{
 			return false;

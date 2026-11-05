@@ -6,9 +6,6 @@
 
 namespace
 {
-	const FEIGroupStage NoStage;
-	constexpr int32 MaxStage = 100;
-
 	bool ReadGroup(const FJsonObject& Line, FEIEnemyGroup& Out, FString& OutError)
 	{
 		if (!Line.TryGetStringField(TEXT("name"), Out.Name) || !Line.TryGetStringField(TEXT("groesse"), Out.Size))
@@ -16,15 +13,6 @@ namespace
 			OutError = TEXT("Einer Gruppe fehlt der Name oder die Größe.");
 			return false;
 		}
-		float FromStage = 0.0f;
-		float ToStage = 0.0f;
-		if (!FEIDataFile::ReadNumber(Line, TEXT("ab_stufe"), 0.0, MaxStage, FromStage, OutError)
-			|| !FEIDataFile::ReadNumber(Line, TEXT("bis_stufe"), 0.0, MaxStage, ToStage, OutError))
-		{
-			return false;
-		}
-		Out.FromStage = FMath::RoundToInt(FromStage);
-		Out.ToStage = FMath::RoundToInt(ToStage);
 		int32 Everyone = 0;
 		for (int32 Kind = 0; Kind < EIEnemyKindCount; ++Kind)
 		{
@@ -45,32 +33,33 @@ namespace
 		return true;
 	}
 
-	bool ReadStage(const FJsonObject& Line, FEIGroupStage& Out, FString& OutError)
+	bool ReadWave(const FJsonObject& Waves, const TCHAR* Key, FEIWaveRule& Out, FString& OutError)
 	{
-		if (!Line.TryGetStringField(TEXT("lager"), Out.Camp)
-			|| !Line.TryGetStringField(TEXT("nachschub"), Out.Reinforcement)
-			|| !Line.TryGetStringField(TEXT("truhe"), Out.Chest)
-			|| !Line.TryGetStringField(TEXT("altar"), Out.AltarWave)
-			|| !Line.TryGetStringField(TEXT("signalfeuer"), Out.SignalWave))
+		const TSharedPtr<FJsonObject>* Line = nullptr;
+		if (!Waves.TryGetObjectField(Key, Line) || !(*Line)->TryGetStringField(TEXT("groesse"), Out.Size))
 		{
-			OutError = TEXT("Einer Stufe fehlt lager, nachschub, truhe, altar oder signalfeuer.");
+			OutError = FString::Printf(TEXT("Im Abschnitt blutmond fehlt %s mit seiner groesse."), Key);
 			return false;
 		}
-		return FEIDataFile::ReadNumber(Line, TEXT("nachschub_alle_s"), 0.0, 3600.0, Out.ReinforcementEverySeconds, OutError)
-			&& FEIDataFile::ReadNumber(Line, TEXT("obergrenze"), 0.0, 10000.0, Out.ThreatCap, OutError);
+		return FEIDataFile::ReadNumber(**Line, TEXT("alle_s"), 0.1, 3600.0, Out.EverySeconds, OutError);
 	}
 
 	bool ReadTable(const FJsonObject& Root, FEIEnemyGroups& Out, FString& OutError)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* GroupLines = nullptr;
-		const TArray<TSharedPtr<FJsonValue>>* StageLines = nullptr;
-		if (!Root.TryGetArrayField(TEXT("gruppen"), GroupLines) || !Root.TryGetArrayField(TEXT("stufen"), StageLines) || StageLines->IsEmpty())
+		const TSharedPtr<FJsonObject>* Waves = nullptr;
+		if (!Root.TryGetArrayField(TEXT("gruppen"), GroupLines) || !Root.TryGetObjectField(TEXT("blutmond"), Waves) || !Root.TryGetStringField(TEXT("truhe"), Out.ChestGuards))
 		{
-			OutError = TEXT("Die Listen gruppen und stufen müssen da sein, und stufen darf nicht leer sein.");
+			OutError = TEXT("Die Liste gruppen und die Abschnitte blutmond und truhe müssen da sein.");
 			return false;
 		}
-		if (!FEIDataFile::ReadNumber(Root, TEXT("altar_welle_alle_s"), 0.1, 3600.0, Out.AltarWaveEverySeconds, OutError)
-			|| !FEIDataFile::ReadNumber(Root, TEXT("signalfeuer_welle_alle_s"), 0.1, 3600.0, Out.SignalWaveEverySeconds, OutError))
+		if (!FEIDataFile::ReadNumber(Root, TEXT("obergrenze"), 0.0, 10000.0, Out.ThreatCap, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("blutmond_nachlauf_s"), 0.0, 600.0, Out.BloodMoonLingerSeconds, OutError)
+			|| !ReadWave(**Waves, TEXT("altar"), Out.AltarWave, OutError)
+			|| !ReadWave(**Waves, TEXT("ankerstein"), Out.StoneWave, OutError)
+			|| !ReadWave(**Waves, TEXT("bosskampf"), Out.FightWave, OutError)
+			|| !ReadWave(**Waves, TEXT("flucht"), Out.PursuitWave, OutError)
+			|| !ReadWave(**Waves, TEXT("signalfeuer"), Out.FireWave, OutError))
 		{
 			return false;
 		}
@@ -83,16 +72,6 @@ namespace
 				return false;
 			}
 			Out.Groups.Add(Group);
-		}
-		for (const TSharedPtr<FJsonValue>& Line : *StageLines)
-		{
-			const TSharedPtr<FJsonObject>* Object = nullptr;
-			FEIGroupStage Stage;
-			if (!Line->TryGetObject(Object) || !ReadStage(**Object, Stage, OutError))
-			{
-				return false;
-			}
-			Out.Stages.Add(Stage);
 		}
 		return true;
 	}
@@ -116,22 +95,17 @@ TArray<EEIEnemyKind> FEIEnemyGroup::ListMembers(float CountFactor) const
 	return Members;
 }
 
-const FEIEnemyGroup* FEIEnemyGroups::Pick(const FString& Size, int32 Stage) const
+const FEIEnemyGroup* FEIEnemyGroups::Pick(const FString& Size) const
 {
 	TArray<const FEIEnemyGroup*> Fitting;
 	for (const FEIEnemyGroup& Group : Groups)
 	{
-		if (Group.Size == Size && Group.FromStage <= Stage && Stage <= Group.ToStage)
+		if (Group.Size == Size)
 		{
 			Fitting.Add(&Group);
 		}
 	}
 	return Fitting.IsEmpty() ? nullptr : Fitting[FMath::RandRange(0, Fitting.Num() - 1)];
-}
-
-const FEIGroupStage& FEIEnemyGroups::GetStage(int32 Stage) const
-{
-	return Stages.IsEmpty() ? NoStage : Stages[FMath::Clamp(Stage, 0, Stages.Num() - 1)];
 }
 
 bool FEIEnemyGroups::LoadFromString(const FString& Json, FEIEnemyGroups& OutGroups, FString& OutError)

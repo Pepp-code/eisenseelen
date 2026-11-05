@@ -600,7 +600,7 @@ public:
 			Test->TestTrue(TEXT("The chest is open on the server"), OpenedChest != nullptr && OpenedChest->IsOpen());
 			Test->TestEqual(TEXT("The guest sees the contract done"), GuestState->CountContractsDone(), 1);
 			const UEIProfileComponent* GuestProfile = Session.ClientPlayer->GetProfile();
-			Test->TestEqual(TEXT("The guest earns the gold"), GuestProfile->GetRunGold(), GuestProfile->GetContractTable().GetGold(0));
+			Test->TestEqual(TEXT("The guest earns the gold"), GuestProfile->GetRunGold(), GuestProfile->GetContractTable().GetGold());
 			Test->TestTrue(TEXT("The guest is told"), GuestProfile->GetRewardNote() > 0.0f);
 			const AEIPlayerController* Host = Cast<AEIPlayerController>(ServerWorld->GetFirstPlayerController());
 			Test->TestEqual(TEXT("The fallen host earns nothing"), Host->GetProfile()->GetRunGold(), 0);
@@ -746,12 +746,8 @@ public:
 			Short.CampFactor = 0.0f;
 			Run->ApplyValues(Short);
 			Run->GetContractTable().ContractsPerRun = 0.0f;
-			for (FEIGroupStage& Stage : Run->GetGroups().Stages)
-			{
-				Stage.Reinforcement.Empty();
-				Stage.AltarWave.Empty();
-				Stage.SignalWave.Empty();
-			}
+			Run->GetGroups().AltarWave.Size.Empty();
+			Run->GetGroups().FireWave.Size.Empty();
 			for (FEIBossValues& Boss : Run->GetBossTable().Bosses)
 			{
 				Boss.Bannbruch.HoldSeconds = 0.3f;

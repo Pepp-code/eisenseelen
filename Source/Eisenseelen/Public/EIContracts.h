@@ -68,7 +68,6 @@ struct EISENSEELEN_API FEIContractTable
 	float MinDistanceMeters = 40.0f;
 	float Gold = 100.0f;
 	float Points = 25.0f;
-	float CorruptionBonusPerStage = 0.1f;
 	float KeptOnFailure = 0.3f;
 
 	/** How long a side of the run map is, for the overview. From Data/laufkarte.json. */
@@ -80,9 +79,9 @@ struct EISENSEELEN_API FEIContractTable
 	const FEIContractTask* FindTask(EEIContractKind Kind) const;
 	const FEIFaction* FindFaction(int32 Faction) const;
 
-	/** What one contract pays at a stage of the corruption. */
-	int32 GetGold(int32 Stage) const;
-	int32 GetPoints(int32 Stage) const;
+	/** What one contract pays. */
+	int32 GetGold() const;
+	int32 GetPoints() const;
 
 	/** What is left of an amount after a failed run. */
 	int32 GetKeptOnFailure(int32 Amount) const;

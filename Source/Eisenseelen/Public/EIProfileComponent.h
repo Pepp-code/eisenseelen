@@ -143,8 +143,6 @@ private:
 	const FEISavedClass& GetSavedClass(bool bArcanist) const;
 	FString AddToSave(int32 Item, int32 Quality);
 	int32 RollItem(int32 Quality);
-	int32 ScaleExperience(float Experience) const;
-	int32 GetCorruptionStage() const;
 
 	FEIItemTable Table;
 	FEIContractTable ContractTable;

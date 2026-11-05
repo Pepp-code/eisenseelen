@@ -71,7 +71,7 @@ void AEIBoss::OnRep_Bound()
 	}
 }
 
-void AEIBoss::BreakFree(float StrengthFactor, int32 PlayerCount)
+void AEIBoss::BreakFree(int32 PlayerCount)
 {
 	if (!bBound)
 	{
@@ -79,10 +79,7 @@ void AEIBoss::BreakFree(float StrengthFactor, int32 PlayerCount)
 	}
 	bBound = false;
 	OnRep_Bound();
-	DamageFactor = StrengthFactor;
-	const float PlayerFactor = 1.0f + Table.LifePerExtraPlayer * FMath::Max(PlayerCount - 1, 0);
-	ApplyStrength(StrengthFactor);
-	GetHealth()->Reset(GetHealth()->GetMaxHealth() * PlayerFactor);
+	GetHealth()->Reset(GetValues().Life * (1.0f + Table.LifePerExtraPlayer * FMath::Max(PlayerCount - 1, 0)));
 	NextStompAt = GetWorld()->GetTimeSeconds() + (GetBossValues() != nullptr ? GetBossValues()->Stomp.PauseSeconds / 2.0f : 0.0f);
 	WakeUp(false);
 }
@@ -114,7 +111,7 @@ void AEIBoss::Stomp()
 		{
 			continue;
 		}
-		UGameplayStatics::ApplyDamage(*It, Boss->Stomp.Damage * DamageFactor, GetController(), this, nullptr);
+		UGameplayStatics::ApplyDamage(*It, Boss->Stomp.Damage, GetController(), this, nullptr);
 		if (It->CanBeDamaged())
 		{
 			const FVector Away = (It->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();

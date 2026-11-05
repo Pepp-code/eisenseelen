@@ -441,12 +441,6 @@ void AEIEnemy::ShowHeldPart()
 	}
 }
 
-void AEIEnemy::ApplyStrength(float Factor)
-{
-	Values.Damage *= Factor;
-	Health->Reset(Values.Life * Factor);
-}
-
 void AEIEnemy::ApplySlow(float Share, float Seconds)
 {
 	if (IsUntouchable())

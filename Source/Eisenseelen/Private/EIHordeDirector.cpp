@@ -3,7 +3,6 @@
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
 #include "EIEnemy.h"
-#include "EIEnemyCamp.h"
 #include "EIEnemyGroups.h"
 #include "EIHeroCharacter.h"
 #include "Engine/World.h"
@@ -20,9 +19,6 @@ namespace
 	constexpr int32 PlaceTries = 8;
 	constexpr float InViewDot = 0.35f;
 	constexpr float LeftBehindCheckSeconds = 1.0f;
-	// Reinforcements must not come from so far away that they count as left behind at once.
-	constexpr float CampInReachShare = 0.9f;
-	constexpr float CampSpreadCm = 300.0f;
 	constexpr float ReinforcementRadiusCm = 300.0f;
 	constexpr float MemberSpacingCm = 150.0f;
 
@@ -149,7 +145,6 @@ AEIEnemy* UEIHordeDirector::SpawnAt(const FVector& Location, EEIEnemyKind Kind)
 	{
 		return nullptr;
 	}
-	Enemy->ApplyStrength(EnemyStrength);
 	return Enemy;
 }
 
@@ -212,33 +207,12 @@ bool UEIHordeDirector::FindHiddenPlace(const TArray<AEIHeroCharacter*>& Heroes, 
 	{
 		return false;
 	}
-	const float MinDistance = Values.MinDistanceMeters * CentimetersPerMeter;
-	const float CampInReach = Values.TooFarMeters * CentimetersPerMeter * CampInReachShare;
-	TArray<FVector> Camps;
-	for (TActorIterator<AEIEnemyCamp> It(GetWorld()); It; ++It)
-	{
-		Camps.Add(It->GetActorLocation());
-	}
 	for (int32 Try = 0; Try < PlaceTries; ++Try)
 	{
 		const FVector Center = Heroes[FMath::RandRange(0, Heroes.Num() - 1)]->GetActorLocation();
-		const TArray<FVector> CampsInReach = Camps.FilterByPredicate([&Center, MinDistance, CampInReach](const FVector& Camp)
-		{
-			const double Distance = FVector::Dist2D(Camp, Center);
-			return Distance >= MinDistance && Distance <= CampInReach;
-		});
 		const float Angle = FMath::FRandRange(0.0f, UE_TWO_PI);
-		FVector Ground;
-		if (!CampsInReach.IsEmpty())
-		{
-			const FVector Camp = CampsInReach[FMath::RandRange(0, CampsInReach.Num() - 1)];
-			Ground = FVector(Camp.X + FMath::Cos(Angle) * CampSpreadCm, Camp.Y + FMath::Sin(Angle) * CampSpreadCm, 0.0f);
-		}
-		else
-		{
-			const float Distance = FMath::FRandRange(Values.MinDistanceMeters, Values.MaxDistanceMeters) * CentimetersPerMeter;
-			Ground = FVector(Center.X + FMath::Cos(Angle) * Distance, Center.Y + FMath::Sin(Angle) * Distance, 0.0f);
-		}
+		const float Distance = FMath::FRandRange(Values.MinDistanceMeters, Values.MaxDistanceMeters) * CentimetersPerMeter;
+		const FVector Ground(Center.X + FMath::Cos(Angle) * Distance, Center.Y + FMath::Sin(Angle) * Distance, 0.0f);
 		// Not only the middle, but everyone in the circle around it has to arrive out of sight.
 		const bool bBad = IsBadPlace(Ground, Heroes)
 			|| (RadiusCm > 0.0f && (IsBadPlace(Ground + FVector(RadiusCm, 0.0f, 0.0f), Heroes)

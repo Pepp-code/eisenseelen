@@ -62,11 +62,11 @@ public:
 	int32 GetBannbruchDone() const { return BannbruchDone; }
 	int32 GetBannbruchTotal() const { return BannbruchTotal; }
 
-	int32 GetCorruptionStage() const { return CorruptionStage; }
+	/** Whether the sky is red right now, because a task has called the enemies from all sides. */
 	bool IsBloodMoon() const { return bBloodMoon; }
 
-	/** Seconds of the note left after the corruption rose. For the HUD. */
-	float GetCorruptionNote() const { return CorruptionNoteRemaining; }
+	/** Seconds of the note left after the blood moon rose. For the HUD. */
+	float GetBloodMoonNote() const { return BloodMoonNoteRemaining; }
 
 	/** Server only. */
 	void SetRunPhase(EEIRunPhase NewPhase) { RunPhase = NewPhase; }
@@ -80,8 +80,7 @@ public:
 	void SetContracts(const TArray<FEIContract>& NewContracts);
 	TArray<FEIContract>& EditContracts() { return Contracts; }
 
-	/** Share is how far along the way to the worst the sky should be, from 0 to 1. */
-	void SetCorruption(int32 Stage, float Share, bool bIsBloodMoon);
+	void SetBloodMoon(bool bNewBloodMoon);
 
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -89,7 +88,7 @@ public:
 
 private:
 	UFUNCTION()
-	void OnRep_CorruptionStage(int32 PreviousStage);
+	void OnRep_BloodMoon();
 
 	UPROPERTY(Replicated)
 	bool bHordeActive = false;
@@ -125,15 +124,9 @@ private:
 	UPROPERTY(Replicated)
 	TArray<FEIContract> Contracts;
 
-	UPROPERTY(ReplicatedUsing = OnRep_CorruptionStage)
-	int32 CorruptionStage = 0;
-
-	UPROPERTY(Replicated)
-	float CorruptionShare = 0.0f;
-
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_BloodMoon)
 	bool bBloodMoon = false;
 
-	float CorruptionLook = 0.0f;
-	float CorruptionNoteRemaining = 0.0f;
+	float BloodMoonLook = 0.0f;
+	float BloodMoonNoteRemaining = 0.0f;
 };

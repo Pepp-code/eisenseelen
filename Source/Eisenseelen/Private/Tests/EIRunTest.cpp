@@ -60,14 +60,13 @@ namespace
 		return WaitUntil(What, MaxSeconds, [Phase](const FEIPlayContext& Context) { return GetState(Context)->GetRunPhase() == Phase; });
 	}
 
-	/** Nobody comes by themselves. The camps are another matter. */
+	/** No task calls a group. The camps are another matter. */
 	void SwitchOffReinforcements(const FEIPlayContext& Context)
 	{
-		for (FEIGroupStage& Stage : GetGameMode(Context)->GetRun()->GetGroups().Stages)
+		FEIEnemyGroups& Groups = GetGameMode(Context)->GetRun()->GetGroups();
+		for (FEIWaveRule* Wave : { &Groups.AltarWave, &Groups.StoneWave, &Groups.FightWave, &Groups.PursuitWave, &Groups.FireWave })
 		{
-			Stage.Reinforcement.Empty();
-			Stage.AltarWave.Empty();
-			Stage.SignalWave.Empty();
+			Wave->Size.Empty();
 		}
 	}
 
@@ -487,36 +486,46 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
 	}));
 
-	// Before the first stage of the corruption nobody comes by themselves.
+	// Nothing comes by itself, however long one walks about.
 	Steps.Add(WaitForPhase(TEXT("the run begins"), 2.0, EEIRunPhase::Exploring));
-	Steps.Add(Wait(1.5));
+	Steps.Add(Wait(3.0));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("At the start nothing comes"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
-		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
-		FEIGroupStage& Row = Run->GetGroups().Stages[1];
-		Row.ReinforcementEverySeconds = 0.5f;
-		Row.ThreatCap = 8.0f;
-		Run->SetCorruptionStage(1);
+		Context.Test->TestEqual(TEXT("Without a task nothing comes"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
+		Context.Test->TestFalse(TEXT("Without a task the blood moon does not rise"), GetState(Context)->IsBloodMoon());
 	}));
 
-	// With the first stage a small group comes at once, and it is stronger than the camps at the start.
-	Steps.Add(Wait(0.1));
-	Steps.Add(Do([CheckNewEnemies](const FEIPlayContext& Context)
+	// Whoever holds an altar calls the blood moon: a small group comes at once, and more follow up to a limit.
+	AddTap(Steps, EKeys::R);
+	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::AtDock));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		EmptyCamps(Context);
+		OnlyContracts(Context, EEIContractKind::Altar);
+		FEIEnemyGroups& Groups = GetGameMode(Context)->GetRun()->GetGroups();
+		Groups.AltarWave.Size = TEXT("klein");
+		Groups.AltarWave.EverySeconds = 0.5f;
+		Groups.ThreatCap = 8.0f;
+		Groups.BloodMoonLingerSeconds = 0.5f;
+		const FVector Altar = GetState(Context)->GetContracts()[0].Location;
+		StartRun(Context);
+		Teleport(Context, FVector(Altar.X + 300.0f, Altar.Y, HeroHeight), 180.0f);
+	}));
+	Steps.Add(WaitForPhase(TEXT("the run begins at the altar"), 2.0, EEIRunPhase::Exploring));
+	Steps.Add(Wait(0.15));
+	Steps.Add(Do([CheckNewEnemies, Threat](const FEIPlayContext& Context)
 	{
 		CheckNewEnemies(Context);
-		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
-		const UEIHordeDirector* Horde = Run->GetOwner<AEIGameMode>()->GetHorde();
-		Context.Test->TestTrue(TEXT("With the first stage a group comes"), Horde->CountEnemies() > 0);
-		Context.Test->TestTrue(TEXT("The first group is small"), Horde->CountThreat() <= 4.0f);
+		Context.Test->TestTrue(TEXT("Holding the altar calls the blood moon"), GetState(Context)->IsBloodMoon());
+		Context.Test->TestTrue(TEXT("At the altar a group comes at once"), Threat(Context) > 0.0f);
+		Context.Test->TestTrue(TEXT("The first group is small"), Threat(Context) <= 4.0f);
 		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
 		{
 			Context.Test->TestFalse(TEXT("It hunts the hero"), It->IsWatching());
-			Context.Test->TestNearlyEqual(TEXT("It is stronger"), It->GetHealth()->GetMaxHealth(), It->GetValues().Life * (1.0f + Run->GetValues().CorruptionStrengthPerStage), 0.01f);
+			Context.Test->TestNearlyEqual(TEXT("It is no stronger than its kind"), It->GetHealth()->GetMaxHealth(), It->GetValues().Life, 0.01f);
 		}
 	}));
-
-	// More of them come, up to a limit.
 	Steps.Add(WaitUntil(TEXT("more groups come up to the limit"), 15.0, [CheckNewEnemies, Threat](const FEIPlayContext& Context)
 	{
 		CheckNewEnemies(Context);
@@ -525,7 +534,7 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([State, Threat](const FEIPlayContext& Context)
 	{
 		State->Threat = Threat(Context);
-		Context.Test->AddInfo(FString::Printf(TEXT("Corruption 1: threat %.0f at a limit of 8, %d enemies checked at 1500 cm from the middle"), State->Threat, State->Checked));
+		Context.Test->AddInfo(FString::Printf(TEXT("Altar: threat %.0f at a limit of 8, %d enemies checked"), State->Threat, State->Checked));
 		Context.Test->TestTrue(TEXT("A group does not go far over the limit"), State->Threat < 12.0f);
 	}));
 	Steps.Add(Wait(0.7));
@@ -539,76 +548,10 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	}));
 	Steps.Add(WaitUntil(TEXT("the enemy left behind is gone"), 3.0, [State](const FEIPlayContext& Context) { return !State->LeftBehind.IsValid(); }));
 
-	// At the blood moon big groups come, much stronger.
+	// Away from the altar no group comes any more, and the sky clears soon after.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		DefeatAllEnemies(Context);
-		GetGameMode(Context)->GetRun()->SetCorruptionStage(6);
-	}));
-	Steps.Add(Wait(0.1));
-	Steps.Add(Do([Threat](const FEIPlayContext& Context)
-	{
-		const float Factor = 1.0f + GetGameMode(Context)->GetRun()->GetValues().CorruptionStrengthPerStage * 6.0f;
-		Context.Test->AddInfo(FString::Printf(TEXT("Blood moon: threat %.0f at once"), Threat(Context)));
-		Context.Test->TestTrue(TEXT("At the blood moon a big group comes"), Threat(Context) >= 10.0f);
-		Context.Test->TestTrue(TEXT("This is the blood moon"), GetState(Context)->IsBloodMoon());
-		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
-		{
-			if (!It->IsDead())
-			{
-				Context.Test->TestNearlyEqual(TEXT("At the blood moon they are much stronger"), It->GetHealth()->GetMaxHealth(), It->GetValues().Life * Factor, 0.01f);
-			}
-		}
-	}));
-
-	// R takes it all back, and the corruption rises with the clock up to the blood moon.
-	AddTap(Steps, EKeys::R);
-	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::AtDock));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestEqual(TEXT("A fresh run has no corruption"), GetState(Context)->GetCorruptionStage(), 0);
-		Context.Test->TestFalse(TEXT("A fresh run has no blood moon"), GetState(Context)->IsBloodMoon());
-		Context.Test->TestEqual(TEXT("A fresh run has no enemies"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
-		Context.Hero->SetCanBeDamaged(false);
-		SwitchOffDirector(Context);
-		FEIRunValues Fast = GetGameMode(Context)->GetRun()->GetValues();
-		Fast.CorruptionEverySeconds = 0.1f;
-		GetGameMode(Context)->GetRun()->ApplyValues(Fast);
-		StartRun(Context);
-		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
-	}));
-	Steps.Add(WaitUntil(TEXT("the blood moon rises by itself"), 5.0, [](const FEIPlayContext& Context) { return GetState(Context)->IsBloodMoon(); }));
-	Steps.Add(Wait(0.3));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		const float MaxStage = GetGameMode(Context)->GetRun()->GetValues().CorruptionMaxStage;
-		Context.Test->TestEqual(TEXT("The stage stops at the blood moon"), GetState(Context)->GetCorruptionStage(), FMath::RoundToInt(MaxStage));
-	}));
-
-	// Whoever holds an altar is attacked in waves.
-	AddTap(Steps, EKeys::R);
-	Steps.Add(WaitForPhase(TEXT("another fresh run starts"), 3.0, EEIRunPhase::AtDock));
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Hero->SetCanBeDamaged(false);
-		EmptyCamps(Context);
-		OnlyContracts(Context, EEIContractKind::Altar);
-		GetGameMode(Context)->GetRun()->GetGroups().AltarWaveEverySeconds = 0.5f;
-		const FVector Altar = GetState(Context)->GetContracts()[0].Location;
-		StartRun(Context);
-		Teleport(Context, FVector(Altar.X + 300.0f, Altar.Y, HeroHeight), 180.0f);
-	}));
-	Steps.Add(WaitForPhase(TEXT("the run begins at the altar"), 2.0, EEIRunPhase::Exploring));
-	Steps.Add(Wait(0.15));
-	Steps.Add(Do([Threat](const FEIPlayContext& Context)
-	{
-		Context.Test->TestTrue(TEXT("At the altar a wave comes at once"), Threat(Context) > 0.0f);
-		DefeatAllEnemies(Context);
-	}));
-	Steps.Add(Wait(0.7));
-	Steps.Add(Do([Threat](const FEIPlayContext& Context)
-	{
-		Context.Test->TestTrue(TEXT("The next wave follows"), Threat(Context) > 0.0f);
 		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
 	}));
 	Steps.Add(Wait(0.1));
@@ -616,7 +559,17 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(1.0));
 	Steps.Add(Do([Threat](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("Away from the altar no waves come"), Threat(Context), 0.0f);
+		Context.Test->TestEqual(TEXT("Away from the altar no group comes"), Threat(Context), 0.0f);
+		Context.Test->TestFalse(TEXT("The sky clears again"), GetState(Context)->IsBloodMoon());
+	}));
+
+	// A fresh run starts without the blood moon.
+	AddTap(Steps, EKeys::R);
+	Steps.Add(WaitForPhase(TEXT("another fresh run starts"), 3.0, EEIRunPhase::AtDock));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestFalse(TEXT("A fresh run has no blood moon"), GetState(Context)->IsBloodMoon());
+		Context.Test->TestEqual(TEXT("A fresh run has no enemies"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
 	}));
 
 	// At the fire too.
@@ -641,6 +594,7 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([Threat](const FEIPlayContext& Context)
 	{
 		Context.Test->TestTrue(TEXT("At the fire a wave comes"), Threat(Context) > 0.0f);
+		Context.Test->TestTrue(TEXT("The fire calls the blood moon"), GetState(Context)->IsBloodMoon());
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }
@@ -797,7 +751,7 @@ bool FEICampsTest::RunTest(const FString& Parameters)
 		}
 	}));
 
-	// An empty camp fills up again with the next stage of the corruption.
+	// An empty camp stays empty: nothing comes back by itself.
 	Steps.Add(Do([CampEnemies](const FEIPlayContext& Context)
 	{
 		for (AEIEnemy* Enemy : CampEnemies(Context))
@@ -809,17 +763,11 @@ bool FEICampsTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([CampEnemies](const FEIPlayContext& Context)
 	{
 		Context.Test->TestEqual(TEXT("The camp is empty now"), CampEnemies(Context).Num(), 0);
-		GetGameMode(Context)->GetRun()->SetCorruptionStage(1);
 	}));
-	Steps.Add(Wait(0.1));
+	Steps.Add(Wait(1.5));
 	Steps.Add(Do([CampEnemies](const FEIPlayContext& Context)
 	{
-		const TArray<AEIEnemy*> Enemies = CampEnemies(Context);
-		Context.Test->TestTrue(TEXT("The next stage fills the camp"), Enemies.Num() > 0);
-		for (const AEIEnemy* Enemy : Enemies)
-		{
-			Context.Test->TestTrue(TEXT("They stand watch too"), Enemy->IsWatching());
-		}
+		Context.Test->TestEqual(TEXT("An empty camp does not fill up again"), CampEnemies(Context).Num(), 0);
 	}));
 
 	// R clears the map, and the camps fill up with the next jump.
@@ -964,7 +912,7 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 	{
 		const UEIProfileComponent* Profile = Context.Player->GetProfile();
 		Context.Test->TestEqual(TEXT("The chest fulfils its contract"), GetState(Context)->CountContractsDone(), 1);
-		Context.Test->TestEqual(TEXT("It pays the gold"), Profile->GetRunGold(), Profile->GetContractTable().GetGold(0));
+		Context.Test->TestEqual(TEXT("It pays the gold"), Profile->GetRunGold(), Profile->GetContractTable().GetGold());
 		Context.Test->TestTrue(TEXT("The chest is open now"), ChestsInUse(Context)[0]->IsOpen());
 		Context.Test->TestTrue(TEXT("The hero is told"), Profile->GetRewardNote() > 0.0f);
 		Context.Test->TestEqual(TEXT("Nobody comes a second time"), GetGameMode(Context)->GetHorde()->CountEnemies(), 0);
@@ -975,19 +923,17 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 	{
 		const UEIProfileComponent* Profile = Context.Player->GetProfile();
 		Context.Test->TestEqual(TEXT("An open chest counts only once"), GetState(Context)->CountContractsDone(), 1);
-		Context.Test->TestEqual(TEXT("An open chest pays only once"), Profile->GetRunGold(), Profile->GetContractTable().GetGold(0));
+		Context.Test->TestEqual(TEXT("An open chest pays only once"), Profile->GetRunGold(), Profile->GetContractTable().GetGold());
 
-		// Later in the run a chest has more guards.
-		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
-		Run->SetCorruptionStage(6);
+		// The next chest has its own guards.
 		StandBeside(Context, ChestsInUse(Context)[1], 200.0f);
 	}));
 	Steps.Add(Wait(0.1));
 	Steps.Add(Do([ChestsInUse, FirstGuardsThreat](const FEIPlayContext& Context)
 	{
 		const float Later = GetGameMode(Context)->GetHorde()->CountThreat();
-		Context.Test->AddInfo(FString::Printf(TEXT("At the blood moon the guards of a chest have a threat of %.0f, at the start %.0f"), Later, *FirstGuardsThreat));
-		Context.Test->TestTrue(TEXT("The corruption brings stronger guards"), Later > *FirstGuardsThreat);
+		Context.Test->AddInfo(FString::Printf(TEXT("The guards of the next chest have a threat of %.0f, those of the first %.0f"), Later, *FirstGuardsThreat));
+		Context.Test->TestTrue(TEXT("The next chest has guards too"), Later > 0.0f);
 		Context.Test->TestEqual(TEXT("The other chests stay sealed"), ChestsInUse(Context)[2]->GetState(), EEIChestState::Sealed);
 	}));
 
@@ -1146,14 +1092,14 @@ bool FEIContractsTest::RunTest(const FString& Parameters)
 		const int32 Faction = Contract != nullptr ? Contract->Faction : 0;
 		Found[1]->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 		const FEIContractTable& Table = Profile->GetContractTable();
-		Context.Test->TestEqual(TEXT("Near it pays gold"), Profile->GetRunGold(), Table.GetGold(0));
-		Context.Test->TestEqual(TEXT("Near it pays points of its faction"), Profile->GetRunPoints(Table.Factions[Faction].Name), Table.GetPoints(0));
+		Context.Test->TestEqual(TEXT("Near it pays gold"), Profile->GetRunGold(), Table.GetGold());
+		Context.Test->TestEqual(TEXT("Near it pays points of its faction"), Profile->GetRunPoints(Table.Factions[Faction].Name), Table.GetPoints());
 		Context.Test->TestTrue(TEXT("The note names the faction"), Profile->GetRewardText().Contains(Table.Factions[Faction].Name));
 		Context.Test->TestFalse(TEXT("Nothing is safe yet"), Profile->GetSave().Gold > 0);
 		Context.Test->TestEqual(TEXT("Experience only comes from the enemy itself"), Profile->GetRunExperience(), FMath::RoundToInt32(EnemyExperience));
 	}));
 
-	// A run of shrines: the time runs in the zone and only there, and the next stage of the corruption pays more.
+	// A run of shrines: the time runs in the zone and only there, and every shrine pays the same.
 	AddTap(Steps, EKeys::R);
 	Steps.Add(WaitForPhase(TEXT("a run of shrines starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([StandAt](const FEIPlayContext& Context)
@@ -1203,12 +1149,11 @@ bool FEIContractsTest::RunTest(const FString& Parameters)
 	{
 		TArray<FEIContract>& Contracts = GetState(Context)->EditContracts();
 		const UEIProfileComponent* Profile = Context.Player->GetProfile();
-		Context.Test->TestEqual(TEXT("The shrine pays"), Profile->GetRunGold(), Profile->GetContractTable().GetGold(0));
+		Context.Test->TestEqual(TEXT("The shrine pays"), Profile->GetRunGold(), Profile->GetContractTable().GetGold());
 		Context.Test->TestEqual(TEXT("It gives no experience"), Profile->GetRunExperience(), 0);
 		Context.Test->TestFalse(TEXT("A finished shrine is not held any more"), Contracts[0].bHeld);
 		Context.Test->TestEqual(TEXT("It is broken now"), Cast<AEIAltar>(Contracts[0].Target)->GetState(), EEIAltarState::Broken);
 
-		GetGameMode(Context)->GetRun()->SetCorruptionStage(3);
 		Contracts[1].HoldLeft = 0.1f;
 		StandAt(Context, Contracts[1].Location, 200.0f);
 	}));
@@ -1217,8 +1162,7 @@ bool FEIContractsTest::RunTest(const FString& Parameters)
 	{
 		const UEIProfileComponent* Profile = Context.Player->GetProfile();
 		const FEIContractTable& Table = Profile->GetContractTable();
-		Context.Test->TestEqual(TEXT("More corruption pays more"), Profile->GetRunGold(), Table.GetGold(0) + Table.GetGold(3));
-		Context.Test->TestTrue(TEXT("The bonus is real"), Table.GetGold(3) > Table.GetGold(0));
+		Context.Test->TestEqual(TEXT("The next shrine pays the same again"), Profile->GetRunGold(), Table.GetGold() * 2);
 	}));
 
 	// However often it is rolled: with a big distance the two contracts lie far apart.

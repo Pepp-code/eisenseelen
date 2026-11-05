@@ -8,8 +8,8 @@ class AEIEnemy;
 class UStaticMeshComponent;
 
 /**
- * A fixed place on the map where enemies stand watch from the start of a run. Later in the run reinforcements come out
- * of these places. The camp itself marks the spot and knows who belongs to it, the run director fills it.
+ * A fixed place on the map where enemies stand watch from the start of a run. Whoever clears it has peace there, because
+ * nobody comes back. The camp itself marks the spot and knows who belongs to it, the run director fills it.
  */
 UCLASS()
 class EISENSEELEN_API AEIEnemyCamp : public AActor

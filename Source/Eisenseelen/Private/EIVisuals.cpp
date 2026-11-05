@@ -86,7 +86,7 @@ UMaterialInstanceDynamic* EIVisuals::SetGlow(UMeshComponent* Mesh, const FLinear
 	return Instance;
 }
 
-void EIVisuals::ApplyCorruptionLook(UWorld* World, float Share)
+void EIVisuals::ApplyBloodMoonLook(UWorld* World, float Share)
 {
 	const FLinearColor ClearSky(0.175287f, 0.409607f, 1.0f);
 	const FLinearColor BloodSky(1.0f, 0.2f, 0.12f);

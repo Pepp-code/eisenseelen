@@ -30,8 +30,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
 	bool IsStompMarked() const { return GetGroundMark().bVisible && GetGroundMark().Shape == EEIMarkShape::Circle; }
 
-	/** Server only. The Bannbruch is done: it fights from now on, with more life for more players and later in a run. */
-	void BreakFree(float StrengthFactor, int32 PlayerCount);
+	/** Server only. The Bannbruch is done: it fights from now on, with more life for more players. */
+	void BreakFree(int32 PlayerCount);
 
 	virtual bool IsBoss() const override { return true; }
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -60,5 +60,4 @@ private:
 	FEIBossTable Table;
 	float StompLeft = 0.0f;
 	double NextStompAt = 0.0;
-	float DamageFactor = 1.0f;
 };

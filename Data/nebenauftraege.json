@@ -3,7 +3,6 @@
 	"mindestabstand_m": 40,
 	"gold": 100,
 	"punkte": 25,
-	"verderbnis_bonus_je_stufe": 0.1,
 	"beim_scheitern_bleibt": 0.3,
 	"fraktionen": [
 		{ "name": "Feuer", "farbe": [1.0, 0.38, 0.06] },

@@ -5,8 +5,8 @@
 
 namespace
 {
-	constexpr float CorruptionNoteSeconds = 4.0f;
-	constexpr float LookChangePerSecond = 0.2f;
+	constexpr float BloodMoonNoteSeconds = 4.0f;
+	constexpr float LookChangePerSecond = 0.33f;
 }
 
 AEIGameState::AEIGameState()
@@ -28,8 +28,6 @@ void AEIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIGameState, BannbruchDone);
 	DOREPLIFETIME(AEIGameState, BannbruchTotal);
 	DOREPLIFETIME(AEIGameState, Contracts);
-	DOREPLIFETIME(AEIGameState, CorruptionStage);
-	DOREPLIFETIME(AEIGameState, CorruptionShare);
 	DOREPLIFETIME(AEIGameState, bBloodMoon);
 }
 
@@ -96,35 +94,32 @@ void AEIGameState::SetBannbruchProgress(int32 Done, int32 Total)
 	BannbruchTotal = Total;
 }
 
-void AEIGameState::SetCorruption(int32 Stage, float Share, bool bIsBloodMoon)
+void AEIGameState::SetBloodMoon(bool bNewBloodMoon)
 {
-	const int32 PreviousStage = CorruptionStage;
-	CorruptionStage = Stage;
-	CorruptionShare = Share;
-	bBloodMoon = bIsBloodMoon;
-	OnRep_CorruptionStage(PreviousStage);
+	if (bBloodMoon != bNewBloodMoon)
+	{
+		bBloodMoon = bNewBloodMoon;
+		OnRep_BloodMoon();
+	}
 }
 
-void AEIGameState::OnRep_CorruptionStage(int32 PreviousStage)
+void AEIGameState::OnRep_BloodMoon()
 {
-	if (CorruptionStage > PreviousStage)
+	BloodMoonNoteRemaining = bBloodMoon ? BloodMoonNoteSeconds : 0.0f;
+	if (bBloodMoon)
 	{
-		CorruptionNoteRemaining = CorruptionNoteSeconds;
 		EIVisuals::PlaySound2D(this, TEXT("Schlachtruf"));
-	}
-	else
-	{
-		CorruptionNoteRemaining = 0.0f;
 	}
 }
 
 void AEIGameState::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	CorruptionNoteRemaining = FMath::Max(0.0f, CorruptionNoteRemaining - DeltaSeconds);
-	if (!FMath::IsNearlyEqual(CorruptionLook, CorruptionShare))
+	BloodMoonNoteRemaining = FMath::Max(0.0f, BloodMoonNoteRemaining - DeltaSeconds);
+	const float WantedLook = bBloodMoon ? 1.0f : 0.0f;
+	if (!FMath::IsNearlyEqual(BloodMoonLook, WantedLook))
 	{
-		CorruptionLook = FMath::FInterpConstantTo(CorruptionLook, CorruptionShare, DeltaSeconds, LookChangePerSecond);
-		EIVisuals::ApplyCorruptionLook(GetWorld(), CorruptionLook);
+		BloodMoonLook = FMath::FInterpConstantTo(BloodMoonLook, WantedLook, DeltaSeconds, LookChangePerSecond);
+		EIVisuals::ApplyBloodMoonLook(GetWorld(), BloodMoonLook);
 	}
 }

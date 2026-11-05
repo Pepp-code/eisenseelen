@@ -2,8 +2,6 @@
 	"platz_leine_m": 32,
 	"erholung_anteil_pro_s": 0.05,
 	"leben_je_weiterem_spieler": 0.65,
-	"kampf_welle_alle_s": 20,
-	"verfolgung_welle_alle_s": 12,
 	"signalfeuer_mindestabstand_m": 100,
 	"bosse": [
 		{

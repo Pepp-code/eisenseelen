@@ -122,11 +122,11 @@ void AEIPlayerController::PreviewInvulnerable()
 	}
 }
 
-void AEIPlayerController::PreviewCorruption(int32 Stage)
+void AEIPlayerController::PreviewBloodMoon(bool bStands)
 {
 	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
-		GameMode->GetRun()->SetCorruptionStage(Stage);
+		GameMode->GetRun()->ForceBloodMoon(bStands);
 	}
 }
 

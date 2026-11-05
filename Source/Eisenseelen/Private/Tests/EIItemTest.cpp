@@ -38,7 +38,7 @@ namespace
 		"start_items": ["Probeschwert", "Probestab"],
 		"erfahrung": { "level_max": 4, "erste_stufe": 100, "zuwachs_je_level": 50 },
 		"attribute": [{ "name": "Probekraft", "wert": "angriffskraft", "je_punkt": 0.03 }],
-		"belohnung": { "doppelt_erfahrung": 14, "umkreis_m": 15, "verderbnis_erfahrung_je_stufe": 0.5, "geschmiedet_ab_stufe": 2 },
+		"belohnung": { "doppelt_erfahrung": 14, "umkreis_m": 15 },
 		"arten": [{ "name": "Probeart", "je_zwei_teile": { "leben": 10 } }],
 		"items": [
 			{ "name": "Probeschwert", "platz": "waffe", "grundform": "schwert", "element": "eis" },
@@ -602,21 +602,16 @@ bool FEILootTest::RunTest(const FString& Parameters)
 	}));
 	Steps.Add(Wait(0.05));
 
-	// A late stage of the corruption pays more, and what is new comes forged.
+	// Even under the blood moon an enemy is worth its plain experience, and what is new comes rusty.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		AEIGameMode* GameMode = Context.World->GetAuthGameMode<AEIGameMode>();
-		const FEIRewardValues& Rewards = Profile(Context)->GetTable().Rewards;
-		const int32 Stage = FMath::RoundToInt32(Rewards.ForgedFromStage);
-		GameMode->GetRun()->SetCorruptionStage(Stage);
+		GameMode->GetRun()->ForceBloodMoon(true);
 		const int32 Before = Profile(Context)->GetSave().Experience;
 		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
-		const int32 Expected = FMath::RoundToInt32(FoundExperience * (1.0f + Rewards.ExperiencePerStage * Stage));
-		Context.Test->TestEqual(TEXT("More corruption brings more experience"), Profile(Context)->GetSave().Experience - Before, Expected);
-		Context.Test->TestEqual(TEXT("From that stage on a new item comes forged"), Profile(Context)->GetLoot()[0].Quality, 1);
-		Profile(Context)->EndRun(true);
-		Context.Test->TestEqual(TEXT("It is forged in the save"), Profile(Context)->GetSave().Items.FindRef(Profile(Context)->GetTable().Items[Profile(Context)->GetLoot()[0].Item].Name), 1);
-		GameMode->GetRun()->SetCorruptionStage(0);
+		Context.Test->TestEqual(TEXT("The blood moon brings no extra experience"), Profile(Context)->GetSave().Experience - Before, FMath::RoundToInt32(FoundExperience));
+		Context.Test->TestEqual(TEXT("A new item comes rusty"), Profile(Context)->GetLoot()[0].Quality, 0);
+		GameMode->GetRun()->ForceBloodMoon(false);
 		Profile(Context)->StartFresh();
 	}));
 

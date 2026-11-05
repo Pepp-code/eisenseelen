@@ -22,7 +22,6 @@ struct EISENSEELEN_API FEIRunValues
 {
 	float CampFactor = 1.0f;
 	float CampRadiusMeters = 3.0f;
-	float CampRefillFromMeters = 40.0f;
 	float ChestReachMeters = 3.0f;
 	float ChestZoneMeters = 10.0f;
 	float ChestGuardDistanceMeters = 6.0f;
@@ -39,9 +38,6 @@ struct EISENSEELEN_API FEIRunValues
 	float LeaderLifeFactor = 2.5f;
 	float LeaderDamageFactor = 1.5f;
 	float LeaderScaleFactor = 1.25f;
-	float CorruptionEverySeconds = 120.0f;
-	float CorruptionMaxStage = 6.0f;
-	float CorruptionStrengthPerStage = 0.1f;
 
 	static bool LoadFromProjectFile(FEIRunValues& OutValues, FString& OutError);
 };
@@ -98,8 +94,8 @@ public:
 	/** The crossing is over: the barge sets everybody who lives down at the edge of the map. Tests and preview pictures call it directly, to skip the way there. */
 	void BeginRunNow();
 
-	/** The clock raises it by itself. Directly only for preview pictures. */
-	void SetCorruptionStage(int32 Stage);
+	/** For preview pictures: the blood moon stands, whatever happens. */
+	void ForceBloodMoon(bool bForce) { bForcedBloodMoon = bForce; }
 
 	/** For tests and preview pictures: the Bannbruch is done at once, as if somebody had just finished it. */
 	void SkipBannbruch();
@@ -128,10 +124,9 @@ private:
 	void LightSignal();
 	void HoldSignal(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void LeaveOnceAllAboard(const TArray<AEIHeroCharacter*>& LivingHeroes);
-	void UpdateCorruption();
-	void UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	const FEIWaveRule* FindCurrentWave(EEIRunPhase Phase) const;
+	void UpdateBloodMoon(EEIRunPhase Phase, const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void FillCamp(AEIEnemyCamp* Camp, const FString& Size, int32 HeroCount);
-	void RefillEmptyCamps(const TArray<AEIHeroCharacter*>& LivingHeroes, const FString& Size);
 	bool SendGroup(const FString& Size, int32 HeroCount);
 	float GetPlayerFactor(int32 HeroCount) const;
 	void EndRunForAll(bool bEscaped);
@@ -161,6 +156,6 @@ private:
 	float CrossingLeft = 0.0f;
 	float HoldLeft = 0.0f;
 	float WaveLeft = 0.0f;
-	float ReinforcementLeft = 0.0f;
-	int32 LastStage = 0;
+	float BloodMoonLeft = 0.0f;
+	bool bForcedBloodMoon = false;
 };

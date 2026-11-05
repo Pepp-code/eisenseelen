@@ -45,9 +45,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewInvulnerable();
 
-	/** For preview pictures: jumps to a stage of the corruption. */
+	/** For preview pictures: the blood moon stands, or not. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
-	void PreviewCorruption(int32 Stage);
+	void PreviewBloodMoon(bool bStands);
 
 	/** For preview pictures: the run begins at once, without the way there. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")

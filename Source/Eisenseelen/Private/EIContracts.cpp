@@ -80,7 +80,6 @@ namespace
 			|| !FEIDataFile::ReadNumber(Root, TEXT("mindestabstand_m"), 0.0, 1000.0, Out.MinDistanceMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("gold"), 0.0, 1000000.0, Out.Gold, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("punkte"), 0.0, 1000000.0, Out.Points, OutError)
-			|| !FEIDataFile::ReadNumber(Root, TEXT("verderbnis_bonus_je_stufe"), 0.0, 100.0, Out.CorruptionBonusPerStage, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("beim_scheitern_bleibt"), 0.0, 1.0, Out.KeptOnFailure, OutError))
 		{
 			return false;
@@ -143,14 +142,14 @@ const FEIFaction* FEIContractTable::FindFaction(int32 Faction) const
 	return Factions.IsValidIndex(Faction) ? &Factions[Faction] : nullptr;
 }
 
-int32 FEIContractTable::GetGold(int32 Stage) const
+int32 FEIContractTable::GetGold() const
 {
-	return FMath::RoundToInt32(Gold * (1.0f + CorruptionBonusPerStage * Stage));
+	return FMath::RoundToInt32(Gold);
 }
 
-int32 FEIContractTable::GetPoints(int32 Stage) const
+int32 FEIContractTable::GetPoints() const
 {
-	return FMath::RoundToInt32(Points * (1.0f + CorruptionBonusPerStage * Stage));
+	return FMath::RoundToInt32(Points);
 }
 
 int32 FEIContractTable::GetKeptOnFailure(int32 Amount) const

@@ -173,9 +173,6 @@ public:
 	/** Server only. Leaves the element on the enemy for a while, or sets off what it does with the one already there. */
 	EEIReaction MarkElement(EEIElement Element, float WindowSeconds);
 
-	/** Server only. More life and more damage, for enemies that come later in a run. */
-	void ApplyStrength(float Factor);
-
 	virtual void Tick(float DeltaSeconds) override;
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

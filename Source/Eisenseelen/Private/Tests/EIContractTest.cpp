@@ -28,7 +28,7 @@ bool FEIContractDataTest::RunTest(const FString& Parameters)
 
 	// A small table, to see that the rules are kept.
 	const FString Valid = TEXT("{\"auftraege_pro_lauf\": 3, \"mindestabstand_m\": 40, \"gold\": 100, \"punkte\": 10, ")
-		TEXT("\"verderbnis_bonus_je_stufe\": 0.1, \"beim_scheitern_bleibt\": 0.3, ")
+		TEXT("\"beim_scheitern_bleibt\": 0.3, ")
 		TEXT("\"fraktionen\": [{\"name\": \"Eins\", \"farbe\": [1, 0, 0]}, {\"name\": \"Zwei\", \"farbe\": [0, 1, 0]}, {\"name\": \"Drei\", \"farbe\": [0, 0, 1]}], ")
 		TEXT("\"aufgaben\": [{\"art\": \"anfuehrer\", \"name\": \"Jagen\", \"kurz\": \"J\"}, {\"art\": \"schrein\", \"name\": \"Schrein\", \"kurz\": \"S\", \"halten_s\": 15, \"zone_m\": 6}, ")
 		TEXT("{\"art\": \"truhe\", \"name\": \"Truhe\", \"kurz\": \"T\"}, {\"art\": \"altar\", \"name\": \"Altar\", \"kurz\": \"A\", \"halten_s\": 30, \"zone_m\": 8}]}");
@@ -41,9 +41,8 @@ bool FEIContractDataTest::RunTest(const FString& Parameters)
 	TestNull(TEXT("A faction that does not exist is nothing"), Small.FindFaction(3));
 
 	// What a contract pays.
-	TestEqual(TEXT("At the start it pays the plain gold"), Small.GetGold(0), 100);
-	TestEqual(TEXT("Every stage of the corruption pays more gold"), Small.GetGold(3), 130);
-	TestEqual(TEXT("Every stage pays more points too"), Small.GetPoints(5), 15);
+	TestEqual(TEXT("It pays its gold"), Small.GetGold(), 100);
+	TestEqual(TEXT("It pays its points"), Small.GetPoints(), 10);
 	TestEqual(TEXT("A failed run keeps its share"), Small.GetKeptOnFailure(100), 30);
 	TestEqual(TEXT("And never rounds up"), Small.GetKeptOnFailure(25), 7);
 

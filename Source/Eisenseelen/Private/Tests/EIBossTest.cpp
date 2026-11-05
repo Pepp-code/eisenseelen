@@ -56,11 +56,7 @@ namespace
 		Values.SignalHoldSeconds = ShortHoldSeconds;
 		Run->ApplyValues(Values);
 		Run->GetContractTable().ContractsPerRun = 0.0f;
-		for (FEIGroupStage& Stage : Run->GetGroups().Stages)
-		{
-			Stage.Reinforcement.Empty();
-			Stage.AltarWave.Empty();
-		}
+		Run->GetGroups().AltarWave.Size.Empty();
 		for (FEIBossValues& Boss : Run->GetBossTable().Bosses)
 		{
 			Boss.Bannbruch.HoldSeconds = ShortHoldSeconds;
@@ -304,7 +300,7 @@ bool FEIBossRunTest::RunTest(const FString& Parameters)
 		Context.Test->TestFalse(TEXT("The fire still cannot burn"), GetState(Context)->CanLightSignal());
 		Context.Test->TestFalse(TEXT("It has noticed the hero"), Boss->IsWatching());
 		const float Life = Boss->GetHealth()->GetHealth();
-		Context.Test->TestEqual(TEXT("Alone, without corruption, it has its plain life"), Life, Boss->GetBossValues()->Fight.Life);
+		Context.Test->TestEqual(TEXT("Alone it has its plain life"), Life, Boss->GetBossValues()->Fight.Life);
 		Boss->TakeDamage(100.0f, FDamageEvent(), nullptr, Context.Hero);
 		Context.Test->TestEqual(TEXT("Now it can be hurt"), Boss->GetHealth()->GetHealth(), Life - 100.0f);
 		Boss->Freeze(5.0f);
@@ -491,10 +487,6 @@ bool FEIBossFightWavesTest::RunTest(const FString& Parameters)
 		Values.CampFactor = 0.0f;
 		Run->ApplyValues(Values);
 		Run->GetContractTable().ContractsPerRun = 0.0f;
-		for (FEIGroupStage& Stage : Run->GetGroups().Stages)
-		{
-			Stage.Reinforcement.Empty();
-		}
 		for (FEIBossValues& Boss : Run->GetBossTable().Bosses)
 		{
 			Boss.Bannbruch.HoldSeconds = 100.0f;

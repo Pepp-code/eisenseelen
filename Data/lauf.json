@@ -1,7 +1,6 @@
 {
 	"lager_faktor": 1,
 	"lager_radius_m": 3,
-	"lager_nachschub_ab_abstand_m": 40,
 	"truhe_reichweite_m": 3,
 	"truhe_zone_m": 10,
 	"truhe_waechter_abstand_m": 6,
@@ -17,8 +16,5 @@
 	"anfuehrer_art": "schildtraeger",
 	"anfuehrer_leben_faktor": 2.5,
 	"anfuehrer_schaden_faktor": 1.5,
-	"anfuehrer_groesse_faktor": 1.25,
-	"verderbnis_alle_s": 120,
-	"verderbnis_stufen": 6,
-	"verderbnis_gegner_staerke_je_stufe": 0.1
+	"anfuehrer_groesse_faktor": 1.25
 }

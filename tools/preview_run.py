@@ -87,14 +87,13 @@ def scenario():
     shot()
     yield AFTER_SHOT_SECONDS
 
-    # The sky on the way to the blood moon, and back for the rest of the pictures.
+    # The sky under the blood moon, and back for the rest of the pictures.
     stand_looking_at((0, 0), (4000, 0, 900))
-    for stage in (3, 6):
-        player().preview_corruption(stage)
-        yield 5.0
-        shot()
-        yield AFTER_SHOT_SECONDS
-    player().preview_corruption(0)
+    player().preview_blood_moon(True)
+    yield 5.0
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_blood_moon(False)
     yield 6.0
 
     # The overview of the side jobs.

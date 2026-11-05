@@ -220,9 +220,7 @@ namespace
 			return false;
 		}
 		if (!FEIDataFile::ReadNumber(**Rewards, TEXT("doppelt_erfahrung"), 0.0, 1000000.0, Out.Rewards.DuplicateExperience, OutError)
-			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("umkreis_m"), 1.0, 1000.0, Out.Rewards.RadiusMeters, OutError)
-			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("verderbnis_erfahrung_je_stufe"), 0.0, 100.0, Out.Rewards.ExperiencePerStage, OutError)
-			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("geschmiedet_ab_stufe"), 0.0, 100.0, Out.Rewards.ForgedFromStage, OutError))
+			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("umkreis_m"), 1.0, 1000.0, Out.Rewards.RadiusMeters, OutError))
 		{
 			return false;
 		}

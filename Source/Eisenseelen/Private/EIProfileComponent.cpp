@@ -326,17 +326,6 @@ void UEIProfileComponent::ApplyTo(AEIHeroCharacter* Hero)
 	Hero->GetGear()->SetSetup(bHasSetups ? ServerSetups[bArcanist ? 1 : 0] : MakeStartSetup(bArcanist));
 }
 
-int32 UEIProfileComponent::GetCorruptionStage() const
-{
-	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	return State != nullptr ? State->GetCorruptionStage() : 0;
-}
-
-int32 UEIProfileComponent::ScaleExperience(float Experience) const
-{
-	return FMath::RoundToInt32(Experience * (1.0f + Table.Rewards.ExperiencePerStage * GetCorruptionStage()));
-}
-
 int32 UEIProfileComponent::RollItem(int32 Quality)
 {
 	const AEIHeroCharacter* Hero = GetPlayer()->GetPawn<AEIHeroCharacter>();
@@ -387,9 +376,9 @@ int32 UEIProfileComponent::RollItem(int32 Quality)
 
 void UEIProfileComponent::GrantEnemyReward(float Experience, float ItemChance)
 {
-	const int32 Quality = GetCorruptionStage() >= FMath::RoundToInt32(Table.Rewards.ForgedFromStage) ? 1 : 0;
-	const int32 Item = FMath::FRand() < ItemChance ? RollItem(Quality) : INDEX_NONE;
-	ClientReceiveReward(Item, Quality, ScaleExperience(Experience));
+	constexpr int32 PlainQuality = 0;
+	const int32 Item = FMath::FRand() < ItemChance ? RollItem(PlainQuality) : INDEX_NONE;
+	ClientReceiveReward(Item, PlainQuality, FMath::RoundToInt32(Experience));
 }
 
 void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Item, int32 Quality, int32 Experience)
