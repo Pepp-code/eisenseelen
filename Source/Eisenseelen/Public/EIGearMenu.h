@@ -49,11 +49,16 @@ public:
 	EEISlot GetSelectedSlot() const { return SelectedSlot; }
 	void SelectSlot(EEISlot Slot) { SelectedSlot = Slot; }
 
+	/** Whether the loot book shows instead of the gear. */
+	bool IsShowingLootBook() const { return bShowLootBook; }
+	void ShowLootBook(bool bShow) { bShowLootBook = bShow; }
+
 private:
 	void AddText(float X, float Y, const FString& Text, const FLinearColor& Color, float Scale = 1.0f);
 	void AddBox(float X, float Y, float Width, float Height, const FLinearColor& Color);
 	void AddButton(float X, float Y, float Width, float Height, const FString& Text, const FLinearColor& TextColor, bool bActive, float MouseX, float MouseY, TFunction<void()> OnClick);
 
+	void BuildLootBook(const UEIProfileComponent& Profile, float Left, float Top, float InnerWidth);
 	void BuildSlots(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
 	int32 BuildChoices(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
 	void BuildSums(const UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, float X, float Y);
@@ -62,4 +67,5 @@ private:
 
 	TArray<FEIMenuElement> Elements;
 	EEISlot SelectedSlot = EEISlot::Weapon;
+	bool bShowLootBook = false;
 };

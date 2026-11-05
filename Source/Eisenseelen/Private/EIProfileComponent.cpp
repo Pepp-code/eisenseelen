@@ -65,6 +65,10 @@ void UEIProfileComponent::LoadTable()
 	{
 		FEIDataFile::ReportError(TEXT("nebenauftraege.json"), Error);
 	}
+	if (!FEIBossTable::LoadFromProjectFile(BossTable, Error))
+	{
+		FEIDataFile::ReportError(TEXT("bosse.json"), Error);
+	}
 }
 
 void UEIProfileComponent::LoadSave()
@@ -440,6 +444,8 @@ void UEIProfileComponent::ClientReceiveBossLoot_Implementation(const FString& Bo
 {
 	RunGold += Gold;
 	RunIngredients.Append(Ingredients);
+	// Seen is seen: the loot book names it from now on, even if the run fails.
+	Save.FoundIngredients.Append(Ingredients);
 	FString Note = FString::Printf(TEXT("%s ist gefallen: +%d Gold"), *BossName, Gold);
 	for (const FString& Ingredient : Ingredients)
 	{

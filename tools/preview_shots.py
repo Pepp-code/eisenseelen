@@ -158,6 +158,11 @@ def scenario():
     yield 0.2
     shot()
     yield AFTER_SHOT_SECONDS
+    player().preview_loot_book(True)
+    yield 0.2
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_loot_book(False)
     yield from tap("I")
     yield 0.1
 

@@ -31,6 +31,12 @@ namespace
 	constexpr float ColumnGap = 22.0f;
 	constexpr float NearlyNothing = 0.0001f;
 	constexpr float PointButtonWidth = 122.0f;
+	constexpr float PageButtonWidth = 160.0f;
+	constexpr int32 BookColumns = 3;
+	constexpr float BookNameScale = 1.25f;
+	constexpr float BossNameBrighten = 0.4f;
+	constexpr float BookChanceShare = 0.55f;
+	constexpr float BookStockShare = 0.76f;
 
 	/** The values of an item at a quality, added to what stands in the array. */
 	void AddItemStats(const FEIItemTable& Table, int32 Item, int32 Quality, float Sign, float (&Sums)[EIStatCount])
@@ -103,6 +109,14 @@ void FEIGearMenu::Build(UEIProfileComponent& Profile, const AEIHeroCharacter& He
 	const float Left = PageX + PagePadding;
 	const float Top = PageY + PagePadding;
 	const float InnerWidth = PageWidth - PagePadding * 2.0f;
+	AddButton(Left + InnerWidth - PageButtonWidth, Top, PageButtonWidth, RowHeight, bShowLootBook ? TEXT("Ausrüstung") : TEXT("Beutebuch"), NormalColor, false, MouseX, MouseY,
+		[this]() { bShowLootBook = !bShowLootBook; });
+	if (bShowLootBook)
+	{
+		BuildLootBook(Profile, Left, Top, InnerWidth);
+		return;
+	}
+
 	const bool bArcanist = Profile.GetCurrentClass() == EEIHeroClass::Arcanist;
 	AddText(Left, Top, FString::Printf(TEXT("Ausrüstung: %s"), bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht")), TitleColor, TitleScale);
 	const FString Hint = Profile.IsFreeChoice()
@@ -296,6 +310,62 @@ void FEIGearMenu::BuildAttributes(UEIProfileComponent& Profile, float X, float B
 		AddButton(X + PointButtonWidth + RowGap, RowY, PointButtonWidth, RowHeight, FString::Printf(TEXT("+ %s"), *Attribute.Name), NormalColor, false, MouseX, MouseY, [ProfilePointer, Index]() { ProfilePointer->ChangeAttribute(Index, 1); });
 		AddText(X + (PointButtonWidth + RowGap) * 2.0f + TextInset, RowY + TextDrop, FString::Printf(TEXT("%d: %s"), Points, *EIDescribeStat(Attribute.Stat, Attribute.PerPoint * Points)), NormalColor);
 		RowY += RowHeight + RowGap;
+	}
+}
+
+void FEIGearMenu::BuildLootBook(const UEIProfileComponent& Profile, float Left, float Top, float InnerWidth)
+{
+	const FEIBossTable& Bosses = Profile.GetBossTable();
+	const FEISaveGame& Save = Profile.GetSave();
+	int32 Found = 0;
+	int32 Total = 0;
+	for (const FEIBossValues& Boss : Bosses.Bosses)
+	{
+		for (const FEILootItem& Item : Boss.Loot)
+		{
+			Found += Profile.HasFound(Item.Name) ? 1 : 0;
+			++Total;
+		}
+	}
+	AddText(Left, Top, TEXT("Beutebuch"), TitleColor, TitleScale);
+	AddText(Left, Top + LineHeight * 1.5f, FString::Printf(TEXT("%d von %d Zutaten gefunden. Was noch fehlt, steht als ???   I schließt"), Found, Total), QuietColor);
+	if (Bosses.Bosses.IsEmpty())
+	{
+		AddText(Left, Top + HeadHeight, TEXT("Noch kein Boss bekannt."), QuietColor);
+		return;
+	}
+
+	const float Width = (InnerWidth - ColumnGap * (BookColumns - 1)) / BookColumns;
+	float RowTop = Top + HeadHeight;
+	float RowBottom = RowTop;
+	for (int32 Index = 0; Index < Bosses.Bosses.Num(); ++Index)
+	{
+		const int32 Column = Index % BookColumns;
+		if (Index > 0 && Column == 0)
+		{
+			RowTop = RowBottom + LineHeight;
+		}
+		const FEIBossValues& Boss = Bosses.Bosses[Index];
+		const float X = Left + (Width + ColumnGap) * Column;
+		// Some bosses are dark, and the page is dark too.
+		const FLinearColor NameColor = FMath::Lerp(Boss.Color, FLinearColor::White, BossNameBrighten).CopyWithNewOpacity(1.0f);
+		AddText(X, RowTop, Boss.Name, NameColor, BookNameScale);
+		AddText(X, RowTop + LineHeight * 1.5f, FString::Printf(TEXT("Bannbruch: %s"), *Boss.Bannbruch.Name), QuietColor);
+		float LineY = RowTop + LineHeight * 2.75f;
+		for (const FEILootItem& Item : Boss.Loot)
+		{
+			const bool bFound = Profile.HasFound(Item.Name);
+			AddBox(X, LineY, Width, RowHeight, RowColor);
+			AddText(X + TextInset, LineY + TextDrop, bFound ? Item.Name : TEXT("???"), bFound ? NormalColor : QuietColor);
+			AddText(X + Width * BookChanceShare, LineY + TextDrop, Bosses.DescribeChance(Item.Chance), QuietColor);
+			const int32 Stock = Save.Ingredients.FindRef(Item.Name);
+			if (Stock > 0)
+			{
+				AddText(X + Width * BookStockShare, LineY + TextDrop, FString::Printf(TEXT("im Lager: %d"), Stock), NormalColor);
+			}
+			LineY += RowHeight + RowGap;
+		}
+		RowBottom = FMath::Max(RowBottom, LineY);
 	}
 }
 

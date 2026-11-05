@@ -89,6 +89,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewMenuSlot(int32 Slot);
 
+	/** For preview pictures: the open page shows the loot book, or the gear. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewLootBook(bool bShow);
+
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);
 

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "EIBosses.h"
 #include "EIContracts.h"
 #include "EIHeroCharacter.h"
 #include "EIItems.h"
@@ -35,6 +36,12 @@ public:
 	/** Owner only. */
 	const FEIItemTable& GetTable() const { return Table; }
 	const FEIContractTable& GetContractTable() const { return ContractTable; }
+
+	/** For the loot book: which boss can drop what. */
+	const FEIBossTable& GetBossTable() const { return BossTable; }
+
+	/** Owner only. Whether a boss has ever dropped this for the player. */
+	bool HasFound(const FString& Ingredient) const { return Save.FoundIngredients.Contains(Ingredient); }
 	FEISaveGame& GetSave() { return Save; }
 	const FEISaveGame& GetSave() const { return Save; }
 
@@ -146,6 +153,7 @@ private:
 
 	FEIItemTable Table;
 	FEIContractTable ContractTable;
+	FEIBossTable BossTable;
 	FEISaveGame Save;
 	bool bSent = false;
 	bool bSentFree = false;

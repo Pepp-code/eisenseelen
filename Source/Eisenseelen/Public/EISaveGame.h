@@ -30,6 +30,9 @@ struct EISENSEELEN_API FEISaveGame
 	/** Name of an ingredient and how many there are. */
 	TMap<FString, int32> Ingredients;
 
+	/** Every ingredient a boss has dropped for this player, even in a run that failed. Only these have a name in the loot book. */
+	TSet<FString> FoundIngredients;
+
 	/** Name of an item and its quality. Whatever stands in here is owned. */
 	TMap<FString, int32> Items;
 

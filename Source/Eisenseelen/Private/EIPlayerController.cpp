@@ -62,6 +62,7 @@ void AEIPlayerController::SetMenuOpen(bool bOpen)
 	bShowMouseCursor = bOpen;
 	if (bOpen)
 	{
+		Menu.ShowLootBook(false);
 		FInputModeGameAndUI Mode;
 		Mode.SetHideCursorDuringCapture(false);
 		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
@@ -103,6 +104,11 @@ void AEIPlayerController::HandleMap()
 void AEIPlayerController::PreviewMenuSlot(int32 Slot)
 {
 	Menu.SelectSlot(static_cast<EEISlot>(FMath::Clamp(Slot, 0, EISlotCount - 1)));
+}
+
+void AEIPlayerController::PreviewLootBook(bool bShow)
+{
+	Menu.ShowLootBook(bShow);
 }
 
 void AEIPlayerController::PreviewEquip(const FString& Name)

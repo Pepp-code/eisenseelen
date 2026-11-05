@@ -443,6 +443,8 @@ bool FEIBossRunTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("From its own set"), Profile->GetRunIngredients()[0], Values.Loot[0].Name);
 		Context.Test->TestTrue(TEXT("The screen says so"), Profile->GetRewardText().Contains(Values.Name) && Profile->GetRewardText().Contains(Values.Loot[0].Name));
 		Context.Test->TestEqual(TEXT("Nothing is safe yet"), Profile->GetSave().Ingredients.Num(), 0);
+		Context.Test->TestTrue(TEXT("But the loot book knows it now"), Profile->HasFound(Values.Loot[0].Name));
+		Context.Test->TestFalse(TEXT("Only what fell"), Profile->HasFound(Values.Loot[1].Name));
 		Context.Test->TestEqual(TEXT("The boss brings its experience"), Profile->GetRunExperience() - State->ExperienceBefore, FMath::RoundToInt32(Values.Fight.Experience));
 	}));
 
@@ -507,6 +509,10 @@ bool FEIBossRunTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("A share of the gold stays"), Profile->GetSave().Gold, State->ExperienceBefore + Contracts.GetKeptOnFailure(Profile->GetRunGold()));
 		Context.Test->TestEqual(TEXT("The first ingredient is as many as before"), Profile->GetSave().Ingredients.FindRef(Loot[0].Name), 1);
 		Context.Test->TestEqual(TEXT("All others are gone"), Profile->GetSave().Ingredients.Num(), 1);
+		for (const FEILootItem& Item : Loot)
+		{
+			Context.Test->TestTrue(*FString::Printf(TEXT("The loot book keeps %s even so"), *Item.Name), Profile->HasFound(Item.Name));
+		}
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

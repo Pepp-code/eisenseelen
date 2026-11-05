@@ -229,6 +229,7 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	Save.Gold = 1250;
 	Save.FactionPoints.Add(TEXT("Feuer"), 40);
 	Save.Ingredients.Add(TEXT("Glutkern"), 3);
+	Save.FoundIngredients.Add(TEXT("Grabkerze"));
 	Save.Items.Add(TEXT("Sturmrune"), 2);
 	Save.Classes[0].Slots[RuneSlot] = TEXT("Sturmrune");
 	Save.Classes[0].Attributes.Add(TEXT("Kraft"), 3);
@@ -243,6 +244,9 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("The gold stays"), Loaded.Gold, 1250);
 	TestEqual(TEXT("The points of a faction stay"), Loaded.FactionPoints.FindRef(TEXT("Feuer")), 40);
 	TestEqual(TEXT("The ingredients stay"), Loaded.Ingredients.FindRef(TEXT("Glutkern")), 3);
+	TestTrue(TEXT("What was found once stays found"), Loaded.FoundIngredients.Contains(TEXT("Grabkerze")));
+	TestTrue(TEXT("What is in the bag counts as found"), Loaded.FoundIngredients.Contains(TEXT("Glutkern")));
+	TestFalse(TEXT("Nothing else counts as found"), Loaded.FoundIngredients.Contains(TEXT("Seelenasche")));
 	TestEqual(TEXT("The quality stays"), Loaded.Items.FindRef(TEXT("Sturmrune")), 2);
 	TestEqual(TEXT("What is on stays on"), Loaded.Classes[0].Slots[RuneSlot], FString(TEXT("Sturmrune")));
 	TestEqual(TEXT("The points stay"), Loaded.Classes[0].Attributes.FindRef(TEXT("Kraft")), 3);
@@ -728,6 +732,34 @@ bool FEIGearMenuTest::RunTest(const FString& Parameters)
 		ClickOn(Context, TEXT("Qualit\u00E4t:"));
 		ClickOn(Context, TEXT("Qualit\u00E4t:"));
 		Context.Test->TestEqual(TEXT("After the best it starts over"), Gear(Context)->GetWornQuality(EEISlot::Weapon), 0);
+
+		// One page further lies the loot book.
+		ClickOn(Context, TEXT("Beutebuch"));
+		FEIGearMenu& Book = Page(Context);
+		const FEIBossTable& Bosses = Profile(Context)->GetBossTable();
+		Context.Test->TestTrue(TEXT("The button opens the loot book"), Book.IsShowingLootBook());
+		Context.Test->TestFalse(TEXT("The gear is gone from the page"), Book.Shows(TEXT("Waffe:")));
+		for (const FEIBossValues& Boss : Bosses.Bosses)
+		{
+			Context.Test->TestTrue(*FString::Printf(TEXT("The book names %s"), *Boss.Name), Book.Shows(Boss.Name));
+			Context.Test->TestTrue(*FString::Printf(TEXT("The book says how %s comes"), *Boss.Name), Book.Shows(FString::Printf(TEXT("Bannbruch: %s"), *Boss.Bannbruch.Name)));
+		}
+		const FEIBossValues& Caller = Bosses.Bosses.Last();
+		Context.Test->TestTrue(TEXT("What was never found is a riddle"), Book.Shows(TEXT("???")));
+		Context.Test->TestFalse(TEXT("Its name stays hidden"), Book.Shows(Caller.Loot[0].Name));
+		Context.Test->TestTrue(TEXT("The chance is only a word"), Book.Shows(Bosses.DescribeChance(Caller.Loot.Last().Chance)));
+		for (const FEIMenuElement& Element : Book.GetElements())
+		{
+			Context.Test->TestTrue(*FString::Printf(TEXT("%s fits on the screen"), *Element.Text), Element.X + Element.Width <= ScreenWidth && Element.Y + Element.Height <= ScreenHeight);
+		}
+		Profile(Context)->GetSave().FoundIngredients.Add(Caller.Loot[0].Name);
+		Profile(Context)->GetSave().Ingredients.Add(Caller.Loot[0].Name, 2);
+		Context.Test->TestTrue(TEXT("What was found has its name"), Page(Context).Shows(Caller.Loot[0].Name));
+		Context.Test->TestTrue(TEXT("And the book says how many are in store"), Page(Context).Shows(TEXT("im Lager: 2")));
+		Context.Test->TestTrue(TEXT("The book counts what was found"), Page(Context).Shows(TEXT("1 von ")));
+		ClickOn(Context, TEXT("Ausr\u00FCstung"));
+		Context.Test->TestFalse(TEXT("The other button leads back"), Context.Player->GetMenu().IsShowingLootBook());
+		Context.Test->TestTrue(TEXT("The gear is there again"), Page(Context).Shows(TEXT("Waffe:")));
 	}));
 
 	// C still works with the page open, and the page follows.
@@ -744,6 +776,7 @@ bool FEIGearMenuTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.1));
 
 	// I closes it, and the hero is free again.
+	Steps.Add(Do([ClickOn](const FEIPlayContext& Context) { ClickOn(Context, TEXT("Beutebuch")); }));
 	AddTap(Steps, EKeys::I);
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
@@ -757,6 +790,17 @@ bool FEIGearMenuTest::RunTest(const FString& Parameters)
 	{
 		Context.Test->TestTrue(TEXT("Now the hero swings again"), Context.Hero->GetSword()->IsSwinging());
 	}));
+
+	// Opened again, the page starts with the gear, even if it was closed on the loot book.
+	Steps.Add(Wait(1.0));
+	AddTap(Steps, EKeys::I);
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("I opens the page again"), Context.Player->IsMenuOpen());
+		Context.Test->TestFalse(TEXT("It starts with the gear"), Context.Player->GetMenu().IsShowingLootBook());
+	}));
+	AddTap(Steps, EKeys::I);
 	return RunInArena(this, MoveTemp(Steps));
 }
 

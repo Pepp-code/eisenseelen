@@ -1,6 +1,7 @@
 #include "EISaveGame.h"
 
 #include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "EIDataFile.h"
 #include "HAL/FileManager.h"
 #include "Misc/CommandLine.h"
@@ -101,6 +102,14 @@ FString FEISaveGame::ToJson() const
 		Found->SetNumberField(Pair.Key, Pair.Value);
 	}
 	Root->SetObjectField(TEXT("zutaten"), Found);
+	TArray<FString> Seen = FoundIngredients.Array();
+	Seen.Sort();
+	TArray<TSharedPtr<FJsonValue>> SeenValues;
+	for (const FString& Name : Seen)
+	{
+		SeenValues.Add(MakeShared<FJsonValueString>(Name));
+	}
+	Root->SetArrayField(TEXT("gefundene_zutaten"), SeenValues);
 
 	const TSharedRef<FJsonObject> Owned = MakeShared<FJsonObject>();
 	for (const TPair<FString, int32>& Pair : Items)
@@ -175,6 +184,24 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 			Pair.Value->TryGetNumber(Amount);
 			Loaded.Ingredients.Add(Pair.Key, FMath::RoundToInt32(Amount));
 		}
+	}
+	// Whatever is in the bag has been found, also in a file from before the loot book.
+	Loaded.FoundIngredients.Reset();
+	const TArray<TSharedPtr<FJsonValue>>* Seen = nullptr;
+	if (Root->TryGetArrayField(TEXT("gefundene_zutaten"), Seen))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *Seen)
+		{
+			FString Name;
+			if (Value->TryGetString(Name) && !Name.IsEmpty())
+			{
+				Loaded.FoundIngredients.Add(Name);
+			}
+		}
+	}
+	for (const TPair<FString, int32>& Pair : Loaded.Ingredients)
+	{
+		Loaded.FoundIngredients.Add(Pair.Key);
 	}
 	const TSharedPtr<FJsonObject>* Arena = nullptr;
 	const bool bHasArena = Root->TryGetObjectField(TEXT("testarena"), Arena);
