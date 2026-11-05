@@ -9,6 +9,7 @@
 #include "EIHeroCharacter.h"
 #include "EIRunDirector.h"
 #include "EIVisuals.h"
+#include "Engine/DamageEvents.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -269,6 +270,19 @@ void AEIBoss::UpdateShield()
 	Summons.Reset();
 	NextSummonAt = Now + (Boss != nullptr ? Boss->Summon.EverySeconds : 0.0f);
 	EIVisuals::PlaySoundAt(this, TEXT("Blocken"), GetActorLocation());
+}
+
+void AEIBoss::DefeatSummons()
+{
+	const TArray<TWeakObjectPtr<AEIEnemy>> Called = Summons;
+	for (const TWeakObjectPtr<AEIEnemy>& Enemy : Called)
+	{
+		if (Enemy.IsValid() && !Enemy->IsDead())
+		{
+			Enemy->TakeDamage(100000000.0f, FDamageEvent(), nullptr, nullptr);
+		}
+	}
+	UpdateShield();
 }
 
 bool AEIBoss::StartVanish()

@@ -192,6 +192,7 @@ void AEIPlayerController::PreviewDefeatBoss()
 {
 	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>(); GameMode != nullptr && GameMode->GetRun()->GetBoss() != nullptr)
 	{
+		GameMode->GetRun()->GetBoss()->DefeatSummons();
 		GameMode->GetRun()->GetBoss()->TakeDamage(100000000.0f, FDamageEvent(), nullptr, nullptr);
 	}
 }

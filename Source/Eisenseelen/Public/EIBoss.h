@@ -52,6 +52,9 @@ public:
 	/** For tests and preview pictures: its next summon or vanish starts as soon as it can. */
 	void HurryMoves();
 
+	/** For preview pictures: its summoned group falls at once, and the shield with it. */
+	void DefeatSummons();
+
 	virtual bool IsBoss() const override { return true; }
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

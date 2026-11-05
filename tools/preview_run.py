@@ -284,8 +284,12 @@ def scenario():
     shot()
     yield AFTER_SHOT_SECONDS
 
-    # After the flight the gear page shows what stays.
+    # After the flight the gear page shows what stays, and the loot book knows what fell.
     yield from tap("I")
+    yield 0.2
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_loot_book(True)
     yield 0.2
     shot()
     yield AFTER_SHOT_SECONDS
