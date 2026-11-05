@@ -334,9 +334,9 @@ Du stellst alles zuerst für einen Spieler ein. Die Zeilen für 2–4 Spieler si
 Die Anlegestelle ist eine kleine begehbare graue Plattform über den Wolken, mit der Barke und dem Brett für die Jagdbriefe. Alles andere bleibt ein Menü.
 
 - **Jagdbrett:** einen von 3 Jagdbriefen wählen, später auch die Schwierigkeit. Seit dem 5. November gebaut: F am Brett nimmt einen anderen Brief, und jeder Brief nennt einen anderen Boss.
-- **Ausrüstung und Schmiede:** Waffen und Rüstung mit Gold kaufen, mit Gold, Fraktionspunkten und Zutaten verbessern, Attributpunkte verteilen. Alles auf der Taste I.
+- **Ausrüstung und Schmiede:** Das Level öffnet Waffen und Rüstung in der Schmiede, gekauft wird mit Gold, verbessert mit Gold, Fraktionspunkten und Zutaten. Alles auf der Taste I.
 
-Jede Währung hat genau einen Zweck: **Gold** kauft und verbessert, **Fraktionspunkte** braucht jede Verbesserung, **seltene Zutaten** vom Boss die stärksten Verbesserungen, und **Erfahrung** von normalen Gegnern bringt Attributpunkte.
+Jede Währung hat genau einen Zweck: **Gold** kauft und verbessert, **Fraktionspunkte** braucht jede Verbesserung, **seltene Zutaten** vom Boss die stärksten Verbesserungen, und **Erfahrung** von normalen Gegnern bringt Level, die neue Teile in der Schmiede öffnen.
 
 | Spielzeit | Was erreicht sein soll |
 | --- | --- |

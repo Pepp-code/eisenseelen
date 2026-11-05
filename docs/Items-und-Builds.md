@@ -3,7 +3,7 @@
 
 # Items und Builds
 
-**Stand: 5. November 2026.** Der Ablauf wurde am 5. November noch einmal geändert und folgt jetzt enger dem Vorbild. Die Schritte A bis C sind gebaut: Anlegestelle, Überfahrt, 3 Nebenaufträge, das Signalfeuer, die Jagdbriefe, die zwei Bosse Der Gefesselte und Der Seelenrufer mit je einem Beute-Set und das Beutebuch. Noch nicht gebaut sind die Schmiede und alles danach. Bis zur Schmiede geben Gegner noch selten ein Item, und die drei Qualitäten sind noch da. Alle Zahlen sind erste Annahmen. Was schon gebaut ist, steht in Textdateien, die du selbst ändern kannst.
+**Stand: 5. November 2026.** Der Ablauf wurde am 5. November noch einmal geändert und folgt jetzt enger dem Vorbild. Die Schritte A bis D sind gebaut: Anlegestelle, Überfahrt, 3 Nebenaufträge, das Signalfeuer, die Jagdbriefe, die zwei Bosse Der Gefesselte und Der Seelenrufer mit je einem Beute-Set, das Beutebuch und die Schmiede. Attribute, die drei Qualitäten und Items von Gegnern sind raus. Noch nicht gebaut sind die Gravuren und alles danach. Alle Zahlen sind erste Annahmen. Was schon gebaut ist, steht in Textdateien, die du selbst ändern kannst.
 
 ## Kurzfassung
 
@@ -31,7 +31,7 @@ Der Masterplan schließt lange Nebenquests aus, weil sie beim Vorbild als sperri
 
 ## Anlegestelle, Barke und Signalfeuer
 
-Die Anlegestelle ist eine kleine graue Plattform über den Wolken, mit der Barke, dem Brett für die Jagdbriefe und später der Schmiede. Es gibt keinen Sprung mehr. Die Barke legt erst ab, wenn alle an Bord sind, und jedes Gebiet hat 3 bis 4 feste Ankunftsorte am Rand, von denen das Spiel einen wählt. Zuerst liegen Anlegestelle und Gebiete weit auseinander auf derselben Karte, und das Laden ist eine Überblendung. Echtes Laden kommt erst, wenn die Karten nicht mehr grau sind.
+Die Anlegestelle ist eine kleine graue Plattform über den Wolken, mit der Barke, dem Brett für die Jagdbriefe und der Schmiede. Es gibt keinen Sprung mehr. Die Barke legt erst ab, wenn alle an Bord sind, und jedes Gebiet hat 3 bis 4 feste Ankunftsorte am Rand, von denen das Spiel einen wählt. Zuerst liegen Anlegestelle und Gebiete weit auseinander auf derselben Karte, und das Laden ist eine Überblendung. Echtes Laden kommt erst, wenn die Karten nicht mehr grau sind.
 
 Das Signalfeuer ist der einzige Abholpunkt. Jedes Gebiet hat 3 bis 4 feste Orte mit genug Platz für die Barke. Das Spiel wählt pro Lauf einen, weit weg vom Boss, und du siehst ihn von Anfang an auf der Karte. Bis der Boss fällt, bleibt das Feuer kalt.
 
@@ -59,7 +59,7 @@ Jede Währung hat genau einen Zweck. Items fallen nicht mehr und kommen auch nic
 | Gold | Nebenaufträge, sehr viel vom Boss | Waffen und Rüstung kaufen, Gravuren bezahlen |
 | Fraktionspunkte (Feuer, Frost, Blitz, Wind) | Nur aus Nebenaufträgen der jeweiligen Fraktion | Gravuren von Waffen und Rüstung dieser Fraktion |
 | Seltene Zutaten | Nur vom Boss, aus seinem Beute-Set | Meisterstücke und die letzte Stufe der Rüstung |
-| Erfahrung | Normale Gegner | Level und Attributpunkte |
+| Erfahrung | Normale Gegner | Level, und jedes Level öffnet neue Teile in der Schmiede |
 
 Jeder Boss hat ein eigenes Beute-Set in einer Textdatei. Gold gibt es immer, jede Zutat hat ihre eigene Chance, und jeder Spieler würfelt für sich. Du siehst die Beute erst, wenn der Boss fällt. Ein erstes Beispiel:
 
@@ -90,7 +90,7 @@ Der Herzkristall ist das, was deiner Liste aus meiner Sicht noch fehlt. Rüstung
 
 ## Statuswerte
 
-Alle Boni zählen zusammen: Waffe, Rüstung, Kristall und Attribute landen in derselben Summe. Items mit Werten, die deiner Klasse nichts bringen, bietet dir die Schmiede für diese Klasse nicht an.
+Alle Boni zählen zusammen: Waffe, Rüstung und Kristall landen in derselben Summe. Dein Level macht dich nicht stärker, es öffnet nur neue Teile in der Schmiede. Items mit Werten, die deiner Klasse nichts bringen, bietet dir die Schmiede für diese Klasse nicht an.
 
 | Statuswert | Wirkung | Vor allem auf | Kommt mit |
 | --- | --- | --- | --- |
@@ -127,9 +127,9 @@ Deine Zauber werden auf fünf Wegen besser, und alle wirken zusammen:
 - **Regeln:** Meisterstücke, volle Rüstungs-Sets und später Herzkristalle ändern Zauber.
 - **Reaktionen:** Reaktionsschaden und die Kesselwacht stärken, was zwei Zauber gemeinsam auslösen.
 
-Deine Angriffskraft steigt über die Grundform und die Gravuren der Waffe, über Angriffskraft auf der Rüstung und über das Attribut Kraft. Angriffstempo und Aufladetempo machen dich zusätzlich schneller.
+Deine Angriffskraft steigt über die Grundform und die Gravuren der Waffe und über Angriffskraft auf der Rüstung. Angriffstempo und Aufladetempo machen dich zusätzlich schneller.
 
-**Rechenbeispiel:** Der Feuerball des Flammenschwerts macht 120 Schaden. Dazu kommen +10 % vom Schwert, +12 % vom Helm der Glutschmiede, +6 % von ihrem Brustpanzer und +12 % aus 6 Punkten Geist. Zusammen sind das +40 %, also 168 Schaden.
+**Rechenbeispiel:** Der Feuerball des Flammenschwerts macht 120 Schaden. Dazu kommen +10 % vom Schwert, +12 % vom Helm der Glutschmiede und +6 % von ihrem Brustpanzer. Zusammen sind das +28 %, also rund 154 Schaden.
 
 ## Waffen
 
@@ -259,16 +259,28 @@ Der Platz für den Kristall ist schon im Menü. Er bleibt leer, bis die Kristall
 | Paradekern | Eine Parade löst eine Druckwelle aus | Klingenwacht |
 | Opferkern | Schüsse kosten Leben statt Mana | Arkanist |
 
-## Erfahrung und Attribute
+## Erfahrung, Level und Schmiede
 
-Erfahrung bekommst du nur von normalen Gegnern, denn die bringen sonst nichts ein. Nebenaufträge geben keine. Jedes Level gibt einen Punkt, höchstens Level 20. Du kannst die Punkte jederzeit frei neu verteilen, denn Ausprobieren soll nichts kosten. Das Level gilt für beide Klassen, die Punkte verteilst du je Klasse getrennt.
+Erfahrung bekommst du nur von normalen Gegnern, denn die bringen sonst nichts ein. Nebenaufträge geben keine. Das höchste Level ist 20, und es gilt für beide Klassen. Ein Level macht dich nicht stärker. Es öffnet neue Waffen, Runen und Rüstungsteile in der Schmiede, und dort kaufst du sie mit Gold. Stärker wirst du also nur durch das, was du kaufst und trägst.
 
-| Attribut | Je Punkt |
-| --- | --- |
-| Kraft | +2 % Angriffskraft |
-| Geist | +2 % Zaubermacht |
-| Zähigkeit | +5 Leben |
-| Gewandtheit | +0,5 % Tempo |
+Die Schmiede steht an der Anlegestelle. Mit F öffnest du sie direkt, oder du wählst im Menü (Taste I) oben den Reiter „Schmiede“. Links stehen die Plätze, daneben alle Teile für diesen Platz: gekauft, kaufbar mit Preis, zu wenig Gold oder ab welchem Level. Gekauftes legst du im Reiter „Ausrüstung“ an. Kaufen geht nur an der Anlegestelle, nicht im Lauf. In der Testarena ist alles frei, dort musst du nichts kaufen.
+
+Was wann kommt, steht in Data/items.json bei jedem Teil unter `ab_level` und `preis_gold`. Die ersten Werte:
+
+| Level | Neu in der Schmiede | Preis |
+| --- | --- | --- |
+| 1 | Flammenschwert, Feuerstab und Frostrune hast du schon. Dazu die Glutschmiede-Rüstung | 300 bis 450 Gold je Teil |
+| 2 | Frostklinge, Froststab, Flammenrune | 800 Gold, Rune 600 |
+| 3 | Eisenwacht (Klingenwacht) und Quellwächter (Arkanist) | 300 bis 450 Gold je Teil |
+| 4 | Sturmklinge, Funkenstab, Sturmrune | 800 Gold, Rune 600 |
+| 5 | Frostwacht | 300 bis 450 Gold je Teil |
+| 6 | Glutsäbel, Reifsäbel, Funkensäbel | 900 Gold |
+| 7 | Henkersgarde (Klingenwacht) | 300 bis 450 Gold je Teil |
+| 8 | Aschenbrecher, Aschenzepter | 1.200 Gold |
+| 10 | Gletscherbrecher, Gletscherzepter | 1.200 Gold |
+| 12 | Donnerbrecher, Donnerzepter | 1.200 Gold |
+
+Steigst du ein Level auf, sagt dir eine Meldung, was in der Schmiede neu ist. Im Menü steht unten, was mit dem nächsten Level kommt.
 
 ## Woher alles kommt
 
@@ -306,12 +318,12 @@ Eine Runde ist wie im Masterplan etwa 2 Stunden deiner Zeit. Alles bleibt zuerst
 | A | Anlegestelle, Überfahrt, Ankunft, Signalfeuer, 3 Nebenaufträge | gebaut, wird zusammen mit B gespielt | 3–4 |
 | B | Boss-Grundlage, Der Gefesselte, Beute-Set, Verfolgung | gebaut. Trägt der ganze Lauf? | 5–6 |
 | C | Der Seelenrufer, Jagdbriefe, Beutebuch | gebaut. Wen jagst du? | 4–6 |
-| D | Schmiede: Waffen und Rüstung kaufen, Item-Belohnungen raus | Worauf sparst du? | 2 |
+| D | Schmiede: Waffen und Rüstung kaufen, Item-Belohnungen raus | gebaut. Worauf sparst du? | 2 |
 | E | Gravuren für Langschwert und Stab | Spürt man die Gravuren wirklich? | 3–4 |
 | F | Die Leere Wacht, 2 weitere graue Gebiete | Bleibt der Lauf abwechslungsreich? | 5–7 |
 | G | Meisterstücke, Rüstungs-Gravuren und 4-Teile-Regeln, weitere Waffen, Wind | Eigene Builds bauen | 12–17 |
 
-Das sind noch 22 bis 30 Runden, also 44 bis 60 Stunden deiner Zeit. Wie alle Zeiten im Plan kann das um die Hälfte danebenliegen. Nach Schritt B spielst du den ganzen Lauf, bevor Schmiede und Gravuren darauf aufbauen. Wird es dir zu viel, lassen sich die Leere Wacht und die weiteren Gebiete nach hinten schieben.
+Das sind noch 20 bis 28 Runden, also 40 bis 56 Stunden deiner Zeit. Wie alle Zeiten im Plan kann das um die Hälfte danebenliegen. Nach Schritt B spielst du den ganzen Lauf, bevor Schmiede und Gravuren darauf aufbauen. Wird es dir zu viel, lassen sich die Leere Wacht und die weiteren Gebiete nach hinten schieben.
 
 ## Risiken
 
@@ -351,6 +363,7 @@ Diese Ideen kommen auf die Ideenliste und nicht in die ersten Schritte:
 - Das Beutebuch zeigt je Boss die möglichen Zutaten, noch nicht gefundene als „???“.
 - Nebenaufträge stehen ab der Ankunft auf der Karte.
 - Wind wird das vierte Element.
+- Das Level macht dich nicht stärker, Attribute sind gestrichen. Jedes Level öffnet neue Waffen, Runen und Rüstung in der Schmiede, und die kaufst du mit Gold.
 
 Von mir festgelegt, du kannst es ändern:
 
@@ -361,4 +374,5 @@ Von mir festgelegt, du kannst es ändern:
 - **Beutebuch:** Eine Zutat gilt als gefunden, sobald sie fällt, nicht erst nach der Flucht.
 - **Weniger Briefe:** Solange es nur 2 Bosse gibt, hängen nur 2 Jagdbriefe am Brett, denn jeder Brief zeigt einen anderen Boss.
 - **Umkreis:** Für Nebenaufträge und normale Gegner zählt, wer im Umkreis von 40 m steht.
+- **Schmiede:** Preise und Level der Teile sind erste Annahmen. Ein gekauftes Teil legst du selbst an, es wird nicht sofort getragen.
 - **Level:** Level 2 braucht 100 Erfahrung, jede weitere Stufe 50 mehr. Level 20 liegt damit bei rund 10.500 Erfahrung.
