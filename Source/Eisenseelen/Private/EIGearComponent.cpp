@@ -48,12 +48,6 @@ const FEIItem* UEIGearComponent::GetWorn(EEISlot Slot) const
 	return Setup.Slots.IsValidIndex(Index) && Table.Items.IsValidIndex(Setup.Slots[Index].Item) ? &Table.Items[Setup.Slots[Index].Item] : nullptr;
 }
 
-int32 UEIGearComponent::GetWornQuality(EEISlot Slot) const
-{
-	const int32 Index = static_cast<int32>(Slot);
-	return Setup.Slots.IsValidIndex(Index) ? Setup.Slots[Index].Quality : 0;
-}
-
 const FEIWeaponForm* UEIGearComponent::GetWeaponForm() const
 {
 	const FEIItem* Weapon = GetWorn(EEISlot::Weapon);
@@ -76,29 +70,24 @@ float UEIGearComponent::GetElementBonus(EEIElement Element) const
 	}
 }
 
-float UEIGearComponent::GetWeaponQualityFactor() const
-{
-	return Table.GetQualityFactor(GetWornQuality(EEISlot::Weapon));
-}
-
 float UEIGearComponent::GetSwordFactor() const
 {
-	return GetWeaponQualityFactor() * (1.0f + GetStat(EEIStat::AttackPower));
+	return 1.0f + GetStat(EEIStat::AttackPower);
 }
 
 float UEIGearComponent::GetShotFactor() const
 {
-	return GetWeaponQualityFactor() * (1.0f + GetStat(EEIStat::AttackPower) + GetElementBonus(GetWeaponElement()));
+	return 1.0f + GetStat(EEIStat::AttackPower) + GetElementBonus(GetWeaponElement());
 }
 
 float UEIGearComponent::GetSpellFactor() const
 {
-	return GetWeaponQualityFactor() * (1.0f + GetStat(EEIStat::SpellPower) + GetElementBonus(GetWeaponElement()));
+	return 1.0f + GetStat(EEIStat::SpellPower) + GetElementBonus(GetWeaponElement());
 }
 
 float UEIGearComponent::GetRuneFactor(EEIElement Element) const
 {
-	return Table.GetQualityFactor(GetWornQuality(EEISlot::Rune)) * (1.0f + GetStat(EEIStat::SpellPower) + GetElementBonus(Element));
+	return 1.0f + GetStat(EEIStat::SpellPower) + GetElementBonus(Element);
 }
 
 float UEIGearComponent::GetCooldownFactor() const
@@ -134,10 +123,9 @@ void UEIGearComponent::Recalculate()
 		{
 			continue;
 		}
-		const float Factor = Table.GetQualityFactor(GetWornQuality(static_cast<EEISlot>(Slot)));
 		for (const FEIStatLine& Line : Item->Stats)
 		{
-			Add(Line.Stat, Line.Amount * Factor);
+			Add(Line.Stat, Line.Amount);
 		}
 		if (!Item->Set.IsEmpty())
 		{
@@ -153,10 +141,6 @@ void UEIGearComponent::Recalculate()
 				Add(Line.Stat, Line.Amount * (Pair.Value / 2));
 			}
 		}
-	}
-	for (int32 Index = 0; Index < Table.Attributes.Num() && Index < Setup.Attributes.Num(); ++Index)
-	{
-		Add(Table.Attributes[Index].Stat, Table.Attributes[Index].PerPoint * Setup.Attributes[Index]);
 	}
 	GetHero()->OnGearChanged();
 }

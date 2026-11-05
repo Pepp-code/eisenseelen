@@ -12,6 +12,7 @@ class AEIBoss;
 class AEIChest;
 class AEIEnemy;
 class AEIEnemyCamp;
+class AEIForge;
 class AEIHeroCharacter;
 class AEIHuntBoard;
 class AEISignalFire;
@@ -37,6 +38,7 @@ struct EISENSEELEN_API FEIRunValues
 	float BargeDistanceMeters = 12.0f;
 	float BargeDepartMetersPerSecond = 6.0f;
 	float HuntBoardReachMeters = 4.0f;
+	float ForgeReachMeters = 4.0f;
 	EEIEnemyKind LeaderKind = EEIEnemyKind::ShieldBearer;
 	float LeaderLifeFactor = 2.5f;
 	float LeaderDamageFactor = 1.5f;
@@ -86,6 +88,7 @@ public:
 	const TArray<TObjectPtr<AEIAnchorStone>>& GetAnchors() const { return Anchors; }
 	AEISoulKettle* GetKettle() const { return Kettle; }
 	AEIHuntBoard* GetHuntBoard() const { return HuntBoard; }
+	AEIForge* GetForge() const { return Forge; }
 
 	/** Puts everything back to the dock, with new contracts and new hunt letters. */
 	void ResetRun();
@@ -130,6 +133,7 @@ private:
 	void PrepareContracts();
 	void PrepareSignalFire();
 	void PrepareHuntBoard();
+	void PrepareForge();
 	void SetBossIndex(int32 NewBossIndex);
 	void SpawnLeaders();
 	void SpawnBoss(int32 HeroCount);
@@ -175,10 +179,14 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<AEIHuntBoard> HuntBoard;
 
+	UPROPERTY(Transient)
+	TObjectPtr<AEIForge> Forge;
+
 	FEIBossTable BossTable;
 	FString AreaName;
 	FVector DockCenter = FVector::ZeroVector;
 	FVector HuntBoardPlace = FVector::ZeroVector;
+	FVector ForgePlace = FVector::ZeroVector;
 	bool bHasDock = false;
 	bool bKettleHeld = false;
 	TArray<FVector> BossPlaces;

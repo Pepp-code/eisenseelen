@@ -30,29 +30,51 @@ namespace
 	constexpr float ChoicesShare = 0.33f;
 	constexpr float ColumnGap = 22.0f;
 	constexpr float NearlyNothing = 0.0001f;
-	constexpr float PointButtonWidth = 122.0f;
-	constexpr float PageButtonWidth = 160.0f;
+	constexpr float TabWidth = 160.0f;
+	constexpr float TabsHeight = RowHeight + 12.0f;
+	constexpr int32 NamedUnlocks = 3;
 	constexpr int32 BookColumns = 3;
 	constexpr float BookNameScale = 1.25f;
 	constexpr float BossNameBrighten = 0.4f;
 	constexpr float BookChanceShare = 0.55f;
 	constexpr float BookStockShare = 0.76f;
 
-	/** The values of an item at a quality, added to what stands in the array. */
-	void AddItemStats(const FEIItemTable& Table, int32 Item, int32 Quality, float Sign, float (&Sums)[EIStatCount])
+	/** The values of an item, added to what stands in the array. */
+	void AddItemStats(const FEIItemTable& Table, int32 Item, float Sign, float (&Sums)[EIStatCount])
 	{
 		if (Table.Items.IsValidIndex(Item))
 		{
 			for (const FEIStatLine& Line : Table.Items[Item].Stats)
 			{
-				Sums[static_cast<int32>(Line.Stat)] += Sign * Line.Amount * Table.GetQualityFactor(Quality);
+				Sums[static_cast<int32>(Line.Stat)] += Sign * Line.Amount;
 			}
 		}
 	}
 
 	FString ItemLabel(const FEIItemTable& Table, const FEIWornItem& Worn)
 	{
-		return Table.Items.IsValidIndex(Worn.Item) ? FString::Printf(TEXT("%s (%s)"), *Table.Items[Worn.Item].Name, *Table.GetQualityName(Worn.Quality)) : FString(TEXT("leer"));
+		return Table.Items.IsValidIndex(Worn.Item) ? Table.Items[Worn.Item].Name : FString(TEXT("leer"));
+	}
+
+	/** What the forge says about an item in its list. */
+	FString OfferLabel(const UEIProfileComponent& Profile, int32 Item)
+	{
+		const FEIItem& Entry = Profile.GetTable().Items[Item];
+		if (Profile.IsFreeChoice())
+		{
+			return FString::Printf(TEXT("%s \u2013 ab Level %d, %d Gold"), *Entry.Name, Entry.FromLevel, Entry.Price);
+		}
+		switch (Profile.GetOffer(Item))
+		{
+		case EEIOffer::Owned:
+			return FString::Printf(TEXT("%s \u2013 gekauft"), *Entry.Name);
+		case EEIOffer::Locked:
+			return FString::Printf(TEXT("%s \u2013 ab Level %d"), *Entry.Name, Entry.FromLevel);
+		case EEIOffer::TooPoor:
+			return FString::Printf(TEXT("%s \u2013 zu wenig Gold: %d"), *Entry.Name, Entry.Price);
+		default:
+			return FString::Printf(TEXT("%s \u2013 kaufen: %d Gold"), *Entry.Name, Entry.Price);
+		}
 	}
 }
 
@@ -107,13 +129,18 @@ void FEIGearMenu::Build(UEIProfileComponent& Profile, const AEIHeroCharacter& He
 	AddBox(PageX, PageY, PageWidth, PageHeight, PageColor);
 
 	const float Left = PageX + PagePadding;
-	const float Top = PageY + PagePadding;
 	const float InnerWidth = PageWidth - PagePadding * 2.0f;
-	AddButton(Left + InnerWidth - PageButtonWidth, Top, PageButtonWidth, RowHeight, bShowLootBook ? TEXT("Ausrüstung") : TEXT("Beutebuch"), NormalColor, false, MouseX, MouseY,
-		[this]() { bShowLootBook = !bShowLootBook; });
-	if (bShowLootBook)
+	const float Bottom = PageY + PageHeight - PagePadding;
+	BuildTabs(Left, PageY + PagePadding, MouseX, MouseY);
+	const float Top = PageY + PagePadding + TabsHeight;
+	if (Page == EEIMenuPage::LootBook)
 	{
 		BuildLootBook(Profile, Left, Top, InnerWidth);
+		return;
+	}
+	if (Page == EEIMenuPage::Forge)
+	{
+		BuildForge(Profile, Hero, Left, Top, InnerWidth, Bottom, MouseX, MouseY);
 		return;
 	}
 
@@ -129,38 +156,181 @@ void FEIGearMenu::Build(UEIProfileComponent& Profile, const AEIHeroCharacter& He
 	const float ChoicesX = Left + SlotsWidth + ColumnGap;
 	const float ChoicesWidth = InnerWidth * ChoicesShare;
 	const float SumsX = ChoicesX + ChoicesWidth + ColumnGap;
-	if (!Profile.IsFreeChoice())
-	{
-		FString Purse = FString::Printf(TEXT("Gold %d"), Profile.GetSave().Gold);
-		for (const FEIFaction& Faction : Profile.GetContractTable().Factions)
-		{
-			Purse += FString::Printf(TEXT("   %s %d"), *Faction.Name, Profile.GetSave().FactionPoints.FindRef(Faction.Name));
-		}
-		AddText(ChoicesX, Top, Purse, TitleColor);
-		FString Ingredients;
-		for (const TPair<FString, int32>& Pair : Profile.GetSave().Ingredients)
-		{
-			Ingredients += FString::Printf(TEXT("%s%s %d"), Ingredients.IsEmpty() ? TEXT("Zutaten: ") : TEXT(", "), *Pair.Key, Pair.Value);
-		}
-		if (!Ingredients.IsEmpty())
-		{
-			AddText(ChoicesX, Top + LineHeight * 1.5f, Ingredients, NormalColor);
-		}
-	}
+	BuildPurse(Profile, ChoicesX, Top);
 	BuildSlots(Profile, Left, ColumnsTop, SlotsWidth, MouseX, MouseY);
 	const int32 Hovered = BuildChoices(Profile, ChoicesX, ColumnsTop, ChoicesWidth, MouseX, MouseY);
 	BuildSums(Profile, Hero, SumsX, ColumnsTop);
 	BuildComparison(Profile, Hero, Hovered, Left, ColumnsTop + (RowHeight + RowGap) * EISlotCount + LineHeight * 2.0f);
-	BuildAttributes(Profile, SumsX, PageY + PageHeight - PagePadding, MouseX, MouseY);
+	BuildLevel(Profile, SumsX, Bottom);
+}
 
+void FEIGearMenu::BuildTabs(float Left, float Top, float MouseX, float MouseY)
+{
+	struct FTab
+	{
+		EEIMenuPage Page;
+		const TCHAR* Name;
+	};
+	const FTab Tabs[] = {
+		{ EEIMenuPage::Gear, TEXT("Ausrüstung") },
+		{ EEIMenuPage::Forge, TEXT("Schmiede") },
+		{ EEIMenuPage::LootBook, TEXT("Beutebuch") },
+	};
+	float X = Left;
+	for (const FTab& Tab : Tabs)
+	{
+		const EEIMenuPage Target = Tab.Page;
+		AddButton(X, Top, TabWidth, RowHeight, Tab.Name, Target == Page ? TitleColor : NormalColor, Target == Page, MouseX, MouseY, [this, Target]() { Page = Target; });
+		X += TabWidth + RowGap;
+	}
+}
+
+void FEIGearMenu::BuildPurse(const UEIProfileComponent& Profile, float X, float Y)
+{
 	if (Profile.IsFreeChoice())
 	{
-		const int32 Quality = Profile.GetSave().ArenaQuality;
-		const int32 Count = FMath::Max(Profile.GetTable().QualityFactors.Num(), 1);
-		UEIProfileComponent* ProfilePointer = &Profile;
-		AddButton(Left, PageY + PageHeight - PagePadding - RowHeight, SlotsWidth, RowHeight, FString::Printf(TEXT("Qualität: %s"), *Profile.GetTable().GetQualityName(Quality)), NormalColor, false, MouseX, MouseY,
-			[ProfilePointer, Quality, Count]() { ProfilePointer->SetArenaQuality((Quality + 1) % Count); });
+		return;
 	}
+	FString Purse = FString::Printf(TEXT("Gold %d"), Profile.GetSave().Gold);
+	for (const FEIFaction& Faction : Profile.GetContractTable().Factions)
+	{
+		Purse += FString::Printf(TEXT("   %s %d"), *Faction.Name, Profile.GetSave().FactionPoints.FindRef(Faction.Name));
+	}
+	AddText(X, Y, Purse, TitleColor);
+	FString Ingredients;
+	for (const TPair<FString, int32>& Pair : Profile.GetSave().Ingredients)
+	{
+		Ingredients += FString::Printf(TEXT("%s%s %d"), Ingredients.IsEmpty() ? TEXT("Zutaten: ") : TEXT(", "), *Pair.Key, Pair.Value);
+	}
+	if (!Ingredients.IsEmpty())
+	{
+		AddText(X, Y + LineHeight * 1.5f, Ingredients, NormalColor);
+	}
+}
+
+void FEIGearMenu::BuildLevel(const UEIProfileComponent& Profile, float X, float Bottom)
+{
+	const FEIItemTable& Table = Profile.GetTable();
+	const int32 Level = Profile.GetLevel();
+	FString Head;
+	if (Profile.IsFreeChoice())
+	{
+		Head = TEXT("Testarena: jedes Level und jedes Teil ist frei");
+	}
+	else if (Level >= FMath::RoundToInt32(Table.MaxLevel))
+	{
+		Head = FString::Printf(TEXT("Level %d, das höchste Level"), Level);
+	}
+	else
+	{
+		Head = FString::Printf(TEXT("Level %d, %d von %d Erfahrung"), Level, Profile.GetSave().Experience, Table.GetExperienceForLevel(Level + 1));
+	}
+	TArray<int32> Next;
+	const int32 NextLevel = Profile.IsFreeChoice() ? 0 : Profile.GetNextUnlockLevel(Next);
+	if (NextLevel <= 0)
+	{
+		AddText(X, Bottom - LineHeight, Head, TitleColor);
+		return;
+	}
+	// One name per line, because the column is narrow and the names are long.
+	TArray<FString> Lines;
+	Lines.Add(FString::Printf(TEXT("Ab Level %d in der Schmiede:"), NextLevel));
+	for (int32 Index = 0; Index < FMath::Min(Next.Num(), NamedUnlocks); ++Index)
+	{
+		Lines.Add(Table.Items[Next[Index]].Name);
+	}
+	if (Next.Num() > NamedUnlocks)
+	{
+		Lines.Add(FString::Printf(TEXT("und %d weitere"), Next.Num() - NamedUnlocks));
+	}
+	AddText(X, Bottom - LineHeight * (Lines.Num() + 1), Head, TitleColor);
+	for (int32 Index = 0; Index < Lines.Num(); ++Index)
+	{
+		AddText(X, Bottom - LineHeight * (Lines.Num() - Index), Lines[Index], NormalColor);
+	}
+}
+
+void FEIGearMenu::BuildForge(UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, float Left, float Top, float InnerWidth, float Bottom, float MouseX, float MouseY)
+{
+	const bool bArcanist = Profile.GetCurrentClass() == EEIHeroClass::Arcanist;
+	AddText(Left, Top, FString::Printf(TEXT("Schmiede: %s"), bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht")), TitleColor, TitleScale);
+	const FString Hint = Profile.IsFreeChoice()
+		? TEXT("Testarena: hier ist alles frei, kaufen musst du nichts.   C wechselt die Klasse   I schließt")
+		: TEXT("Dein Level öffnet neue Teile, mit Gold kaufst du sie.   C wechselt die Klasse   I schließt");
+	AddText(Left, Top + LineHeight * 1.5f, Hint, QuietColor);
+
+	const float ColumnsTop = Top + HeadHeight;
+	const float SlotsWidth = InnerWidth * SlotsShare;
+	const float OffersX = Left + SlotsWidth + ColumnGap;
+	const float OffersWidth = InnerWidth * ChoicesShare;
+	const float DetailsX = OffersX + OffersWidth + ColumnGap;
+	BuildPurse(Profile, OffersX, Top);
+	BuildForgeSlots(Profile, Left, ColumnsTop, SlotsWidth, MouseX, MouseY);
+	const int32 Hovered = BuildOffers(Profile, OffersX, ColumnsTop, OffersWidth, MouseX, MouseY);
+	if (Profile.GetTable().Items.IsValidIndex(Hovered))
+	{
+		const FEIItem& Entry = Profile.GetTable().Items[Hovered];
+		AddText(DetailsX, ColumnsTop, FString::Printf(TEXT("Ab Level %d, %d Gold"), Entry.FromLevel, Entry.Price), QuietColor);
+		BuildComparison(Profile, Hero, Hovered, DetailsX, ColumnsTop + LineHeight * 1.25f);
+	}
+	else
+	{
+		AddText(DetailsX, ColumnsTop, TEXT("Zeig mit der Maus auf ein Teil, dann steht hier, was es kann."), QuietColor);
+	}
+	BuildLevel(Profile, DetailsX, Bottom);
+}
+
+void FEIGearMenu::BuildForgeSlots(const UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY)
+{
+	AddText(X, Y, TEXT("Plätze"), TitleColor);
+	float RowY = Y + LineHeight * 1.25f;
+	for (int32 Index = 0; Index < EISlotCount; ++Index)
+	{
+		const EEISlot Slot = static_cast<EEISlot>(Index);
+		int32 Buyable = 0;
+		if (!Profile.IsFreeChoice())
+		{
+			for (const int32 Item : Profile.ListOffers(Slot))
+			{
+				Buyable += Profile.GetOffer(Item) == EEIOffer::Buyable ? 1 : 0;
+			}
+		}
+		const FString Text = Buyable > 0 ? FString::Printf(TEXT("%s: %d zu kaufen"), EISlotName(Slot), Buyable) : FString(EISlotName(Slot));
+		AddButton(X, RowY, Width, RowHeight, Text, Buyable > 0 ? BetterColor : NormalColor, Slot == SelectedSlot, MouseX, MouseY, [this, Slot]() { SelectedSlot = Slot; });
+		RowY += RowHeight + RowGap;
+	}
+}
+
+int32 FEIGearMenu::BuildOffers(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY)
+{
+	const EEISlot Slot = SelectedSlot;
+	AddText(X, Y, FString::Printf(TEXT("Teile für %s"), EISlotName(Slot)), TitleColor);
+	float RowY = Y + LineHeight * 1.25f;
+	const TArray<int32> Offers = Profile.ListOffers(Slot);
+	if (Offers.IsEmpty())
+	{
+		AddText(X + TextInset, RowY + TextDrop, Slot == EEISlot::Crystal ? TEXT("Herzkristalle kommen später.") : TEXT("Hier gibt es nichts für diese Klasse."), QuietColor);
+	}
+	const int32 Equipped = Profile.GetEquipped(Slot).Item;
+	UEIProfileComponent* ProfilePointer = &Profile;
+	int32 Hovered = INDEX_NONE;
+	for (const int32 Item : Offers)
+	{
+		const EEIOffer Offer = Profile.IsFreeChoice() ? EEIOffer::Owned : Profile.GetOffer(Item);
+		const FLinearColor Color = Offer == EEIOffer::Buyable ? BetterColor : (Offer == EEIOffer::Owned ? NormalColor : QuietColor);
+		TFunction<void()> OnClick;
+		if (Offer == EEIOffer::Buyable)
+		{
+			OnClick = [ProfilePointer, Item]() { ProfilePointer->Buy(Item); };
+		}
+		AddButton(X, RowY, Width, RowHeight, OfferLabel(Profile, Item), Color, Item == Equipped, MouseX, MouseY, MoveTemp(OnClick));
+		if (Elements.Last().Contains(MouseX, MouseY))
+		{
+			Hovered = Item;
+		}
+		RowY += RowHeight + RowGap;
+	}
+	return Hovered;
 }
 
 void FEIGearMenu::BuildSlots(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY)
@@ -188,7 +358,7 @@ int32 FEIGearMenu::BuildChoices(UEIProfileComponent& Profile, float X, float Y, 
 	const TArray<FEIWornItem> Choices = Profile.ListChoices(Slot);
 	if (Choices.IsEmpty())
 	{
-		AddText(X + TextInset, RowY + TextDrop, Slot == EEISlot::Crystal ? TEXT("Herzkristalle kommen später.") : TEXT("Noch nichts für diese Klasse gefunden."), QuietColor);
+		AddText(X + TextInset, RowY + TextDrop, Slot == EEISlot::Crystal ? TEXT("Herzkristalle kommen später.") : TEXT("Noch nichts für diese Klasse gekauft. Neues gibt es in der Schmiede."), QuietColor);
 	}
 	for (const FEIWornItem& Choice : Choices)
 	{
@@ -271,13 +441,8 @@ void FEIGearMenu::BuildComparison(const UEIProfileComponent& Profile, const AEIH
 	}
 
 	float Change[EIStatCount] = {};
-	int32 Quality = 0;
-	for (const FEIWornItem& Choice : Profile.ListChoices(SelectedSlot))
-	{
-		Quality = Choice.Item == Item ? Choice.Quality : Quality;
-	}
-	AddItemStats(Table, Item, Quality, 1.0f, Change);
-	AddItemStats(Table, Worn.Item, Worn.Quality, -1.0f, Change);
+	AddItemStats(Table, Item, 1.0f, Change);
+	AddItemStats(Table, Worn.Item, -1.0f, Change);
 	for (int32 Index = 0; Index < EIStatCount; ++Index)
 	{
 		if (FMath::Abs(Change[Index]) > NearlyNothing)
@@ -288,28 +453,6 @@ void FEIGearMenu::BuildComparison(const UEIProfileComponent& Profile, const AEIH
 			AddText(X, LineY, EIDescribeStat(Stat, Change[Index]), (Change[Index] > 0.0f) != bLessIsMore ? BetterColor : WorseColor);
 			LineY += LineHeight;
 		}
-	}
-}
-
-void FEIGearMenu::BuildAttributes(UEIProfileComponent& Profile, float X, float Bottom, float MouseX, float MouseY)
-{
-	const FEIItemTable& Table = Profile.GetTable();
-	const int32 Rows = Table.Attributes.Num();
-	float RowY = Bottom - (RowHeight + RowGap) * Rows;
-	const int32 Level = Profile.GetLevel();
-	const FString Head = Profile.IsFreeChoice() || Level >= FMath::RoundToInt32(Table.MaxLevel)
-		? FString::Printf(TEXT("Level %d, noch %d Punkte frei"), Level, Profile.GetFreePoints())
-		: FString::Printf(TEXT("Level %d, %d von %d Erfahrung, noch %d Punkte frei"), Level, Profile.GetSave().Experience, Table.GetExperienceForLevel(Level + 1), Profile.GetFreePoints());
-	AddText(X, RowY - LineHeight * 1.25f, Head, TitleColor);
-	UEIProfileComponent* ProfilePointer = &Profile;
-	for (int32 Index = 0; Index < Rows; ++Index)
-	{
-		const FEIAttribute& Attribute = Table.Attributes[Index];
-		const int32 Points = Profile.GetAttributePoints(Index);
-		AddButton(X, RowY, PointButtonWidth, RowHeight, FString::Printf(TEXT("- %s"), *Attribute.Name), NormalColor, false, MouseX, MouseY, [ProfilePointer, Index]() { ProfilePointer->ChangeAttribute(Index, -1); });
-		AddButton(X + PointButtonWidth + RowGap, RowY, PointButtonWidth, RowHeight, FString::Printf(TEXT("+ %s"), *Attribute.Name), NormalColor, false, MouseX, MouseY, [ProfilePointer, Index]() { ProfilePointer->ChangeAttribute(Index, 1); });
-		AddText(X + (PointButtonWidth + RowGap) * 2.0f + TextInset, RowY + TextDrop, FString::Printf(TEXT("%d: %s"), Points, *EIDescribeStat(Attribute.Stat, Attribute.PerPoint * Points)), NormalColor);
-		RowY += RowHeight + RowGap;
 	}
 }
 

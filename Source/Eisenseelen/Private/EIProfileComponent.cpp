@@ -12,6 +12,7 @@
 namespace
 {
 	constexpr float RewardNoteSeconds = 5.0f;
+	constexpr int32 NamedUnlocks = 3;
 
 	bool AllowsGearChange(EEIRunPhase Phase)
 	{
@@ -155,12 +156,10 @@ TArray<FEIWornItem> UEIProfileComponent::ListChoices(EEISlot Slot) const
 	for (int32 Index = 0; Index < Table.Items.Num(); ++Index)
 	{
 		const FEIItem& Item = Table.Items[Index];
-		const int32* Quality = Save.Items.Find(Item.Name);
-		if (Item.Slot == Slot && Item.FitsClass(bArcanist) && (bFree || Quality != nullptr))
+		if (Item.Slot == Slot && Item.FitsClass(bArcanist) && (bFree || Save.Items.Contains(Item.Name)))
 		{
 			FEIWornItem Choice;
 			Choice.Item = Index;
-			Choice.Quality = bFree ? Save.ArenaQuality : *Quality;
 			Choices.Add(Choice);
 		}
 	}
@@ -210,44 +209,111 @@ void UEIProfileComponent::EquipNext(EEISlot Slot)
 	Equip(Slot, Choices[(Place + 1) % Choices.Num()].Item);
 }
 
-void UEIProfileComponent::SetArenaQuality(int32 Quality)
-{
-	Save.ArenaQuality = FMath::Clamp(Quality, 0, FMath::Max(Table.QualityFactors.Num() - 1, 0));
-	WriteSave();
-	SendSetups();
-}
-
 int32 UEIProfileComponent::GetLevel() const
 {
 	return IsFreeChoice() ? FMath::RoundToInt32(Table.MaxLevel) : Table.GetLevel(Save.Experience);
 }
 
-int32 UEIProfileComponent::GetAttributePoints(int32 Attribute) const
+bool UEIProfileComponent::Owns(int32 Item) const
 {
-	const FEIHeroSetup Setup = BuildSetup(GetCurrentClass() == EEIHeroClass::Arcanist);
-	return Setup.Attributes.IsValidIndex(Attribute) ? Setup.Attributes[Attribute] : 0;
+	return Table.Items.IsValidIndex(Item) && (IsFreeChoice() || Save.Items.Contains(Table.Items[Item].Name));
 }
 
-int32 UEIProfileComponent::GetFreePoints() const
+bool UEIProfileComponent::IsUnlocked(int32 Item) const
 {
-	int32 Free = GetLevel() - 1;
-	for (int32 Index = 0; Index < Table.Attributes.Num(); ++Index)
-	{
-		Free -= GetAttributePoints(Index);
-	}
-	return Free;
+	return Table.Items.IsValidIndex(Item) && GetLevel() >= Table.Items[Item].FromLevel;
 }
 
-void UEIProfileComponent::ChangeAttribute(int32 Attribute, int32 Change)
+EEIOffer UEIProfileComponent::GetOffer(int32 Item) const
 {
-	if (!CanChangeGear() || !Table.Attributes.IsValidIndex(Attribute) || (Change > 0 && GetFreePoints() < Change))
+	if (Owns(Item))
 	{
-		return;
+		return EEIOffer::Owned;
 	}
-	const int32 Points = FMath::Max(GetAttributePoints(Attribute) + Change, 0);
-	GetSavedClass(GetCurrentClass() == EEIHeroClass::Arcanist).Attributes.Add(Table.Attributes[Attribute].Name, Points);
+	if (!IsUnlocked(Item))
+	{
+		return EEIOffer::Locked;
+	}
+	return Save.Gold >= Table.Items[Item].Price ? EEIOffer::Buyable : EEIOffer::TooPoor;
+}
+
+bool UEIProfileComponent::Buy(int32 Item)
+{
+	if (!IsOwnerSide() || IsFreeChoice() || !CanChangeGear() || GetOffer(Item) != EEIOffer::Buyable)
+	{
+		return false;
+	}
+	const FEIItem& Bought = Table.Items[Item];
+	Save.Gold -= Bought.Price;
+	Save.Items.Add(Bought.Name);
 	WriteSave();
-	SendSetups();
+	ClientShowNote_Implementation(FString::Printf(TEXT("Gekauft: %s"), *Bought.Name));
+	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
+	return true;
+}
+
+bool UEIProfileComponent::BuyByName(const FString& Name)
+{
+	return Buy(Table.FindItem(Name));
+}
+
+TArray<int32> UEIProfileComponent::ListOffers(EEISlot Slot) const
+{
+	const bool bArcanist = GetCurrentClass() == EEIHeroClass::Arcanist;
+	TArray<int32> Offers;
+	for (int32 Index = 0; Index < Table.Items.Num(); ++Index)
+	{
+		if (Table.Items[Index].Slot == Slot && Table.Items[Index].FitsClass(bArcanist))
+		{
+			Offers.Add(Index);
+		}
+	}
+	// Sorted the way they open, so that the list reads like a way ahead.
+	Offers.StableSort([this](int32 Left, int32 Right) { return Table.Items[Left].FromLevel < Table.Items[Right].FromLevel; });
+	return Offers;
+}
+
+int32 UEIProfileComponent::GetNextUnlockLevel(TArray<int32>& OutItems) const
+{
+	OutItems.Reset();
+	const bool bArcanist = GetCurrentClass() == EEIHeroClass::Arcanist;
+	for (int32 Level = GetLevel() + 1; Level <= FMath::RoundToInt32(Table.MaxLevel); ++Level)
+	{
+		for (const int32 Item : Table.GetUnlockedAt(Level))
+		{
+			if (Table.Items[Item].FitsClass(bArcanist))
+			{
+				OutItems.Add(Item);
+			}
+		}
+		if (!OutItems.IsEmpty())
+		{
+			return Level;
+		}
+	}
+	return 0;
+}
+
+FString UEIProfileComponent::DescribeUnlocks(int32 FirstLevel, int32 LastLevel) const
+{
+	TArray<FString> Names;
+	for (int32 Level = FirstLevel; Level <= LastLevel; ++Level)
+	{
+		for (const int32 Item : Table.GetUnlockedAt(Level))
+		{
+			Names.Add(Table.Items[Item].Name);
+		}
+	}
+	if (Names.IsEmpty())
+	{
+		return FString();
+	}
+	FString Text = FString::Join(TArrayView<const FString>(Names.GetData(), FMath::Min(Names.Num(), NamedUnlocks)), TEXT(", "));
+	if (Names.Num() > NamedUnlocks)
+	{
+		Text += FString::Printf(TEXT(" und %d weitere"), Names.Num() - NamedUnlocks);
+	}
+	return Text;
 }
 
 FEIHeroSetup UEIProfileComponent::MakeStartSetup(bool bArcanist) const
@@ -269,52 +335,30 @@ FEIHeroSetup UEIProfileComponent::BuildSetup(bool bArcanist) const
 	for (int32 Slot = 0; Slot < EISlotCount; ++Slot)
 	{
 		const int32 Index = Table.FindItem(Saved.Slots[Slot]);
-		const int32* Quality = Table.Items.IsValidIndex(Index) ? Save.Items.Find(Table.Items[Index].Name) : nullptr;
-		const bool bFits = Table.Items.IsValidIndex(Index) && static_cast<int32>(Table.Items[Index].Slot) == Slot && Table.Items[Index].FitsClass(bArcanist) && (bFree || Quality != nullptr);
+		const bool bFits = Table.Items.IsValidIndex(Index) && static_cast<int32>(Table.Items[Index].Slot) == Slot && Table.Items[Index].FitsClass(bArcanist) && (bFree || Save.Items.Contains(Table.Items[Index].Name));
 		// The data files may have changed since the last time, and a hero always keeps a weapon.
 		if (bFits)
 		{
 			Setup.Slots[Slot].Item = Index;
-			Setup.Slots[Slot].Quality = bFree ? Save.ArenaQuality : *Quality;
 		}
 		else if (Slot != static_cast<int32>(EEISlot::Weapon))
 		{
 			Setup.Slots[Slot].Item = INDEX_NONE;
 		}
 	}
-	// Never more points than the level gives, whatever the file says.
-	int32 PointsLeft = GetLevel() - 1;
-	Setup.Attributes.SetNum(Table.Attributes.Num());
-	for (int32 Index = 0; Index < Table.Attributes.Num(); ++Index)
-	{
-		Setup.Attributes[Index] = FMath::Clamp(Saved.Attributes.FindRef(Table.Attributes[Index].Name), 0, PointsLeft);
-		PointsLeft -= Setup.Attributes[Index];
-	}
 	return Setup;
 }
 
 void UEIProfileComponent::SendSetups()
 {
-	TArray<FEIWornItem> Owned;
-	for (const TPair<FString, int32>& Pair : Save.Items)
-	{
-		FEIWornItem Entry;
-		Entry.Item = Table.FindItem(Pair.Key);
-		Entry.Quality = Pair.Value;
-		if (Table.Items.IsValidIndex(Entry.Item))
-		{
-			Owned.Add(Entry);
-		}
-	}
-	ServerSendSetups(BuildSetup(false), BuildSetup(true), Owned);
+	ServerSendSetups(BuildSetup(false), BuildSetup(true));
 }
 
-void UEIProfileComponent::ServerSendSetups_Implementation(const FEIHeroSetup& ForBladewarden, const FEIHeroSetup& ForArcanist, const TArray<FEIWornItem>& Owned)
+void UEIProfileComponent::ServerSendSetups_Implementation(const FEIHeroSetup& ForBladewarden, const FEIHeroSetup& ForArcanist)
 {
 	const bool bFirst = !bHasSetups;
 	ServerSetups[0] = ForBladewarden;
 	ServerSetups[1] = ForArcanist;
-	ServerOwned = Owned;
 	bHasSetups = true;
 	// During a run a hero keeps what they flew out with. Only somebody joining late still needs to get dressed.
 	AEIHeroCharacter* Hero = GetPlayer()->GetPawn<AEIHeroCharacter>();
@@ -330,84 +374,27 @@ void UEIProfileComponent::ApplyTo(AEIHeroCharacter* Hero)
 	Hero->GetGear()->SetSetup(bHasSetups ? ServerSetups[bArcanist ? 1 : 0] : MakeStartSetup(bArcanist));
 }
 
-int32 UEIProfileComponent::RollItem(int32 Quality)
+void UEIProfileComponent::GrantEnemyReward(float Experience)
 {
-	const AEIHeroCharacter* Hero = GetPlayer()->GetPawn<AEIHeroCharacter>();
-	const bool bArcanist = Hero != nullptr && Hero->GetHeroClass() == EEIHeroClass::Arcanist;
-	const int32 MaxQuality = FMath::Max(Table.QualityFactors.Num() - 1, 0);
-	TArray<int32> Fitting;
-	TArray<int32> CanRise;
-	TArray<int32> New;
-	for (int32 Index = 0; Index < Table.Items.Num(); ++Index)
-	{
-		const FEIItem& Item = Table.Items[Index];
-		if (Item.Slot == EEISlot::Crystal || !Item.FitsClass(bArcanist))
-		{
-			continue;
-		}
-		Fitting.Add(Index);
-		const FEIWornItem* Owned = ServerOwned.FindByPredicate([Index](const FEIWornItem& Entry) { return Entry.Item == Index; });
-		if (Owned == nullptr)
-		{
-			New.Add(Index);
-		}
-		else if (Owned->Quality < MaxQuality)
-		{
-			CanRise.Add(Index);
-		}
-	}
-	const TArray<int32>& Choice = !New.IsEmpty() ? New : (!CanRise.IsEmpty() ? CanRise : Fitting);
-	if (Choice.IsEmpty())
-	{
-		return INDEX_NONE;
-	}
-	const int32 Picked = Choice[FMath::RandRange(0, Choice.Num() - 1)];
-
-	// The next reward of this run should know about this one, long before the owner has it for good.
-	if (FEIWornItem* Owned = ServerOwned.FindByPredicate([Picked](const FEIWornItem& Entry) { return Entry.Item == Picked; }))
-	{
-		Owned->Quality = FMath::Min(Owned->Quality + 1, MaxQuality);
-	}
-	else
-	{
-		FEIWornItem Entry;
-		Entry.Item = Picked;
-		Entry.Quality = Quality;
-		ServerOwned.Add(Entry);
-	}
-	return Picked;
+	ClientReceiveReward(FMath::RoundToInt32(Experience));
 }
 
-void UEIProfileComponent::GrantEnemyReward(float Experience, float ItemChance)
-{
-	constexpr int32 PlainQuality = 0;
-	const int32 Item = FMath::FRand() < ItemChance ? RollItem(PlainQuality) : INDEX_NONE;
-	ClientReceiveReward(Item, PlainQuality, FMath::RoundToInt32(Experience));
-}
-
-void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Item, int32 Quality, int32 Experience)
+void UEIProfileComponent::ClientReceiveReward_Implementation(int32 Experience)
 {
 	const int32 LevelBefore = Table.GetLevel(Save.Experience);
 	Save.Experience += Experience;
 	RunExperience += Experience;
 	const int32 LevelAfter = Table.GetLevel(Save.Experience);
-	const FString LevelNote = LevelAfter > LevelBefore ? FString::Printf(TEXT("Level %d! Einen neuen Punkt verteilst du in der Ausr\u00FCstung."), LevelAfter) : FString();
 
-	// An ordinary kill does not interrupt with a note every time.
-	const bool bFound = Table.Items.IsValidIndex(Item);
-	if (!bFound && LevelNote.IsEmpty())
+	// An ordinary kill does not interrupt with a note every time, only a new level does.
+	if (LevelAfter <= LevelBefore)
 	{
 		return;
 	}
-	if (bFound)
-	{
-		FEILootLine Line;
-		Line.Item = Item;
-		Line.Quality = Quality;
-		Loot.Add(Line);
-	}
-	const FString FoundNote = bFound ? FString::Printf(TEXT("Gefunden: %s"), *Table.Items[Item].Name) : FString();
-	ClientShowNote_Implementation(FoundNote + (bFound && !LevelNote.IsEmpty() ? TEXT("   ") : TEXT("")) + LevelNote);
+	const FString Unlocks = DescribeUnlocks(LevelBefore + 1, LevelAfter);
+	ClientShowNote_Implementation(Unlocks.IsEmpty()
+		? FString::Printf(TEXT("Level %d!"), LevelAfter)
+		: FString::Printf(TEXT("Level %d! Neu in der Schmiede: %s"), LevelAfter, *Unlocks));
 	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
 }
 
@@ -460,27 +447,6 @@ int32 UEIProfileComponent::GetSecured(int32 Amount) const
 	return bLastRunEscaped ? Amount : ContractTable.GetKeptOnFailure(Amount);
 }
 
-FString UEIProfileComponent::AddToSave(int32 Item, int32 Quality)
-{
-	const FEIItem& Entry = Table.Items[Item];
-	const int32 MaxQuality = FMath::Max(Table.QualityFactors.Num() - 1, 0);
-	int32* Owned = Save.Items.Find(Entry.Name);
-	if (Owned == nullptr)
-	{
-		Save.Items.Add(Entry.Name, Quality);
-		return FString::Printf(TEXT("neu, %s"), *Table.GetQualityName(Quality));
-	}
-	if (*Owned < MaxQuality)
-	{
-		*Owned = FMath::Max(*Owned + 1, Quality);
-		return FString::Printf(TEXT("steigt auf %s"), *Table.GetQualityName(*Owned));
-	}
-	const int32 Experience = FMath::RoundToInt32(Table.Rewards.DuplicateExperience);
-	Save.Experience += Experience;
-	RunExperience += Experience;
-	return FString::Printf(TEXT("schon %s, +%d Erfahrung"), *Table.GetQualityName(*Owned), Experience);
-}
-
 void UEIProfileComponent::EndRun(bool bEscaped)
 {
 	ClientEndRun(bEscaped);
@@ -501,10 +467,6 @@ void UEIProfileComponent::ClientEndRun_Implementation(bool bEscaped)
 			Save.Ingredients.FindOrAdd(Ingredient) += 1;
 		}
 	}
-	for (FEILootLine& Line : Loot)
-	{
-		Line.Result = bEscaped ? AddToSave(Line.Item, Line.Quality) : FString(TEXT("verloren"));
-	}
 	WriteSave();
 	SendSetups();
 }
@@ -518,7 +480,6 @@ void UEIProfileComponent::StartFresh()
 void UEIProfileComponent::ClientStartFresh_Implementation()
 {
 	LoadTable();
-	Loot.Reset();
 	RunExperience = 0;
 	RunGold = 0;
 	RunPoints.Reset();

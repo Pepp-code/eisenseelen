@@ -28,7 +28,6 @@ public:
 
 	/** Null for an empty slot. */
 	const FEIItem* GetWorn(EEISlot Slot) const;
-	int32 GetWornQuality(EEISlot Slot) const;
 
 	float GetStat(EEIStat Stat) const { return Stats[static_cast<int32>(Stat)]; }
 
@@ -61,7 +60,6 @@ private:
 
 	AEIHeroCharacter* GetHero() const;
 	float GetElementBonus(EEIElement Element) const;
-	float GetWeaponQualityFactor() const;
 
 	FEIItemTable Table;
 

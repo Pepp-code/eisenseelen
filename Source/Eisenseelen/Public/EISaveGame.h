@@ -9,9 +9,6 @@ struct EISENSEELEN_API FEISavedClass
 	/** One entry per slot. Empty text is an empty slot. */
 	TArray<FString> Slots;
 
-	/** Name of an attribute and its points. */
-	TMap<FString, int32> Attributes;
-
 	FEISavedClass() { Slots.SetNum(EISlotCount); }
 };
 
@@ -33,13 +30,12 @@ struct EISENSEELEN_API FEISaveGame
 	/** Every ingredient a boss has dropped for this player, even in a run that failed. Only these have a name in the loot book. */
 	TSet<FString> FoundIngredients;
 
-	/** Name of an item and its quality. Whatever stands in here is owned. */
-	TMap<FString, int32> Items;
+	/** The names of all items this player owns. */
+	TSet<FString> Items;
 
 	/** By class: first the blade warden, then the arcanist. */
 	FEISavedClass Classes[2];
 	FEISavedClass ArenaClasses[2];
-	int32 ArenaQuality = 0;
 
 	/** What a new player begins with. */
 	static FEISaveGame MakeNew(const FEIItemTable& Table);

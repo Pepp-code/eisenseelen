@@ -11,14 +11,13 @@
 
 class AEIPlayerController;
 
-/** One thing found during a run. It is only safe once the hero has got away. */
-struct FEILootLine
+/** How the forge offers an item to this player. */
+enum class EEIOffer : uint8
 {
-	int32 Item = INDEX_NONE;
-	int32 Quality = 0;
-
-	/** What it came to, in words for the player. Empty until the run has ended. */
-	FString Result;
+	Owned,
+	Locked,
+	TooPoor,
+	Buyable
 };
 
 /**
@@ -65,19 +64,28 @@ public:
 	/** Owner only. The next choice in the slot. */
 	void EquipNext(EEISlot Slot);
 
-	/** Owner only. In the test arena everything is free, and this says how good it is. */
-	void SetArenaQuality(int32 Quality);
-
 	/** Owner only. The level counts for both classes. In the test arena it is the highest. */
 	int32 GetLevel() const;
 
-	/** Owner only. Each class spends its points by itself, and a point can always move elsewhere. */
-	int32 GetFreePoints() const;
-	int32 GetAttributePoints(int32 Attribute) const;
-	void ChangeAttribute(int32 Attribute, int32 Change);
+	/** Owner only. In the test arena everything counts as owned. */
+	bool Owns(int32 Item) const;
+
+	/** Owner only. The level opens items in the forge, and gold buys them there. */
+	bool IsUnlocked(int32 Item) const;
+	EEIOffer GetOffer(int32 Item) const;
+	bool Buy(int32 Item);
+	bool BuyByName(const FString& Name);
+
+	/** Owner only. All the forge has for this slot and the current class, owned or not. */
+	TArray<int32> ListOffers(EEISlot Slot) const;
+
+	/** Owner only. The next level that opens something for the current class, and what. 0 if there is none. */
+	int32 GetNextUnlockLevel(TArray<int32>& OutItems) const;
+
+	/** In words: what the forge opens on reaching these levels. */
+	FString DescribeUnlocks(int32 FirstLevel, int32 LastLevel) const;
 
 	/** Owner only. What this run has brought so far. */
-	const TArray<FEILootLine>& GetLoot() const { return Loot; }
 	int32 GetRunExperience() const { return RunExperience; }
 	int32 GetRunGold() const { return RunGold; }
 	int32 GetRunPoints(const FString& Faction) const { return RunPoints.FindRef(Faction); }
@@ -104,10 +112,10 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientShowNote(const FString& Text);
 
-	/** Server only. A fallen enemy brings a little experience, and very rarely an item. */
-	void GrantEnemyReward(float Experience, float ItemChance);
+	/** Server only. A fallen enemy brings a little experience. */
+	void GrantEnemyReward(float Experience);
 
-	/** Server only. In the barge all of it is safe. Without the barge a share of the gold and points stays, and the items and ingredients are gone. The experience stays either way. */
+	/** Server only. In the barge all of it is safe. Without the barge a share of the gold and points stays, and the ingredients are gone. The experience stays either way. */
 	void EndRun(bool bEscaped);
 
 	/** Server only. A new run begins, and the data files are read again. */
@@ -121,10 +129,10 @@ protected:
 
 private:
 	UFUNCTION(Server, Reliable)
-	void ServerSendSetups(const FEIHeroSetup& ForBladewarden, const FEIHeroSetup& ForArcanist, const TArray<FEIWornItem>& Owned);
+	void ServerSendSetups(const FEIHeroSetup& ForBladewarden, const FEIHeroSetup& ForArcanist);
 
 	UFUNCTION(Client, Reliable)
-	void ClientReceiveReward(int32 Item, int32 Quality, int32 Experience);
+	void ClientReceiveReward(int32 Experience);
 
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveContract(int32 Faction, int32 Gold, int32 Points);
@@ -148,8 +156,6 @@ private:
 	FEIHeroSetup MakeStartSetup(bool bArcanist) const;
 	FEISavedClass& GetSavedClass(bool bArcanist);
 	const FEISavedClass& GetSavedClass(bool bArcanist) const;
-	FString AddToSave(int32 Item, int32 Quality);
-	int32 RollItem(int32 Quality);
 
 	FEIItemTable Table;
 	FEIContractTable ContractTable;
@@ -157,7 +163,6 @@ private:
 	FEISaveGame Save;
 	bool bSent = false;
 	bool bSentFree = false;
-	TArray<FEILootLine> Loot;
 	int32 RunExperience = 0;
 	int32 RunGold = 0;
 	TMap<FString, int32> RunPoints;
@@ -166,8 +171,7 @@ private:
 	float RewardNoteRemaining = 0.0f;
 	FString RewardText;
 
-	// Only on the server: what the player told us, and what they got since.
+	// Only on the server: what the player told us to put on.
 	FEIHeroSetup ServerSetups[2];
-	TArray<FEIWornItem> ServerOwned;
 	bool bHasSetups = false;
 };

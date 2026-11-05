@@ -33,17 +33,15 @@ namespace
 	constexpr float BigLife = 100000.0f;
 
 	const TCHAR* SmallItems = TEXT(R"json({
-		"qualitaeten": [{ "name": "Einfach", "faktor": 1 }, { "name": "Doppelt", "faktor": 2 }],
 		"tempo_bonus_max": 0.3, "ruestung_max": 0.6, "abklingzeit_abzug_max": 0.5, "manakosten_abzug_max": 0.6, "waffe_element_bonus": 0.2,
 		"start_items": ["Probeschwert", "Probestab"],
 		"erfahrung": { "level_max": 4, "erste_stufe": 100, "zuwachs_je_level": 50 },
-		"attribute": [{ "name": "Probekraft", "wert": "angriffskraft", "je_punkt": 0.03 }],
-		"belohnung": { "doppelt_erfahrung": 14, "umkreis_m": 15 },
+		"belohnung": { "umkreis_m": 15 },
 		"arten": [{ "name": "Probeart", "je_zwei_teile": { "leben": 10 } }],
 		"items": [
-			{ "name": "Probeschwert", "platz": "waffe", "grundform": "schwert", "element": "eis" },
-			{ "name": "Probestab", "platz": "waffe", "grundform": "stock", "element": "blitz" },
-			{ "name": "Probehelm", "platz": "helm", "art": "Probeart", "klasse": "arkanist", "werte": { "tempo": -0.03, "leben": 5 } }
+			{ "name": "Probeschwert", "platz": "waffe", "grundform": "schwert", "element": "eis", "preis_gold": 0, "ab_level": 1 },
+			{ "name": "Probestab", "platz": "waffe", "grundform": "stock", "element": "blitz", "preis_gold": 0, "ab_level": 1 },
+			{ "name": "Probehelm", "platz": "helm", "art": "Probeart", "klasse": "arkanist", "werte": { "tempo": -0.03, "leben": 5 }, "preis_gold": 250, "ab_level": 3 }
 		]
 	})json");
 
@@ -130,8 +128,14 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	{
 		AddError(Error);
 	}
-	TestEqual(TEXT("There are three qualities"), Table.QualityFactors.Num(), 3);
 	TestEqual(TEXT("There are five arts of armour"), Table.Sets.Num(), 5);
+	for (const FEIItem& Item : Table.Items)
+	{
+		const bool bStart = Table.StartItems.Contains(Item.Name);
+		TestTrue(*FString::Printf(TEXT("%s costs something in the forge, unless it is a start item"), *Item.Name), bStart ? Item.Price == 0 && Item.FromLevel == 1 : Item.Price > 0);
+		TestTrue(*FString::Printf(TEXT("%s opens at a level there is"), *Item.Name), Item.FromLevel >= 1 && Item.FromLevel <= FMath::RoundToInt32(Table.MaxLevel));
+	}
+	TestTrue(TEXT("Level 2 opens something new in the forge"), !Table.GetUnlockedAt(2).IsEmpty());
 	for (const FEIArmorSet& Set : Table.Sets)
 	{
 		int32 Pieces[EISlotCount] = {};
@@ -144,7 +148,6 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 			TestEqual(*FString::Printf(TEXT("%s has one piece for %s"), *Set.Name, EISlotName(Slot)), Pieces[static_cast<int32>(Slot)], 1);
 		}
 	}
-	TestEqual(TEXT("A forged item counts for more"), Table.GetQualityFactor(1), 1.25f);
 	TestEqual(TEXT("Each class starts with a weapon of its own"), Table.Items[Table.GetStartItem(EEISlot::Weapon, true)].Name, FString(TEXT("Feuerstab")));
 	TestEqual(TEXT("The blade warden starts with the flame sword"), Table.Items[Table.GetStartItem(EEISlot::Weapon, false)].Name, FString(TEXT("Flammenschwert")));
 	for (const FEIItem& Item : Table.Items)
@@ -159,8 +162,7 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	FEIItemTable Small;
 	TestTrue(TEXT("A complete table loads"), FEIItemTable::LoadFromStrings(SmallItems, SmallWeapons, Small, Error));
 	TestEqual(TEXT("All lines are there"), Small.Items.Num(), 3);
-	TestEqual(TEXT("The rewards count"), Small.Rewards.DuplicateExperience, 14.0f);
-	TestEqual(TEXT("The attributes count"), Small.Attributes[0].PerPoint, 0.03f);
+	TestEqual(TEXT("The rewards count"), Small.Rewards.RadiusMeters, 15.0f);
 	TestEqual(TEXT("A new player is level 1"), Small.GetLevel(0), 1);
 	TestEqual(TEXT("Just before the first step still level 1"), Small.GetLevel(99), 1);
 	TestEqual(TEXT("The first step is level 2"), Small.GetLevel(100), 2);
@@ -178,6 +180,10 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("The class of an item counts"), Helmet.bForBladewarden);
 	TestEqual(TEXT("All values of an item count"), Helmet.Stats.Num(), 2);
 	TestEqual(TEXT("The set counts"), Helmet.Set, FString(TEXT("Probeart")));
+	TestEqual(TEXT("The price counts"), Helmet.Price, 250);
+	TestEqual(TEXT("The level counts"), Helmet.FromLevel, 3);
+	TestEqual(TEXT("The forge knows what opens at a level"), Small.GetUnlockedAt(3).Num(), 1);
+	TestTrue(TEXT("Nothing opens at a level without new items"), Small.GetUnlockedAt(2).IsEmpty());
 
 	const auto Refuses = [this](const TCHAR* What, const TCHAR* Old, const TCHAR* New, const TCHAR* Named)
 	{
@@ -195,7 +201,8 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	Refuses(TEXT("An unknown set is refused"), TEXT("\"art\": \"Probeart\""), TEXT("\"art\": \"Keine\""), TEXT("Probehelm"));
 	Refuses(TEXT("An unknown class is refused"), TEXT("\"klasse\": \"arkanist\""), TEXT("\"klasse\": \"niemand\""), TEXT("Probehelm"));
 	Refuses(TEXT("The same name twice is refused"), TEXT("\"name\": \"Probehelm\""), TEXT("\"name\": \"Probestab\""), TEXT("Probestab"));
-	Refuses(TEXT("An attribute with an unknown value is refused"), TEXT("\"wert\": \"angriffskraft\""), TEXT("\"wert\": \"glueck\""), TEXT("Probekraft"));
+	Refuses(TEXT("An item without a price is refused"), TEXT("\"preis_gold\": 250, "), TEXT(""), TEXT("Probehelm"));
+	Refuses(TEXT("A level above the top is refused"), TEXT("\"ab_level\": 3"), TEXT("\"ab_level\": 9"), TEXT("Probehelm"));
 	Refuses(TEXT("An unknown start item is refused"), TEXT("[\"Probeschwert\", \"Probestab\"]"), TEXT("[\"Gibtsnicht\"]"), TEXT("Gibtsnicht"));
 	Refuses(TEXT("A class without a start weapon is refused"), TEXT("[\"Probeschwert\", \"Probestab\"]"), TEXT("[\"Probeschwert\"]"), TEXT("Start-Waffe"));
 	return true;
@@ -230,13 +237,10 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	Save.FactionPoints.Add(TEXT("Feuer"), 40);
 	Save.Ingredients.Add(TEXT("Glutkern"), 3);
 	Save.FoundIngredients.Add(TEXT("Grabkerze"));
-	Save.Items.Add(TEXT("Sturmrune"), 2);
+	Save.Items.Add(TEXT("Sturmrune"));
 	Save.Classes[0].Slots[RuneSlot] = TEXT("Sturmrune");
-	Save.Classes[0].Attributes.Add(TEXT("Kraft"), 3);
-	Save.ArenaClasses[1].Attributes.Add(TEXT("Geist"), 7);
 	Save.Classes[1].Slots[RuneSlot].Reset();
 	Save.ArenaClasses[1].Slots[WeaponSlot] = TEXT("Donnerzepter");
-	Save.ArenaQuality = 1;
 
 	FEISaveGame Loaded = FEISaveGame::MakeNew(Table);
 	TestTrue(TEXT("What was written can be read"), Loaded.FromJson(Save.ToJson(), Error));
@@ -247,14 +251,11 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("What was found once stays found"), Loaded.FoundIngredients.Contains(TEXT("Grabkerze")));
 	TestTrue(TEXT("What is in the bag counts as found"), Loaded.FoundIngredients.Contains(TEXT("Glutkern")));
 	TestFalse(TEXT("Nothing else counts as found"), Loaded.FoundIngredients.Contains(TEXT("Seelenasche")));
-	TestEqual(TEXT("The quality stays"), Loaded.Items.FindRef(TEXT("Sturmrune")), 2);
+	TestTrue(TEXT("What was bought stays"), Loaded.Items.Contains(TEXT("Sturmrune")));
+	TestFalse(TEXT("What was not bought stays away"), Loaded.Items.Contains(TEXT("Donnerzepter")));
 	TestEqual(TEXT("What is on stays on"), Loaded.Classes[0].Slots[RuneSlot], FString(TEXT("Sturmrune")));
-	TestEqual(TEXT("The points stay"), Loaded.Classes[0].Attributes.FindRef(TEXT("Kraft")), 3);
-	TestEqual(TEXT("The arena has its own points"), Loaded.ArenaClasses[1].Attributes.FindRef(TEXT("Geist")), 7);
-	TestEqual(TEXT("The other class has none of them"), Loaded.Classes[1].Attributes.FindRef(TEXT("Kraft")), 0);
 	TestTrue(TEXT("An empty slot stays empty"), Loaded.Classes[1].Slots[RuneSlot].IsEmpty());
 	TestEqual(TEXT("The test arena keeps its own things"), Loaded.ArenaClasses[1].Slots[WeaponSlot], FString(TEXT("Donnerzepter")));
-	TestEqual(TEXT("The arena keeps its quality"), Loaded.ArenaQuality, 1);
 	TestEqual(TEXT("A real run is not touched by that"), Loaded.Classes[1].Slots[WeaponSlot], FString(TEXT("Feuerstab")));
 
 	FEISaveGame Untouched = FEISaveGame::MakeNew(Table);
@@ -262,13 +263,20 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A file without items is refused"), Untouched.FromJson(TEXT("{ \"version\": 1 }"), Error));
 	TestTrue(TEXT("A refused file changes nothing"), Untouched.Items.Contains(TEXT("Frostrune")));
 
+	// A file from before the forge had a quality for every item and points for attributes. What was owned stays owned.
+	FEISaveGame Old = FEISaveGame::MakeNew(Table);
+	TestTrue(TEXT("An old file can be read"), Old.FromJson(TEXT("{ \"version\": 1, \"erfahrung\": 500, \"items\": { \"Frostrune\": 0, \"Sturmklinge\": 2 }, \"klingenwacht\": { \"attribute\": { \"Kraft\": 3 } } }"), Error));
+	TestTrue(TEXT("An item of an old file stays owned"), Old.Items.Contains(TEXT("Sturmklinge")));
+	TestEqual(TEXT("The experience of an old file stays"), Old.Experience, 500);
+	TestTrue(TEXT("The new file has no qualities"), !Old.ToJson().Contains(TEXT("qualitaet")) && !Old.ToJson().Contains(TEXT("attribute")));
+
 	const FString Path = FPaths::Combine(FPaths::AutomationTransientDir(), TEXT("SpielstandProbe.json"));
 	TestTrue(TEXT("The file gets written"), Save.SaveToFile(Path));
 	FString Json;
 	TestTrue(TEXT("The file is there"), FFileHelper::LoadFileToString(Json, *Path));
 	FEISaveGame FromFile = FEISaveGame::MakeNew(Table);
 	TestTrue(TEXT("The file can be read"), FromFile.FromJson(Json, Error));
-	TestEqual(TEXT("The file holds the same"), FromFile.Items.FindRef(TEXT("Sturmrune")), 2);
+	TestTrue(TEXT("The file holds the same"), FromFile.Items.Contains(TEXT("Sturmrune")));
 	TestFalse(TEXT("No half file stays behind"), IFileManager::Get().FileExists(*(Path + TEXT(".neu"))));
 	IFileManager::Get().Delete(*Path);
 	return true;
@@ -303,7 +311,7 @@ bool FEIGearTest::RunTest(const FString& Parameters)
 		State->BaseSpeed = Context.Hero->GetCharacterMovement()->MaxWalkSpeed;
 	}));
 
-	// Another form plays differently: slower and harder, and the higher quality counts on top.
+	// Another form plays differently: slower and harder.
 	Steps.Add(Do([](const FEIPlayContext& Context) { Profile(Context)->EquipByName(TEXT("Aschenbrecher")); }));
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
@@ -318,15 +326,6 @@ bool FEIGearTest::RunTest(const FString& Parameters)
 	{
 		Context.Test->AddInfo(FString::Printf(TEXT("A swing of the two-hander at 180 cm: %.1f damage"), HighestDummyDamage(Context)));
 		Context.Test->TestNearlyEqual(TEXT("The swing does the form's damage"), HighestDummyDamage(Context), 50.0f, 0.01f);
-		Profile(Context)->SetArenaQuality(2);
-	}));
-	Steps.Add(Wait(0.05));
-	AddSwingAtDummies(Steps);
-	Steps.Add(Do([](const FEIPlayContext& Context)
-	{
-		Context.Test->TestNearlyEqual(TEXT("The quality raises the damage"), HighestDummyDamage(Context), 75.0f, 0.01f);
-		Context.Test->TestNearlyEqual(TEXT("The quality raises the element too"), Gear(Context)->GetStat(EEIStat::FireDamage), Gear(Context)->GetTable().WeaponElementBonus * 1.5f);
-		Profile(Context)->SetArenaQuality(0);
 	}));
 
 	// Armour: life and the share of a hit it swallows, at the price of some speed.
@@ -515,123 +514,151 @@ bool FEIGearTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FEILootTest,
-	"Eisenseelen.Play.Run.Loot",
+	FEIForgeTest,
+	"Eisenseelen.Play.Run.Forge",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FEILootTest::RunTest(const FString& Parameters)
+bool FEIForgeTest::RunTest(const FString& Parameters)
 {
-	constexpr float FoundExperience = 50.0f;
-	struct FState
-	{
-		FString Item;
-		int32 Experience = 0;
-	};
-	const TSharedRef<FState> State = MakeShared<FState>();
 	TArray<FEIPlayStep> Steps;
-	const auto Remember = [State](const FEIPlayContext& Context)
-	{
-		State->Experience = Profile(Context)->GetSave().Experience;
-		const TArray<FEILootLine>& Loot = Profile(Context)->GetLoot();
-		State->Item = Loot.IsEmpty() ? FString() : Profile(Context)->GetTable().Items[Loot.Last().Item].Name;
-	};
 
-	// A reward lands in the bag at once. The experience is safe, the item is not yet.
-	Steps.Add(Do([Remember](const FEIPlayContext& Context)
-	{
-		Context.Test->TestEqual(TEXT("A new player has no experience"), Profile(Context)->GetSave().Experience, 0);
-		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
-		Remember(Context);
-		const FEIRewardValues& Rewards = Profile(Context)->GetTable().Rewards;
-		const FEIItemTable& Table = Profile(Context)->GetTable();
-		Context.Test->TestEqual(TEXT("A find brings one item"), Profile(Context)->GetLoot().Num(), 1);
-		const FEIItem& Item = Table.Items[Profile(Context)->GetLoot()[0].Item];
-		Context.Test->TestTrue(TEXT("It fits the class"), Item.FitsClass(false));
-		Context.Test->TestFalse(TEXT("It is not safe yet"), Profile(Context)->GetSave().Items.Contains(Item.Name));
-		Context.Test->TestEqual(TEXT("The experience is there at once"), Profile(Context)->GetSave().Experience, FMath::RoundToInt32(FoundExperience));
-		Context.Test->TestTrue(TEXT("The screen says so"), Profile(Context)->GetRewardNote() > 0.0f);
-		Context.Test->TestTrue(TEXT("The note names the item"), Profile(Context)->GetRewardText().Contains(Item.Name));
-
-		// The next one is something else, as long as there is something else.
-		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
-		Context.Test->TestNotEqual(TEXT("The second reward is another item"), Profile(Context)->GetLoot()[1].Item, Profile(Context)->GetLoot()[0].Item);
-
-		// Without the barge the loot is gone.
-		Profile(Context)->EndRun(false);
-		Context.Test->TestFalse(TEXT("A failed run loses the item"), Profile(Context)->GetSave().Items.Contains(Item.Name));
-		Context.Test->TestEqual(TEXT("The loot can still be read"), Profile(Context)->GetLoot()[0].Result, FString(TEXT("verloren")));
-		Context.Test->TestEqual(TEXT("A failed run keeps the experience"), Profile(Context)->GetSave().Experience, FMath::RoundToInt32(FoundExperience * 2.0f));
-		Profile(Context)->StartFresh();
-		Context.Test->TestEqual(TEXT("A new run has an empty bag"), Profile(Context)->GetLoot().Num(), 0);
-		Context.Test->TestEqual(TEXT("A new run counts from nothing"), Profile(Context)->GetRunExperience(), 0);
-
-		// In the barge it is safe.
-		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
-		Remember(Context);
-		Profile(Context)->EndRun(true);
-		Context.Test->TestTrue(TEXT("Getting away secures the item"), Profile(Context)->GetSave().Items.Contains(Profile(Context)->GetTable().Items[Profile(Context)->GetLoot()[0].Item].Name));
-		Context.Test->TestTrue(TEXT("The settlement says it is new"), Profile(Context)->GetLoot()[0].Result.StartsWith(TEXT("neu")));
-		Profile(Context)->StartFresh();
-
-		// Once all is owned, a find raises the quality.
-		FEISaveGame& Save = Profile(Context)->GetSave();
-		for (const FEIItem& Entry : Table.Items)
-		{
-			Save.Items.Add(Entry.Name, 0);
-		}
-		Profile(Context)->EquipByName(TEXT("Frostrune"));
-		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
-		Profile(Context)->EndRun(true);
-		Context.Test->TestTrue(TEXT("A second find raises the quality"), Profile(Context)->GetLoot()[0].Result.Contains(Table.GetQualityName(1)));
-		Context.Test->TestEqual(TEXT("It counts in the save"), Save.Items.FindRef(Table.Items[Profile(Context)->GetLoot()[0].Item].Name), 1);
-		Profile(Context)->StartFresh();
-
-		// And when all of it is at its best, a find is worth experience.
-		for (const FEIItem& Entry : Table.Items)
-		{
-			Save.Items.Add(Entry.Name, Table.QualityFactors.Num() - 1);
-		}
-		Profile(Context)->EquipByName(TEXT("Frostrune"));
-		const int32 Before = Save.Experience;
-		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
-		Profile(Context)->EndRun(true);
-		Context.Test->TestEqual(TEXT("A find of the best is worth experience"), Save.Experience, Before + FMath::RoundToInt32(FoundExperience + Rewards.DuplicateExperience));
-		Profile(Context)->StartFresh();
-		Save.Items.Reset();
-		for (const FString& Name : Table.StartItems)
-		{
-			Save.Items.Add(Name, 0);
-		}
-		Profile(Context)->EquipByName(TEXT("Frostrune"));
-	}));
-	Steps.Add(Wait(0.05));
-
-	// Even under the blood moon an enemy is worth its plain experience, and what is new comes rusty.
+	// At the dock the level opens new items, and the gold buys them.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		AEIGameMode* GameMode = Context.World->GetAuthGameMode<AEIGameMode>();
-		GameMode->GetRun()->ForceBloodMoon(true);
-		const int32 Before = Profile(Context)->GetSave().Experience;
-		Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
-		Context.Test->TestEqual(TEXT("The blood moon brings no extra experience"), Profile(Context)->GetSave().Experience - Before, FMath::RoundToInt32(FoundExperience));
-		Context.Test->TestEqual(TEXT("A new item comes rusty"), Profile(Context)->GetLoot()[0].Quality, 0);
-		GameMode->GetRun()->ForceBloodMoon(false);
-		Profile(Context)->StartFresh();
+		UEIProfileComponent* Player = Profile(Context);
+		const FEIItemTable& Table = Player->GetTable();
+		FEISaveGame& Save = Player->GetSave();
+		const int32 Blade = Table.FindItem(TEXT("Frostklinge"));
+		const int32 Start = Table.FindItem(TEXT("Flammenschwert"));
+		const int32 Price = Table.Items[Blade].Price;
+		Context.Test->TestEqual(TEXT("A new player is level 1"), Player->GetLevel(), 1);
+		Context.Test->TestTrue(TEXT("The start weapon is owned"), Player->GetOffer(Start) == EEIOffer::Owned);
+		Context.Test->TestTrue(TEXT("An item of level 2 stays shut at level 1"), Player->GetOffer(Blade) == EEIOffer::Locked);
+		Save.Gold = Price * 10;
+		Context.Test->TestFalse(TEXT("Gold alone does not buy a shut item"), Player->Buy(Blade));
+		Context.Test->TestEqual(TEXT("And costs nothing"), Save.Gold, Price * 10);
+
+		Save.Gold = 0;
+		Save.Experience = Table.GetExperienceForLevel(2);
+		Context.Test->TestTrue(TEXT("The level opens it"), Player->GetOffer(Blade) == EEIOffer::TooPoor);
+		Context.Test->TestFalse(TEXT("Without gold it cannot be bought"), Player->Buy(Blade));
+		Save.Gold = Price + 7;
+		Context.Test->TestTrue(TEXT("With gold it can"), Player->GetOffer(Blade) == EEIOffer::Buyable);
+		Context.Test->TestTrue(TEXT("Buying works"), Player->Buy(Blade));
+		Context.Test->TestEqual(TEXT("It costs its price"), Save.Gold, 7);
+		Context.Test->TestTrue(TEXT("Now it is owned"), Save.Items.Contains(TEXT("Frostklinge")));
+		Context.Test->TestTrue(TEXT("The screen says so"), Player->GetRewardText().Contains(TEXT("Frostklinge")));
+		Context.Test->TestTrue(TEXT("The forge shows it as bought"), Player->GetOffer(Blade) == EEIOffer::Owned);
+		Context.Test->TestFalse(TEXT("It cannot be bought twice"), Player->Buy(Blade));
+		Context.Test->TestEqual(TEXT("Nothing more is paid"), Save.Gold, 7);
+		Context.Test->TestFalse(TEXT("Something unknown cannot be bought"), Player->BuyByName(TEXT("Holzschwert")));
+		Player->EquipByName(TEXT("Frostklinge"));
+	}));
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		const FEIItemTable& Table = Player->GetTable();
+		Context.Test->TestEqual(TEXT("What was bought can go on"), Gear(Context)->GetWorn(EEISlot::Weapon)->Name, FString(TEXT("Frostklinge")));
+
+		// The forge lists what fits the class, in the order it opens.
+		const TArray<int32> Weapons = Player->ListOffers(EEISlot::Weapon);
+		Context.Test->TestTrue(TEXT("The forge has weapons"), Weapons.Num() > 2);
+		for (int32 Index = 0; Index < Weapons.Num(); ++Index)
+		{
+			Context.Test->TestTrue(TEXT("Every weapon fits the blade warden"), Table.Items[Weapons[Index]].FitsClass(false));
+			Context.Test->TestTrue(TEXT("The list goes from low to high"), Index == 0 || Table.Items[Weapons[Index - 1]].FromLevel <= Table.Items[Weapons[Index]].FromLevel);
+		}
+		TArray<int32> Next;
+		Context.Test->TestEqual(TEXT("The next level with something new is known"), Player->GetNextUnlockLevel(Next), 3);
+		Context.Test->TestFalse(TEXT("And what it brings"), Next.IsEmpty());
+
+		// A new level names what opens in the forge.
+		Player->GetSave().Experience = Table.GetExperienceForLevel(4) - 1;
+		Player->GrantEnemyReward(1.0f);
+		Context.Test->TestEqual(TEXT("One more point of experience is a level"), Player->GetLevel(), 4);
+		Context.Test->TestTrue(TEXT("The note names the level"), Player->GetRewardText().Contains(TEXT("Level 4")));
+		Context.Test->TestTrue(TEXT("The note names the forge"), Player->GetRewardText().Contains(TEXT("Neu in der Schmiede")));
+		Context.Test->TestTrue(TEXT("The note names what is new"), Player->GetRewardText().Contains(Table.Items[Table.GetUnlockedAt(4)[0]].Name));
 	}));
 
-	// The arcanist gets what an arcanist can use.
+	// The page of the forge buys with a click.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		FEISaveGame& Save = Player->GetSave();
+		const int32 Rune = Player->GetTable().FindItem(TEXT("Sturmrune"));
+		Save.Gold = Player->GetTable().Items[Rune].Price;
+		FEIGearMenu& Menu = Context.Player->GetMenu();
+		Menu.ShowPage(EEIMenuPage::Gear);
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("The gear page shows the level"), Menu.Shows(TEXT("Level 4")));
+		Context.Test->TestTrue(TEXT("The gear page shows what opens next"), Menu.Shows(TEXT("Ab Level 5 in der Schmiede")));
+		const FEIMenuElement* Tab = Menu.FindButton(TEXT("Schmiede"));
+		Context.Test->TestNotNull(TEXT("The page has a tab for the forge"), Tab);
+		if (Tab == nullptr)
+		{
+			return;
+		}
+		Menu.Click(Tab->X + 1.0f, Tab->Y + 1.0f);
+		Context.Test->TestTrue(TEXT("The tab opens the forge"), Menu.GetPage() == EEIMenuPage::Forge);
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("The forge names the class"), Menu.Shows(TEXT("Schmiede: Klingenwacht")));
+		Context.Test->TestTrue(TEXT("The forge shows the gold"), Menu.Shows(FString::Printf(TEXT("Gold %d"), Save.Gold)));
+		const FEIMenuElement* RuneSlot = Menu.FindButton(TEXT("Rune:"));
+		Context.Test->TestNotNull(TEXT("The forge says which slot has something to buy"), RuneSlot);
+		if (RuneSlot == nullptr)
+		{
+			return;
+		}
+		Menu.Click(RuneSlot->X + 1.0f, RuneSlot->Y + 1.0f);
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("What is owned says so"), Menu.Shows(TEXT("Frostrune \u2013 gekauft")));
+		Context.Test->TestNull(TEXT("What is owned cannot be clicked"), Menu.FindButton(TEXT("Frostrune")));
+		const FEIMenuElement* Offer = Menu.FindButton(TEXT("Sturmrune \u2013 kaufen"));
+		Context.Test->TestNotNull(TEXT("What is open and paid for has a button"), Offer);
+		for (const FEIMenuElement& Element : Menu.GetElements())
+		{
+			Context.Test->TestTrue(*FString::Printf(TEXT("%s fits on the screen"), *Element.Text), Element.X + Element.Width <= 1600.0f && Element.Y + Element.Height <= 900.0f);
+		}
+		if (Offer == nullptr)
+		{
+			return;
+		}
+		Menu.Click(Offer->X + 1.0f, Offer->Y + 1.0f);
+		Context.Test->TestTrue(TEXT("A click buys it"), Save.Items.Contains(TEXT("Sturmrune")));
+		Context.Test->TestEqual(TEXT("And pays for it"), Save.Gold, 0);
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("Then the forge shows it as bought"), Menu.Shows(TEXT("Sturmrune \u2013 gekauft")));
+		Context.Test->TestTrue(TEXT("Without gold the rest waits"), Menu.Shows(TEXT("Flammenrune \u2013 zu wenig Gold")));
+	}));
+
+	// The arcanist sees only what an arcanist can use.
 	AddTap(Steps, EKeys::C);
 	Steps.Add(Wait(0.1));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		for (int32 Count = 0; Count < 4; ++Count)
+		UEIProfileComponent* Player = Profile(Context);
+		for (const int32 Item : Player->ListOffers(EEISlot::Weapon))
 		{
-			Profile(Context)->GrantEnemyReward(FoundExperience, 1.0f);
+			Context.Test->TestTrue(TEXT("It fits the arcanist"), Player->GetTable().Items[Item].FitsClass(true));
 		}
-		for (const FEILootLine& Line : Profile(Context)->GetLoot())
-		{
-			Context.Test->TestTrue(TEXT("It fits the arcanist"), Profile(Context)->GetTable().Items[Line.Item].FitsClass(true));
-		}
+		FEIGearMenu& Menu = Context.Player->GetMenu();
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("The forge follows the class"), Menu.Shows(TEXT("Schmiede: Arkanist")));
+		Menu.ShowPage(EEIMenuPage::Gear);
+	}));
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
+
+	// Once the run has begun, the forge is closed.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		Player->GetSave().Gold = 100000;
+		Context.World->GetAuthGameMode<AEIGameMode>()->GetRun()->BeginRunNow();
+		Context.Test->TestFalse(TEXT("During a run nothing can be bought"), Player->BuyByName(TEXT("Sturmklinge")));
+		Context.Test->TestEqual(TEXT("And nothing is paid"), Player->GetSave().Gold, 100000);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }
@@ -674,7 +701,9 @@ bool FEIGearMenuTest::RunTest(const FString& Parameters)
 		FEIGearMenu& Menu = Page(Context);
 		Context.Test->TestTrue(TEXT("The page shows the class"), Menu.Shows(TEXT("Klingenwacht")));
 		Context.Test->TestTrue(TEXT("The page shows all slots"), Menu.Shows(TEXT("Waffe:")) && Menu.Shows(TEXT("Rune:")) && Menu.Shows(TEXT("Helm:")) && Menu.Shows(TEXT("Brustpanzer:")) && Menu.Shows(TEXT("Handschuhe:")) && Menu.Shows(TEXT("Schuhe:")) && Menu.Shows(TEXT("Herzkristall:")));
-		Context.Test->TestTrue(TEXT("It shows what is on"), Menu.Shows(TEXT("Waffe: Flammenschwert (Rostig)")));
+		Context.Test->TestTrue(TEXT("It shows what is on"), Menu.Shows(TEXT("Waffe: Flammenschwert")));
+		Context.Test->TestFalse(TEXT("There are no qualities any more"), Menu.Shows(TEXT("Rostig")));
+		Context.Test->TestTrue(TEXT("The arena says all is free"), Menu.Shows(TEXT("Testarena: jedes Level und jedes Teil ist frei")));
 		Context.Test->TestTrue(TEXT("It shows the sum of the values"), Menu.Shows(TEXT("+10 % Feuerschaden")));
 		Context.Test->TestTrue(TEXT("It shows the spell on Q"), Menu.Shows(TEXT("Zauber auf Q: Feuerball")));
 		Context.Test->TestNotNull(TEXT("The arena has all weapons of the class"), Menu.FindButton(TEXT("Donnerbrecher")));
@@ -726,12 +755,16 @@ bool FEIGearMenuTest::RunTest(const FString& Parameters)
 		ClickOn(Context, TEXT("Waffe:"));
 		Context.Test->TestNull(TEXT("A weapon has no button to take it off"), Page(Context).FindButton(TEXT("Ablegen")));
 
-		// In the arena the quality is free too.
-		ClickOn(Context, TEXT("Qualit\u00E4t:"));
-		Context.Test->TestEqual(TEXT("The button raises the quality"), Gear(Context)->GetWornQuality(EEISlot::Weapon), 1);
-		ClickOn(Context, TEXT("Qualit\u00E4t:"));
-		ClickOn(Context, TEXT("Qualit\u00E4t:"));
-		Context.Test->TestEqual(TEXT("After the best it starts over"), Gear(Context)->GetWornQuality(EEISlot::Weapon), 0);
+		// The forge has nothing to sell in the arena: everything is free here.
+		ClickOn(Context, TEXT("Schmiede"));
+		FEIGearMenu& Forge = Page(Context);
+		Context.Test->TestTrue(TEXT("The tab opens the forge"), Forge.GetPage() == EEIMenuPage::Forge);
+		Context.Test->TestTrue(TEXT("The forge says the arena is free"), Forge.Shows(TEXT("kaufen musst du nichts")));
+		Context.Test->TestNull(TEXT("In the arena nothing is for sale"), Forge.FindButton(TEXT("kaufen:")));
+		for (const FEIMenuElement& Element : Forge.GetElements())
+		{
+			Context.Test->TestTrue(*FString::Printf(TEXT("%s fits on the screen"), *Element.Text), Element.X + Element.Width <= ScreenWidth && Element.Y + Element.Height <= ScreenHeight);
+		}
 
 		// One page further lies the loot book.
 		ClickOn(Context, TEXT("Beutebuch"));
@@ -813,53 +846,31 @@ bool FEIExperienceTest::RunTest(const FString& Parameters)
 {
 	TArray<FEIPlayStep> Steps;
 
-	// A new player is level 1 and has no points to spend, whatever the page offers.
+	// A new player is level 1. The level only opens the forge, the hero stays as strong as before.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		UEIProfileComponent* Player = Profile(Context);
 		Context.Hero->SetCanBeDamaged(false);
 		Context.Test->TestEqual(TEXT("A new player is level 1"), Player->GetLevel(), 1);
-		Context.Test->TestEqual(TEXT("A new player has no points"), Player->GetFreePoints(), 0);
-		Player->ChangeAttribute(0, 1);
-		Context.Test->TestEqual(TEXT("Without a point nothing rises"), Player->GetAttributePoints(0), 0);
-
-		// Experience brings levels, and each level a point.
+		const float Attack = Gear(Context)->GetStat(EEIStat::AttackPower);
+		const float Life = Context.Hero->GetHealth()->GetMaxHealth();
 		Player->GetSave().Experience = Player->GetTable().GetExperienceForLevel(3);
 		Context.Test->TestEqual(TEXT("Experience brings levels"), Player->GetLevel(), 3);
-		Context.Test->TestEqual(TEXT("Each level brings a point"), Player->GetFreePoints(), 2);
-
-		const FEIAttribute& Might = Player->GetTable().Attributes[0];
-		Context.Test->TestTrue(TEXT("The first attribute raises the attack"), Might.Stat == EEIStat::AttackPower);
-		Player->ChangeAttribute(0, 1);
-		Player->ChangeAttribute(0, 1);
-		Player->ChangeAttribute(0, 1);
-		Context.Test->TestEqual(TEXT("Only as many points as there are"), Player->GetAttributePoints(0), 2);
-		Context.Test->TestEqual(TEXT("Now none is free"), Player->GetFreePoints(), 0);
-		Context.Test->TestNearlyEqual(TEXT("The points count on the hero"), Gear(Context)->GetStat(EEIStat::AttackPower), Might.PerPoint * 2.0f);
-
-		// A point can always move.
-		Player->ChangeAttribute(0, -1);
-		Player->ChangeAttribute(2, 1);
-		Context.Test->TestEqual(TEXT("A point comes back"), Player->GetAttributePoints(0), 1);
-		const FEIAttribute& Toughness = Player->GetTable().Attributes[2];
-		Context.Test->TestEqual(TEXT("And goes somewhere else"), Context.Hero->GetHealth()->GetMaxHealth(), Context.Hero->GetClassValues().Life + Toughness.PerPoint);
-		Player->ChangeAttribute(1, -1);
-		Context.Test->TestEqual(TEXT("Never below nothing"), Player->GetAttributePoints(1), 0);
+		Context.Test->TestEqual(TEXT("A level does not make the hero stronger"), Gear(Context)->GetStat(EEIStat::AttackPower), Attack);
+		Context.Test->TestEqual(TEXT("Nor gives life"), Context.Hero->GetHealth()->GetMaxHealth(), Life);
 	}));
 
-	// Each class spends for itself, at the same level.
+	// Each class has the same level.
 	AddTap(Steps, EKeys::C);
 	Steps.Add(Wait(0.1));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestEqual(TEXT("The level counts for both classes"), Profile(Context)->GetLevel(), 3);
-		Context.Test->TestEqual(TEXT("The other class spends its own points"), Profile(Context)->GetFreePoints(), 2);
-		Context.Test->TestEqual(TEXT("The other class has its own attributes"), Profile(Context)->GetAttributePoints(0), 0);
 	}));
 	AddTap(Steps, EKeys::C);
 	Steps.Add(Wait(0.1));
 
-	// The page offers it too.
+	// The page shows it.
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		UEIProfileComponent* Player = Profile(Context);
@@ -868,16 +879,7 @@ bool FEIExperienceTest::RunTest(const FString& Parameters)
 		Context.Test->TestTrue(TEXT("The page shows the level"), Menu.Shows(TEXT("Level 3")));
 		Context.Test->TestTrue(TEXT("The page shows the gold"), Menu.Shows(TEXT("Gold 0")));
 		Context.Test->TestTrue(TEXT("The page shows the points of a faction"), Menu.Shows(TEXT("Feuer 0")));
-		const FEIMenuElement* Minus = Menu.FindButton(TEXT("- Kraft"));
-		Context.Test->TestNotNull(TEXT("The page has the button"), Minus);
-		Menu.Click(Minus->X + 1.0f, Minus->Y + 1.0f);
-		Context.Test->TestEqual(TEXT("The button takes a point away"), Player->GetAttributePoints(0), 0);
-		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
-		const FEIMenuElement* Plus = Menu.FindButton(TEXT("+ Geist"));
-		Context.Test->TestNotNull(TEXT("The page has that button too"), Plus);
-		Menu.Click(Plus->X + 1.0f, Plus->Y + 1.0f);
-		Context.Test->TestEqual(TEXT("The button gives a point"), Player->GetAttributePoints(1), 1);
-		Context.Test->TestNearlyEqual(TEXT("The spells follow"), Gear(Context)->GetStat(EEIStat::SpellPower), Player->GetTable().Attributes[1].PerPoint);
+		Context.Test->TestNull(TEXT("There are no points to spend"), Menu.FindButton(TEXT("+ ")));
 	}));
 
 	// Enemies pay a little, but only to whoever stood near.
@@ -898,15 +900,7 @@ bool FEIExperienceTest::RunTest(const FString& Parameters)
 			Far->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 		}
 		Context.Test->TestEqual(TEXT("From afar it brings nothing"), Player->GetSave().Experience, FMath::RoundToInt32(Values.Experience));
-
-		// The rare item, made certain here.
-		AEIEnemy* Lucky = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(800.0f, 300.0f, 0.0f), FRotator::ZeroRotator);
-		FEIEnemyValues Certain = Lucky->GetValues();
-		Certain.ItemChance = 1.0f;
-		Lucky->ApplyValues(Certain);
-		Lucky->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
-		Context.Test->TestEqual(TEXT("A rare item lands in the bag"), Player->GetLoot().Num(), 1);
-		Context.Test->TestTrue(TEXT("Such a find gets a note"), Player->GetRewardNote() > 0.0f);
+		Context.Test->TestEqual(TEXT("An enemy drops no item"), Player->GetSave().Items.Num(), Player->GetTable().StartItems.Num());
 
 		// Reaching a level gets a note, even from an ordinary kill.
 		Player->GetSave().Experience = Player->GetTable().GetExperienceForLevel(2) - 1;
@@ -918,22 +912,27 @@ bool FEIExperienceTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FEIArenaExperienceTest,
-	"Eisenseelen.Play.ArenaAttributes",
+	FEIArenaFreeTest,
+	"Eisenseelen.Play.ArenaFree",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FEIArenaExperienceTest::RunTest(const FString& Parameters)
+bool FEIArenaFreeTest::RunTest(const FString& Parameters)
 {
 	TArray<FEIPlayStep> Steps;
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		UEIProfileComponent* Player = Profile(Context);
-		const int32 MaxLevel = FMath::RoundToInt32(Player->GetTable().MaxLevel);
-		Context.Test->TestEqual(TEXT("In the arena the level is the highest"), Player->GetLevel(), MaxLevel);
-		Context.Test->TestEqual(TEXT("So all points are there"), Player->GetFreePoints(), MaxLevel - 1);
-		Player->ChangeAttribute(0, 1);
-		Context.Test->TestNearlyEqual(TEXT("They count in the arena"), Gear(Context)->GetStat(EEIStat::AttackPower), Player->GetTable().Attributes[0].PerPoint);
-		Context.Test->TestTrue(TEXT("But not for a real run"), Player->GetSave().Classes[0].Attributes.IsEmpty());
+		const FEIItemTable& Table = Player->GetTable();
+		Context.Test->TestEqual(TEXT("In the arena the level is the highest"), Player->GetLevel(), FMath::RoundToInt32(Table.MaxLevel));
+		for (int32 Item = 0; Item < Table.Items.Num(); ++Item)
+		{
+			Context.Test->TestTrue(*FString::Printf(TEXT("In the arena %s is free"), *Table.Items[Item].Name), Player->GetOffer(Item) == EEIOffer::Owned);
+		}
+		Player->GetSave().Gold = 100000;
+		Context.Test->TestFalse(TEXT("In the arena nothing is bought"), Player->BuyByName(TEXT("Donnerbrecher")));
+		Context.Test->TestEqual(TEXT("So no gold goes"), Player->GetSave().Gold, 100000);
+		Context.Test->TestFalse(TEXT("And the real save stays as it was"), Player->GetSave().Items.Contains(TEXT("Donnerbrecher")));
+		Player->GetSave().Gold = 0;
 
 		AEIEnemy* Enemy = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(800.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
 		Enemy->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);

@@ -204,7 +204,6 @@ bool FEIEnemyValues::ReadFrom(const FJsonObject& Section, FEIEnemyValues& OutVal
 		|| !FEIDataFile::ReadNumber(Section, TEXT("schild_schaden_faktor_0_bis_1"), 0.0, 1.0, Loaded.ShieldDamageFactor, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("schild_winkel_grad"), 0.0, 360.0, Loaded.ShieldAngleDegrees, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("erfahrung"), 0.0, 1000000.0, Loaded.Experience, OutError)
-		|| !FEIDataFile::ReadNumber(Section, TEXT("item_chance_0_bis_1"), 0.0, 1.0, Loaded.ItemChance, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("wurf_tempo_m_pro_s"), 0.0, 200.0, Loaded.ThrowSpeedMetersPerSecond, OutError))
 	{
 		return false;

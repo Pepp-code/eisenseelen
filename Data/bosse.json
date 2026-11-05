@@ -47,7 +47,6 @@
 				"schild_winkel_grad": 120,
 				"wurf_tempo_m_pro_s": 0,
 				"erfahrung": 50,
-				"item_chance_0_bis_1": 0,
 				"ansturm_tempo_m_pro_s": 16,
 				"ansturm_strecke_m": 24,
 				"ansturm_breite_m": 3.6,
@@ -110,8 +109,7 @@
 				"schild_winkel_grad": 120,
 				"wurf_tempo_m_pro_s": 24,
 				"zurueckweichen_unter_m": 7,
-				"erfahrung": 50,
-				"item_chance_0_bis_1": 0
+				"erfahrung": 50
 			},
 			"beschwoeren": {
 				"gruppe": "klein",

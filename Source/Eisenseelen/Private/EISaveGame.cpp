@@ -28,12 +28,6 @@ namespace
 		}
 		const TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
 		Object->SetObjectField(TEXT("plaetze"), Slots);
-		const TSharedRef<FJsonObject> Attributes = MakeShared<FJsonObject>();
-		for (const TPair<FString, int32>& Pair : Saved.Attributes)
-		{
-			Attributes->SetNumberField(Pair.Key, Pair.Value);
-		}
-		Object->SetObjectField(TEXT("attribute"), Attributes);
 		return Object;
 	}
 
@@ -50,17 +44,6 @@ namespace
 			FString Name;
 			Out.Slots[Index] = (*Slots)->TryGetStringField(EISlotKey(static_cast<EEISlot>(Index)), Name) ? Name : FString();
 		}
-		Out.Attributes.Reset();
-		const TSharedPtr<FJsonObject>* Attributes = nullptr;
-		if ((*Object)->TryGetObjectField(TEXT("attribute"), Attributes))
-		{
-			for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Attributes)->Values)
-			{
-				double Points = 0.0;
-				Pair.Value->TryGetNumber(Points);
-				Out.Attributes.Add(Pair.Key, FMath::RoundToInt32(Points));
-			}
-		}
 	}
 }
 
@@ -69,7 +52,7 @@ FEISaveGame FEISaveGame::MakeNew(const FEIItemTable& Table)
 	FEISaveGame Save;
 	for (const FString& Name : Table.StartItems)
 	{
-		Save.Items.Add(Name, 0);
+		Save.Items.Add(Name);
 	}
 	for (int32 ClassIndex = 0; ClassIndex < 2; ++ClassIndex)
 	{
@@ -87,7 +70,7 @@ FEISaveGame FEISaveGame::MakeNew(const FEIItemTable& Table)
 FString FEISaveGame::ToJson() const
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
-	Root->SetNumberField(TEXT("version"), 1);
+	Root->SetNumberField(TEXT("version"), 2);
 	Root->SetNumberField(TEXT("erfahrung"), Experience);
 	Root->SetNumberField(TEXT("gold"), Gold);
 	const TSharedRef<FJsonObject> Points = MakeShared<FJsonObject>();
@@ -111,15 +94,16 @@ FString FEISaveGame::ToJson() const
 	}
 	Root->SetArrayField(TEXT("gefundene_zutaten"), SeenValues);
 
-	const TSharedRef<FJsonObject> Owned = MakeShared<FJsonObject>();
-	for (const TPair<FString, int32>& Pair : Items)
+	TArray<FString> OwnedNames = Items.Array();
+	OwnedNames.Sort();
+	TArray<TSharedPtr<FJsonValue>> Owned;
+	for (const FString& Name : OwnedNames)
 	{
-		Owned->SetNumberField(Pair.Key, Pair.Value);
+		Owned.Add(MakeShared<FJsonValueString>(Name));
 	}
-	Root->SetObjectField(TEXT("items"), Owned);
+	Root->SetArrayField(TEXT("items"), Owned);
 
 	const TSharedRef<FJsonObject> Arena = MakeShared<FJsonObject>();
-	Arena->SetNumberField(TEXT("qualitaet"), ArenaQuality);
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
 		Root->SetObjectField(ClassKeys[Index], WriteClass(Classes[Index]));
@@ -136,12 +120,33 @@ FString FEISaveGame::ToJson() const
 bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 {
 	const TSharedPtr<FJsonObject> Root = FEIDataFile::Parse(Json, OutError);
-	const TSharedPtr<FJsonObject>* Owned = nullptr;
 	if (!Root.IsValid())
 	{
 		return false;
 	}
-	if (!Root->TryGetObjectField(TEXT("items"), Owned))
+	// Since version 2 the items are a list of names. Before, every name had a quality, and owning was enough.
+	TSet<FString> OwnedNames;
+	const TArray<TSharedPtr<FJsonValue>>* OwnedList = nullptr;
+	const TSharedPtr<FJsonObject>* OwnedObject = nullptr;
+	if (Root->TryGetArrayField(TEXT("items"), OwnedList))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *OwnedList)
+		{
+			FString Name;
+			if (Value->TryGetString(Name) && !Name.IsEmpty())
+			{
+				OwnedNames.Add(Name);
+			}
+		}
+	}
+	else if (Root->TryGetObjectField(TEXT("items"), OwnedObject))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*OwnedObject)->Values)
+		{
+			OwnedNames.Add(Pair.Key);
+		}
+	}
+	else
 	{
 		OutError = TEXT("Die Liste items fehlt.");
 		return false;
@@ -167,13 +172,7 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 			Loaded.FactionPoints.Add(Pair.Key, FMath::RoundToInt32(Amount));
 		}
 	}
-	Loaded.Items.Reset();
-	for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Owned)->Values)
-	{
-		double Quality = 0.0;
-		Pair.Value->TryGetNumber(Quality);
-		Loaded.Items.Add(Pair.Key, FMath::RoundToInt32(Quality));
-	}
+	Loaded.Items = MoveTemp(OwnedNames);
 	Loaded.Ingredients.Reset();
 	const TSharedPtr<FJsonObject>* Found = nullptr;
 	if (Root->TryGetObjectField(TEXT("zutaten"), Found))
@@ -212,11 +211,6 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 		{
 			ReadClass(**Arena, ClassKeys[Index], Loaded.ArenaClasses[Index]);
 		}
-	}
-	double Quality = 0.0;
-	if (bHasArena && (*Arena)->TryGetNumberField(TEXT("qualitaet"), Quality))
-	{
-		Loaded.ArenaQuality = FMath::RoundToInt32(Quality);
 	}
 	*this = Loaded;
 	return true;

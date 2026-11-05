@@ -136,7 +136,7 @@ def scenario():
     player().preview_choose_boss(boss_index)
     yield 0.5
 
-    # The dock: from the middle of it, at the board with the hunt letters, and then right at the barge, where the use key works.
+    # The dock: from the middle of it, at the board with the hunt letters, at the forge, and then right at the barge, where the use key works.
     shot()
     yield AFTER_SHOT_SECONDS
     board = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIHuntBoard)[0]
@@ -147,6 +147,27 @@ def scenario():
     yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
+
+    # The forge from a few steps away, then close enough for F, and its page with some gold and experience.
+    forge = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIForge)[0]
+    spot = forge.get_actor_location()
+    front = forge.get_actor_forward_vector()
+    stand_looking_at((spot.x + 900 * front.x, spot.y + 900 * front.y), (spot.x, spot.y, spot.z + 120), spot.z + STAND_HEIGHT)
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    stand_looking_at((spot.x + 260 * front.x, spot.y + 260 * front.y), (spot.x, spot.y, spot.z + 80), spot.z + STAND_HEIGHT)
+    player().preview_purse(2000, 500)
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("F")
+    yield 0.3
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from tap("I")
+    yield 0.3
+
     barge = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EISkyBarge)[0]
     spot = barge.get_actor_location()
     pawn().set_actor_location(unreal.Vector(spot.x, spot.y - 500, spot.z + STAND_HEIGHT), False, True)

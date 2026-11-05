@@ -2,11 +2,13 @@
 
 #include "EIBoss.h"
 #include "EIEnemy.h"
+#include "EIForge.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHordeDirector.h"
 #include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
+#include "EISkyBarge.h"
 #include "EISoulKettle.h"
 #include "Engine/DamageEvents.h"
 #include "Engine/World.h"
@@ -109,6 +111,48 @@ void AEIPlayerController::PreviewMenuSlot(int32 Slot)
 void AEIPlayerController::PreviewLootBook(bool bShow)
 {
 	Menu.ShowLootBook(bShow);
+}
+
+void AEIPlayerController::PreviewMenuPage(int32 Page)
+{
+	Menu.ShowPage(static_cast<EEIMenuPage>(FMath::Clamp(Page, 0, static_cast<int32>(EEIMenuPage::LootBook))));
+}
+
+void AEIPlayerController::PreviewBuy(const FString& Name)
+{
+	Profile->BuyByName(Name);
+}
+
+void AEIPlayerController::PreviewPurse(int32 Gold, int32 Experience)
+{
+	Profile->GetSave().Gold = FMath::Max(Gold, 0);
+	Profile->GetSave().Experience = FMath::Max(Experience, 0);
+}
+
+AEIForge* AEIPlayerController::FindForgeInReach() const
+{
+	const AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>();
+	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (Hero == nullptr || Hero->IsDead() || Hero->IsAboard() || State == nullptr || State->GetRunPhase() != EEIRunPhase::AtDock)
+	{
+		return nullptr;
+	}
+	// Getting into the barge goes first, should both be in reach.
+	for (TActorIterator<AEISkyBarge> It(GetWorld()); It; ++It)
+	{
+		if (It->IsInBoardingZone(Hero))
+		{
+			return nullptr;
+		}
+	}
+	for (TActorIterator<AEIForge> It(GetWorld()); It; ++It)
+	{
+		if (It->IsInReach(Hero))
+		{
+			return *It;
+		}
+	}
+	return nullptr;
 }
 
 void AEIPlayerController::PreviewEquip(const FString& Name)
@@ -411,10 +455,21 @@ void AEIPlayerController::HandleSecondaryReleased()
 
 void AEIPlayerController::HandleInteract()
 {
-	if (!bMenuOpen)
+	if (bMenuOpen)
 	{
-		ServerInteract();
+		return;
 	}
+	// The forge is only a page of the menu, so the server need not know about it.
+	if (FindForgeInReach() != nullptr)
+	{
+		SetMenuOpen(true);
+		if (bMenuOpen)
+		{
+			Menu.ShowPage(EEIMenuPage::Forge);
+		}
+		return;
+	}
+	ServerInteract();
 }
 
 void AEIPlayerController::ServerInteract_Implementation()

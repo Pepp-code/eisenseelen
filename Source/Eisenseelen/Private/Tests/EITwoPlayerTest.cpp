@@ -40,6 +40,7 @@ namespace
 	constexpr double TimeoutSeconds = 180.0;
 	constexpr float MaxDriftCm = 25.0f;
 	constexpr float LeaderScale = 1.25f;
+	constexpr int32 GuestReward = 12345;
 
 	/** The worlds and heroes of a session with a host and one guest, once all of them exist. */
 	struct FTwoPlayerSession
@@ -1109,7 +1110,7 @@ public:
 			// Each player gets their own reward, and it stays on their own machine.
 			if (const AEIPlayerController* ServerCopyOfGuest = Session.ServerCopyOfClientHero->GetController<AEIPlayerController>())
 			{
-				ServerCopyOfGuest->GetProfile()->GrantEnemyReward(0.0f, 1.0f);
+				ServerCopyOfGuest->GetProfile()->GrantEnemyReward(GuestReward);
 				ServerCopyOfGuest->GetProfile()->EndRun(true);
 			}
 			EnterStep(8);
@@ -1121,10 +1122,9 @@ public:
 			}
 			{
 				const UEIProfileComponent* Guest = Session.ClientPlayer->GetProfile();
-				Test->TestEqual(TEXT("The guest gets the reward"), Guest->GetLoot().Num(), 1);
-				Test->TestTrue(TEXT("The guest's save has the item"), Guest->GetLoot().Num() == 1 && Guest->GetSave().Items.Contains(Guest->GetTable().Items[Guest->GetLoot()[0].Item].Name));
+				Test->TestTrue(TEXT("The guest gets the experience"), Guest->GetSave().Experience >= GuestReward);
 				const AEIPlayerController* Host = Cast<AEIPlayerController>(ServerWorld->GetFirstPlayerController());
-				Test->TestEqual(TEXT("The host gets nothing of it"), Host->GetProfile()->GetLoot().Num(), 0);
+				Test->TestTrue(TEXT("The host gets nothing of it"), Host->GetProfile()->GetSave().Experience < GuestReward);
 			}
 			// A leader has to look like one on the guest's screen too.
 			if (AEIEnemy* Leader = ServerWorld->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Session.ServerCopyOfClientHero->GetActorLocation() + FVector(0.0f, 1500.0f, 0.0f), FRotator::ZeroRotator))

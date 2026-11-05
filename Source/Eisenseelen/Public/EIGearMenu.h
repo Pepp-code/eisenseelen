@@ -24,10 +24,19 @@ struct FEIMenuElement
 	bool Contains(float PointX, float PointY) const;
 };
 
+/** The three pages of the menu, chosen by the tabs at its top. */
+enum class EEIMenuPage : uint8
+{
+	Gear,
+	Forge,
+	LootBook
+};
+
 /**
- * The gear page: the seven slots on the left, what fits the chosen slot in the middle, and the sum of all values on the
- * right. It only makes a list of what is on the page, and the HUD draws that list. So it can be tested without a screen,
- * and all it changes goes through the player's profile.
+ * The menu with its three pages. The gear page has the seven slots on the left, what fits the chosen slot in the middle,
+ * and the sum of all values on the right. The forge shows what the level opens and gold buys. It only makes a list of
+ * what is on the page, and the HUD draws that list. So it can be tested without a screen, and all it changes goes through
+ * the player's profile.
  */
 class EISENSEELEN_API FEIGearMenu
 {
@@ -49,23 +58,31 @@ public:
 	EEISlot GetSelectedSlot() const { return SelectedSlot; }
 	void SelectSlot(EEISlot Slot) { SelectedSlot = Slot; }
 
+	EEIMenuPage GetPage() const { return Page; }
+	void ShowPage(EEIMenuPage NewPage) { Page = NewPage; }
+
 	/** Whether the loot book shows instead of the gear. */
-	bool IsShowingLootBook() const { return bShowLootBook; }
-	void ShowLootBook(bool bShow) { bShowLootBook = bShow; }
+	bool IsShowingLootBook() const { return Page == EEIMenuPage::LootBook; }
+	void ShowLootBook(bool bShow) { Page = bShow ? EEIMenuPage::LootBook : EEIMenuPage::Gear; }
 
 private:
 	void AddText(float X, float Y, const FString& Text, const FLinearColor& Color, float Scale = 1.0f);
 	void AddBox(float X, float Y, float Width, float Height, const FLinearColor& Color);
 	void AddButton(float X, float Y, float Width, float Height, const FString& Text, const FLinearColor& TextColor, bool bActive, float MouseX, float MouseY, TFunction<void()> OnClick);
 
+	void BuildTabs(float Left, float Top, float MouseX, float MouseY);
+	void BuildPurse(const UEIProfileComponent& Profile, float X, float Y);
 	void BuildLootBook(const UEIProfileComponent& Profile, float Left, float Top, float InnerWidth);
 	void BuildSlots(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
 	int32 BuildChoices(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
 	void BuildSums(const UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, float X, float Y);
 	void BuildComparison(const UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, int32 Item, float X, float Y);
-	void BuildAttributes(UEIProfileComponent& Profile, float X, float Bottom, float MouseX, float MouseY);
+	void BuildLevel(const UEIProfileComponent& Profile, float X, float Bottom);
+	void BuildForge(UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, float Left, float Top, float InnerWidth, float Bottom, float MouseX, float MouseY);
+	void BuildForgeSlots(const UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
+	int32 BuildOffers(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
 
 	TArray<FEIMenuElement> Elements;
 	EEISlot SelectedSlot = EEISlot::Weapon;
-	bool bShowLootBook = false;
+	EEIMenuPage Page = EEIMenuPage::Gear;
 };

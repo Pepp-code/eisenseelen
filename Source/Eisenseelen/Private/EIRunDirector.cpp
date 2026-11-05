@@ -12,6 +12,7 @@
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
 #include "EIHordeDirector.h"
+#include "EIForge.h"
 #include "EIHuntBoard.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
@@ -96,8 +97,8 @@ namespace
 		return true;
 	}
 
-	/** The name of the area and where the dock and the hunt board stand. */
-	bool LoadDock(FString& OutArea, FVector& OutCenter, FVector& OutBoardPlace, FString& OutError)
+	/** The name of the area and where the dock, the hunt board and the forge stand. */
+	bool LoadDock(FString& OutArea, FVector& OutCenter, FVector& OutBoardPlace, FVector& OutForgePlace, FString& OutError)
 	{
 		const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("laufkarte.json"), OutError);
 		const TSharedPtr<FJsonObject>* Dock = nullptr;
@@ -121,17 +122,22 @@ namespace
 		float Height = 0.0f;
 		float BoardX = 0.0f;
 		float BoardY = 0.0f;
+		float ForgeX = 0.0f;
+		float ForgeY = 0.0f;
 		if (!FEIDataFile::ReadNumber(**Dock, TEXT("x_m"), -100000.0, 100000.0, X, OutError)
 			|| !FEIDataFile::ReadNumber(**Dock, TEXT("y_m"), -100000.0, 100000.0, Y, OutError)
 			|| !FEIDataFile::ReadNumber(**Dock, TEXT("hoehe_m"), -10000.0, 10000.0, Height, OutError)
 			|| !FEIDataFile::ReadNumber(**Dock, TEXT("jagdbrett_x_m"), -1000.0, 1000.0, BoardX, OutError)
-			|| !FEIDataFile::ReadNumber(**Dock, TEXT("jagdbrett_y_m"), -1000.0, 1000.0, BoardY, OutError))
+			|| !FEIDataFile::ReadNumber(**Dock, TEXT("jagdbrett_y_m"), -1000.0, 1000.0, BoardY, OutError)
+			|| !FEIDataFile::ReadNumber(**Dock, TEXT("schmiede_x_m"), -1000.0, 1000.0, ForgeX, OutError)
+			|| !FEIDataFile::ReadNumber(**Dock, TEXT("schmiede_y_m"), -1000.0, 1000.0, ForgeY, OutError))
 		{
 			return false;
 		}
 		OutArea = Area;
 		OutCenter = FVector(X, Y, Height) * CentimetersPerMeter;
 		OutBoardPlace = FVector(X + BoardX, Y + BoardY, Height) * CentimetersPerMeter;
+		OutForgePlace = FVector(X + ForgeX, Y + ForgeY, Height) * CentimetersPerMeter;
 		return true;
 	}
 
@@ -173,6 +179,7 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abstand_m"), 1.0, 100.0, Loaded.BargeDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abflug_tempo_m_pro_s"), 0.1, 100.0, Loaded.BargeDepartMetersPerSecond, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("jagdbrett_reichweite_m"), 0.5, 100.0, Loaded.HuntBoardReachMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("schmiede_reichweite_m"), 0.5, 100.0, Loaded.ForgeReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_leben_faktor"), 0.1, 100.0, Loaded.LeaderLifeFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_schaden_faktor"), 0.1, 100.0, Loaded.LeaderDamageFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_groesse_faktor"), 0.1, 10.0, Loaded.LeaderScaleFactor, OutError))
@@ -223,7 +230,7 @@ void UEIRunDirector::LoadValues()
 	{
 		FEIDataFile::ReportError(TEXT("laufkarte.json"), Error);
 	}
-	bHasDock = LoadDock(AreaName, DockCenter, HuntBoardPlace, Error);
+	bHasDock = LoadDock(AreaName, DockCenter, HuntBoardPlace, ForgePlace, Error);
 	if (!bHasDock)
 	{
 		FEIDataFile::ReportError(TEXT("laufkarte.json"), Error);
@@ -258,6 +265,7 @@ void UEIRunDirector::ResetRun()
 		return;
 	}
 	PrepareHuntBoard();
+	PrepareForge();
 	Barge->ReturnToStart();
 	State->SetRunPhase(EEIRunPhase::AtDock);
 }
@@ -278,6 +286,25 @@ void UEIRunDirector::PrepareHuntBoard()
 	{
 		HuntBoard->Setup(Values.HuntBoardReachMeters);
 		HuntBoard->FinishSpawning(Spawn);
+	}
+}
+
+void UEIRunDirector::PrepareForge()
+{
+	if (Forge != nullptr || !bHasDock)
+	{
+		return;
+	}
+	FVector Ground = ForgePlace;
+	FindGround(ForgePlace, Ground);
+	// The anvil faces the middle of the dock, like the hunt board.
+	const FVector Facing = (DockCenter - ForgePlace).GetSafeNormal2D();
+	const FTransform Spawn(Facing.IsNearlyZero() ? FRotator::ZeroRotator : Facing.Rotation(), Ground);
+	Forge = GetWorld()->SpawnActorDeferred<AEIForge>(AEIForge::StaticClass(), Spawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Forge != nullptr)
+	{
+		Forge->Setup(Values.ForgeReachMeters);
+		Forge->FinishSpawning(Spawn);
 	}
 }
 
@@ -888,7 +915,7 @@ void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
 		const AEIHeroCharacter* Hero = Player != nullptr ? Player->GetPawn<AEIHeroCharacter>() : nullptr;
 		if (Hero != nullptr && !Hero->IsDead() && FVector::Dist2D(Hero->GetActorLocation(), Enemy.GetActorLocation()) <= Player->GetProfile()->GetTable().Rewards.RadiusMeters * CentimetersPerMeter)
 		{
-			Player->GetProfile()->GrantEnemyReward(Enemy.GetValues().Experience, Enemy.GetValues().ItemChance);
+			Player->GetProfile()->GrantEnemyReward(Enemy.GetValues().Experience);
 		}
 	}
 }

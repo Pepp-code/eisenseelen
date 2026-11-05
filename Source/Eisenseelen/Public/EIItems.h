@@ -100,6 +100,10 @@ struct EISENSEELEN_API FEIItem
 	int32 Form = INDEX_NONE;
 	EEIElement Element = EEIElement::Fire;
 
+	/** What it costs in the forge, and from which level the forge offers it. */
+	int32 Price = 0;
+	int32 FromLevel = 1;
+
 	bool FitsClass(bool bArcanist) const { return bArcanist ? bForArcanist : bForBladewarden; }
 };
 
@@ -113,30 +117,18 @@ struct EISENSEELEN_API FEIArmorSet
 /** What deeds bring, from the section belohnung of Data/items.json. */
 struct EISENSEELEN_API FEIRewardValues
 {
-	float DuplicateExperience = 30.0f;
 	float RadiusMeters = 40.0f;
-};
-
-/** What a point of experience can buy, from the list attribute of Data/items.json. */
-struct EISENSEELEN_API FEIAttribute
-{
-	FString Name;
-	EEIStat Stat = EEIStat::Life;
-	float PerPoint = 0.0f;
 };
 
 struct EISENSEELEN_API FEIItemTable
 {
 	FEIRewardValues Rewards;
-	TArray<FEIAttribute> Attributes;
 	float MaxLevel = 20.0f;
 	float FirstLevelExperience = 100.0f;
 	float LevelExperienceGrowth = 50.0f;
 	TArray<FEIItem> Items;
 	TArray<FEIWeaponForm> Forms;
 	TArray<FEIArmorSet> Sets;
-	TArray<FString> QualityNames;
-	TArray<float> QualityFactors;
 	TArray<FString> StartItems;
 	float MaxSpeedBonus = 0.3f;
 	float MaxArmor = 0.6f;
@@ -147,12 +139,13 @@ struct EISENSEELEN_API FEIItemTable
 	int32 FindItem(const FString& Name) const;
 	const FEIArmorSet* FindSet(const FString& Name) const;
 	const FEIWeaponForm* GetForm(const FEIItem& Item) const;
-	float GetQualityFactor(int32 Quality) const;
-	FString GetQualityName(int32 Quality) const;
 
 	/** All the experience it takes to be this level. Level 1 takes none. */
 	int32 GetExperienceForLevel(int32 Level) const;
 	int32 GetLevel(int32 Experience) const;
+
+	/** What the forge starts to offer at exactly this level. */
+	TArray<int32> GetUnlockedAt(int32 Level) const;
 
 	/** What a new hero of this class has in this slot. INDEX_NONE if nothing. */
 	int32 GetStartItem(EEISlot Slot, bool bArcanist) const;
@@ -169,9 +162,6 @@ struct FEIWornItem
 
 	UPROPERTY()
 	int32 Item = INDEX_NONE;
-
-	UPROPERTY()
-	int32 Quality = 0;
 };
 
 /** What a hero of one class wears. It travels over the net by the position of the items in the table. */
@@ -183,8 +173,4 @@ struct FEIHeroSetup
 	/** One entry per slot. */
 	UPROPERTY()
 	TArray<FEIWornItem> Slots;
-
-	/** The points in each attribute. */
-	UPROPERTY()
-	TArray<int32> Attributes;
 };

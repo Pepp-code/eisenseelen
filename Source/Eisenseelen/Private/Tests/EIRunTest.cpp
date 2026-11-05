@@ -162,7 +162,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		UEIProfileComponent* Profile = Context.Player->GetProfile();
 		Profile->EquipByName(TEXT("Sturmrune"));
 		Context.Test->TestEqual(TEXT("What the player does not own stays off"), Context.Hero->GetRunes()->GetRuneIndex(), 0);
-		Profile->GetSave().Items.Add(TEXT("Sturmrune"), 0);
+		Profile->GetSave().Items.Add(TEXT("Sturmrune"));
 		Profile->EquipByName(TEXT("Sturmrune"));
 	}));
 	Steps.Add(Wait(0.05));
@@ -314,7 +314,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	{
 		UEIProfileComponent* Profile = Context.Player->GetProfile();
 		Profile->GrantContract(0, 100, 10);
-		Profile->GrantEnemyReward(0.0f, 1.0f);
+		Profile->GrantEnemyReward(10.0f);
 	}));
 	AddTap(Steps, EKeys::F);
 	Steps.Add(WaitForPhase(TEXT("the hero gets away"), 1.0, EEIRunPhase::Escaped));
@@ -324,9 +324,8 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		const FString Faction = Profile->GetContractTable().Factions[0].Name;
 		Context.Test->TestEqual(TEXT("All the gold is safe"), Profile->GetSave().Gold, 100);
 		Context.Test->TestEqual(TEXT("All the points are safe"), Profile->GetSave().FactionPoints.FindRef(Faction), 10);
-		Context.Test->TestEqual(TEXT("The loot is still there"), Profile->GetLoot().Num(), 1);
-		Context.Test->TestFalse(TEXT("The loot came to something"), Profile->GetLoot()[0].Result.IsEmpty());
-		Context.Test->TestTrue(TEXT("The loot is safe"), Profile->GetSave().Items.Contains(Profile->GetTable().Items[Profile->GetLoot()[0].Item].Name));
+		Context.Test->TestTrue(TEXT("The experience is safe"), Profile->GetSave().Experience >= 10);
+		Context.Test->TestTrue(TEXT("The settlement counts it"), Profile->GetRunExperience() >= 10);
 		Context.Test->TestTrue(TEXT("The hero stands on the barge"), Context.Hero->GetAttachParentActor() == GetBarge(Context));
 		Context.Test->TestFalse(TEXT("The hero is safe on the barge"), Context.Hero->CanBeDamaged());
 		State->Height = Context.Hero->GetActorLocation().Z;
@@ -1257,7 +1256,7 @@ bool FEIRunFailedTest::RunTest(const FString& Parameters)
 	{
 		UEIProfileComponent* Profile = Context.Player->GetProfile();
 		Profile->GrantContract(0, 100, 10);
-		Profile->GrantEnemyReward(10.0f, 1.0f);
+		Profile->GrantEnemyReward(10.0f);
 		Context.Hero->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 	}));
 	Steps.Add(WaitForPhase(TEXT("the run is lost"), 1.0, EEIRunPhase::Failed));
@@ -1269,8 +1268,6 @@ bool FEIRunFailedTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("The file says 30 percent"), Table.GetKeptOnFailure(100), 30);
 		Context.Test->TestEqual(TEXT("A share of the points stays"), Profile->GetSave().FactionPoints.FindRef(Table.Factions[0].Name), Table.GetKeptOnFailure(10));
 		Context.Test->TestEqual(TEXT("The settlement can say so"), Profile->GetSecured(100), 30);
-		Context.Test->TestEqual(TEXT("A found item is gone"), Profile->GetLoot()[0].Result, FString(TEXT("verloren")));
-		Context.Test->TestFalse(TEXT("It did not reach the save"), Profile->GetSave().Items.Contains(Profile->GetTable().Items[Profile->GetLoot()[0].Item].Name));
 		Context.Test->TestTrue(TEXT("The experience stays"), Profile->GetSave().Experience > 0);
 	}));
 	AddTap(Steps, EKeys::R);

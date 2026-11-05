@@ -124,7 +124,7 @@ bool FEIBossDataTest::RunTest(const FString& Parameters)
 	// A small table, to see that the rules are kept.
 	const FString Fight = TEXT("{\"leben\": 100, \"bedrohung\": 0, \"tempo_m_pro_s\": 1, \"schaden\": 1, \"angriff_ab_abstand_m\": 1, \"ausholen_s\": 1, \"ausholen_folgen_s\": 0, \"trefferzone_m\": 1, \"trefferbreite_m\": 1, \"erholung_s\": 1, ")
 		TEXT("\"taumeln_faktor_schwerer_hieb_0_bis_1\": 0, \"sicht_m\": 1, \"alarm_umkreis_m\": 0, \"aufgeben_m\": 1, \"wach_mindestens_s\": 1, \"groesse_faktor\": 2, \"drehtempo_grad_pro_s\": 1, ")
-		TEXT("\"schild_schaden_faktor_0_bis_1\": 1, \"schild_winkel_grad\": 1, \"wurf_tempo_m_pro_s\": 0, \"erfahrung\": 7, \"item_chance_0_bis_1\": 0}");
+		TEXT("\"schild_schaden_faktor_0_bis_1\": 1, \"schild_winkel_grad\": 1, \"wurf_tempo_m_pro_s\": 0, \"erfahrung\": 7}");
 	const FString Valid = FString(TEXT("{\"platz_leine_m\": 32, \"erholung_anteil_pro_s\": 0.1, \"leben_je_weiterem_spieler\": 0.5, \"kampf_welle_alle_s\": 20, \"verfolgung_welle_alle_s\": 12, \"signalfeuer_mindestabstand_m\": 100, ")
 		TEXT("\"jagdbriefe\": 2, \"chance_worte\": [{\"ab\": 0, \"wort\": \"kaum\"}, {\"ab\": 0.3, \"wort\": \"oft\"}], ")
 		TEXT("\"bosse\": [{\"name\": \"Probe\", \"auftritt\": \"Los!\", \"farbe\": [1, 0, 0], ")

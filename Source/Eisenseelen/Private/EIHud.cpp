@@ -6,6 +6,7 @@
 #include "EIChest.h"
 #include "EIContracts.h"
 #include "EIEnemy.h"
+#include "EIForge.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
@@ -67,6 +68,7 @@ namespace
 	constexpr float ContractMarkAboveCm = 220.0f;
 	const FLinearColor RewardColor(1.0f, 0.85f, 0.45f);
 	const FLinearColor BargeMarkColor(0.5f, 0.85f, 1.0f);
+	const FLinearColor ForgeMarkColor(1.0f, 0.6f, 0.3f);
 	const FLinearColor WarningTextColor(1.0f, 0.25f, 0.15f);
 	constexpr float WorldMarkSize = 10.0f;
 	const FLinearColor PanelColor(0.0f, 0.0f, 0.0f, 0.72f);
@@ -277,7 +279,6 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 		return;
 	}
 	const UEIProfileComponent* Profile = Player->GetProfile();
-	const TArray<FEILootLine>& Loot = Profile->GetLoot();
 	const bool bEscaped = State->GetRunPhase() == EEIRunPhase::Escaped;
 
 	// Without the barge only a share stays, and it says how much of what.
@@ -298,9 +299,8 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 		}
 	}
 
-	const int32 LootLines = Loot.IsEmpty() ? 0 : Loot.Num() + 1;
 	const int32 IngredientLines = Profile->GetRunIngredients().IsEmpty() ? 0 : 1;
-	const float PanelHeight = PanelPadding * 2.0f + PanelLine * (4 + Earned.Num() + LootLines + IngredientLines) + 40.0f;
+	const float PanelHeight = PanelPadding * 2.0f + PanelLine * (4 + Earned.Num() + IngredientLines) + 40.0f;
 	const float X = Canvas->SizeX / 2.0f - PanelWidth / 2.0f;
 	float Y = FMath::Max(Margin, Canvas->SizeY / 2.0f - PanelHeight / 2.0f);
 	DrawRect(PanelColor, X, Y, PanelWidth, PanelHeight);
@@ -322,20 +322,8 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 		DrawLine(FString::Printf(TEXT("%s%s"), bEscaped ? TEXT("Zutaten: ") : TEXT("Diese Zutaten sind verloren: "), *FString::Join(Profile->GetRunIngredients(), TEXT(", "))), TextX, Y, bEscaped ? RewardColor : LostColor);
 		Y += PanelLine;
 	}
-	if (!Loot.IsEmpty())
-	{
-		DrawLine(bEscaped ? TEXT("Gefunden:") : TEXT("Diese Funde sind verloren:"), TextX, Y, TextColor);
-		Y += PanelLine;
-	}
-	for (const FEILootLine& Line : Loot)
-	{
-		const FEIItemTable& Table = Profile->GetTable();
-		const FString Name = Table.Items.IsValidIndex(Line.Item) ? Table.Items[Line.Item].Name : FString();
-		DrawLine(FString::Printf(TEXT("%s: %s"), *Name, *Line.Result), TextX + PanelPadding, Y, bEscaped ? RewardColor : LostColor);
-		Y += PanelLine;
-	}
 	Y += PanelLine / 2.0f;
-	DrawLine(TEXT("I Ausr\u00FCstung   R zur\u00FCck zur Anlegestelle"), TextX, Y, TextColor);
+	DrawLine(TEXT("I Ausr\u00FCstung und Schmiede   R zur\u00FCck zur Anlegestelle"), TextX, Y, TextColor);
 }
 
 void AEIHud::DrawContracts(const AEIHeroCharacter* Hero, const AEIGameState* State, const FEIContractTable& Table, float PromptY)
@@ -522,7 +510,7 @@ void AEIHud::DrawDock(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 			Aboard += It->IsAboard() ? 1 : 0;
 		}
 	}
-	DrawLine(TEXT("Steig in die Barke, dann beginnt der Lauf. Vorher w\u00E4hlst du mit C die Klasse und mit I die Ausr\u00FCstung."), Margin, LineY, TextColor);
+	DrawLine(TEXT("Steig in die Barke, dann beginnt der Lauf. Vorher w\u00E4hlst du mit C die Klasse und mit I die Ausr\u00FCstung. Neues kaufst du in der Schmiede."), Margin, LineY, TextColor);
 	if (State->IsCastingOff())
 	{
 		DrawLine(TEXT("Die Barke legt ab"), CenterX - 110.0f, PromptY - 40.0f, RewardColor, 1.5f);
@@ -547,6 +535,20 @@ void AEIHud::DrawDock(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 		else
 		{
 			DrawWorldMark(It->GetActorLocation(), FString::Printf(TEXT("Barke %.0f m"), FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), BargeMarkColor);
+		}
+	}
+
+	const AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner);
+	for (TActorIterator<AEIForge> It(GetWorld()); It && !Hero->IsAboard(); ++It)
+	{
+		if (!bPrompted && Player != nullptr && Player->FindForgeInReach() == *It)
+		{
+			DrawLine(TEXT("F: Schmiede"), CenterX - 70.0f, PromptY, TextColor, 1.5f);
+			bPrompted = true;
+		}
+		else if (!It->IsInReach(Hero))
+		{
+			DrawWorldMark(It->GetMarkLocation(), FString::Printf(TEXT("Schmiede %.0f m"), FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), ForgeMarkColor);
 		}
 	}
 

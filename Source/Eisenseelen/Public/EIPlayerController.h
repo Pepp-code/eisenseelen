@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "EIPlayerController.generated.h"
 
+class AEIForge;
 class UEIProfileComponent;
 class UInputAction;
 class UInputMappingContext;
@@ -32,6 +33,9 @@ public:
 
 	/** The overview of the contracts. The hero stays in the player's hands while it is open. */
 	bool IsMapOpen() const { return bMapOpen; }
+
+	/** The forge the own hero stands at, at the dock and off the barge. There the use key opens the forge page. */
+	AEIForge* FindForgeInReach() const;
 
 	/** For preview pictures: puts on an item, by its name. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
@@ -92,6 +96,18 @@ public:
 	/** For preview pictures: the open page shows the loot book, or the gear. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewLootBook(bool bShow);
+
+	/** For preview pictures: the open page by its tab, 0 gear, 1 forge, 2 loot book. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewMenuPage(int32 Page);
+
+	/** For preview pictures: buys an item in the forge, by its name. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewBuy(const FString& Name);
+
+	/** For preview pictures: the profile has this much gold and experience, as if earned. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewPurse(int32 Gold, int32 Experience);
 
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);

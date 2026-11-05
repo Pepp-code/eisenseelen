@@ -134,6 +134,16 @@ namespace
 		{
 			return false;
 		}
+		float Price = 0.0f;
+		float FromLevel = 1.0f;
+		if (!FEIDataFile::ReadNumber(Line, TEXT("preis_gold"), 0.0, 1000000.0, Price, OutError)
+			|| !FEIDataFile::ReadNumber(Line, TEXT("ab_level"), 1.0, Table.MaxLevel, FromLevel, OutError))
+		{
+			OutError = FString::Printf(TEXT("%s: %s"), *Out.Name, *OutError);
+			return false;
+		}
+		Out.Price = FMath::RoundToInt32(Price);
+		Out.FromLevel = FMath::RoundToInt32(FromLevel);
 		if (Out.Slot != EEISlot::Weapon)
 		{
 			return true;
@@ -184,26 +194,6 @@ namespace
 			Out.Forms.Add(Form);
 		}
 
-		const TArray<TSharedPtr<FJsonValue>>* Qualities = nullptr;
-		if (!Items.TryGetArrayField(TEXT("qualitaeten"), Qualities) || Qualities->IsEmpty())
-		{
-			OutError = TEXT("Die Liste qualitaeten fehlt.");
-			return false;
-		}
-		for (const TSharedPtr<FJsonValue>& Value : *Qualities)
-		{
-			const TSharedPtr<FJsonObject>* Line = nullptr;
-			FString Name;
-			float Factor = 1.0f;
-			if (!Value->TryGetObject(Line) || !(*Line)->TryGetStringField(TEXT("name"), Name) || !FEIDataFile::ReadNumber(**Line, TEXT("faktor"), 0.01, 100.0, Factor, OutError))
-			{
-				OutError = TEXT("Einer Qualität fehlt der Name oder der Faktor.");
-				return false;
-			}
-			Out.QualityNames.Add(Name);
-			Out.QualityFactors.Add(Factor);
-		}
-
 		if (!FEIDataFile::ReadNumber(Items, TEXT("tempo_bonus_max"), 0.0, 10.0, Out.MaxSpeedBonus, OutError)
 			|| !FEIDataFile::ReadNumber(Items, TEXT("ruestung_max"), 0.0, 1.0, Out.MaxArmor, OutError)
 			|| !FEIDataFile::ReadNumber(Items, TEXT("abklingzeit_abzug_max"), 0.0, 1.0, Out.MaxCooldownCut, OutError)
@@ -219,8 +209,7 @@ namespace
 			OutError = TEXT("Der Abschnitt belohnung fehlt.");
 			return false;
 		}
-		if (!FEIDataFile::ReadNumber(**Rewards, TEXT("doppelt_erfahrung"), 0.0, 1000000.0, Out.Rewards.DuplicateExperience, OutError)
-			|| !FEIDataFile::ReadNumber(**Rewards, TEXT("umkreis_m"), 1.0, 1000.0, Out.Rewards.RadiusMeters, OutError))
+		if (!FEIDataFile::ReadNumber(**Rewards, TEXT("umkreis_m"), 1.0, 1000.0, Out.Rewards.RadiusMeters, OutError))
 		{
 			return false;
 		}
@@ -236,34 +225,6 @@ namespace
 			|| !FEIDataFile::ReadNumber(**Experience, TEXT("zuwachs_je_level"), 0.0, 1000000.0, Out.LevelExperienceGrowth, OutError))
 		{
 			return false;
-		}
-
-		const TArray<TSharedPtr<FJsonValue>>* Attributes = nullptr;
-		if (!Items.TryGetArrayField(TEXT("attribute"), Attributes))
-		{
-			OutError = TEXT("Die Liste attribute fehlt.");
-			return false;
-		}
-		for (const TSharedPtr<FJsonValue>& Value : *Attributes)
-		{
-			const TSharedPtr<FJsonObject>* Line = nullptr;
-			FEIAttribute Attribute;
-			FString StatText;
-			if (!Value->TryGetObject(Line) || !(*Line)->TryGetStringField(TEXT("name"), Attribute.Name))
-			{
-				OutError = TEXT("Einem Attribut fehlt der Name.");
-				return false;
-			}
-			if (!(*Line)->TryGetStringField(TEXT("wert"), StatText) || !EIStatFromKey(StatText, Attribute.Stat))
-			{
-				OutError = FString::Printf(TEXT("%s hat keinen bekannten Wert."), *Attribute.Name);
-				return false;
-			}
-			if (!FEIDataFile::ReadNumber(**Line, TEXT("je_punkt"), 0.0, 100000.0, Attribute.PerPoint, OutError))
-			{
-				return false;
-			}
-			Out.Attributes.Add(Attribute);
 		}
 
 		const TArray<TSharedPtr<FJsonValue>>* Sets = nullptr;
@@ -408,16 +369,6 @@ const FEIWeaponForm* FEIItemTable::GetForm(const FEIItem& Item) const
 	return Forms.IsValidIndex(Item.Form) ? &Forms[Item.Form] : nullptr;
 }
 
-float FEIItemTable::GetQualityFactor(int32 Quality) const
-{
-	return QualityFactors.IsValidIndex(Quality) ? QualityFactors[Quality] : 1.0f;
-}
-
-FString FEIItemTable::GetQualityName(int32 Quality) const
-{
-	return QualityNames.IsValidIndex(Quality) ? QualityNames[Quality] : FString();
-}
-
 int32 FEIItemTable::GetExperienceForLevel(int32 Level) const
 {
 	const int32 Steps = FMath::Max(Level - 1, 0);
@@ -432,6 +383,19 @@ int32 FEIItemTable::GetLevel(int32 Experience) const
 		++Level;
 	}
 	return Level;
+}
+
+TArray<int32> FEIItemTable::GetUnlockedAt(int32 Level) const
+{
+	TArray<int32> Unlocked;
+	for (int32 Index = 0; Index < Items.Num(); ++Index)
+	{
+		if (Items[Index].FromLevel == Level)
+		{
+			Unlocked.Add(Index);
+		}
+	}
+	return Unlocked;
 }
 
 int32 FEIItemTable::GetStartItem(EEISlot Slot, bool bArcanist) const

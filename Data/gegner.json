@@ -21,8 +21,7 @@
 		"schild_schaden_faktor_0_bis_1": 1,
 		"schild_winkel_grad": 120,
 		"wurf_tempo_m_pro_s": 0,
-		"erfahrung": 1,
-		"item_chance_0_bis_1": 0.005
+		"erfahrung": 1
 	},
 	"knochenwerfer": {
 		"name": "Knochenwerfer",
@@ -47,8 +46,7 @@
 		"schild_winkel_grad": 120,
 		"wurf_tempo_m_pro_s": 20,
 		"zurueckweichen_unter_m": 6,
-		"erfahrung": 2,
-		"item_chance_0_bis_1": 0.01
+		"erfahrung": 2
 	},
 	"schildtraeger": {
 		"name": "Schildträger",
@@ -72,8 +70,7 @@
 		"schild_schaden_faktor_0_bis_1": 0.2,
 		"schild_winkel_grad": 120,
 		"wurf_tempo_m_pro_s": 0,
-		"erfahrung": 3,
-		"item_chance_0_bis_1": 0.02
+		"erfahrung": 3
 	},
 	"kettenkoloss": {
 		"name": "Kettenkoloss",
@@ -107,8 +104,7 @@
 		"ansturm_schaden": 40,
 		"ansturm_erholung_s": 2,
 		"ansturm_pause_s": 7,
-		"erfahrung": 20,
-		"item_chance_0_bis_1": 0.25
+		"erfahrung": 20
 	},
 	"glutschaedel": {
 		"name": "Glutschädel",
@@ -134,8 +130,7 @@
 		"wurf_tempo_m_pro_s": 0,
 		"explodiert": true,
 		"explosion_schaden_gegner": 60,
-		"erfahrung": 2,
-		"item_chance_0_bis_1": 0.01
+		"erfahrung": 2
 	},
 	"horde": {
 		"gleichzeitig_max": 20,
