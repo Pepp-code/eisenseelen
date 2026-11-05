@@ -25,7 +25,7 @@
 6. **Flucht:** Danach jagen euch Gegner quer über die Karte. Mit F entzündest du das Signalfeuer, hältst 60 Sekunden den Kreis und steigst ein.
 7. **Abrechnung:** In der Barke ist alles sicher. Du siehst, was der Lauf gebracht hat, und bist zurück an der Anlegestelle.
 
-Die Kernfrage des Spiels lautet also: Noch ein Nebenauftrag oder gleich zum Boss? Jeder weitere bringt mehr, aber die Verderbnis steigt, und du selbst wirst im Lauf nicht stärker. Und nach dem Boss hast du die beste Beute bei dir, aber noch nicht in Sicherheit.
+Die Kernfrage des Spiels lautet also: Noch ein Nebenauftrag oder gleich zum Boss? Jeder weitere bringt mehr, kostet aber Leben und Zeit, denn bei jeder Aufgabe steigt der Blutmond, und du selbst wirst im Lauf nicht stärker. Und nach dem Boss hast du die beste Beute bei dir, aber noch nicht in Sicherheit.
 
 Der Masterplan schließt lange Nebenquests aus, weil sie beim Vorbild als sperrig kritisiert werden. Deshalb sind die Nebenaufträge bewusst klein: kein Gespräch, keine Reise, alles an einem Ort und in 1 bis 2 Minuten.
 
@@ -282,7 +282,7 @@ Jeder Spieler in der Nähe bekommt seine eigene Belohnung, es gibt also keinen S
 
 Normale Gegner geben absichtlich nur Erfahrung. Gäbe es dort Gold, wäre Stehenbleiben und Gegner-Farmen das Beste, und Nebenaufträge wären überflüssig.
 
-Die Verderbnis bringt mehr: 10 % mehr Gold und Punkte je Stufe. Länger bleiben lohnt sich also, ist aber gefährlicher, weil du selbst im Lauf nicht stärker wirst.
+Die Belohnungen sind fest und steigen nicht mit der Zeit. Mehr bekommst du nur durch mehr Aufgaben, und bei jeder steigt der Blutmond mit seinen Wellen.
 
 ## Beispiel-Builds
 
@@ -317,7 +317,7 @@ Das sind noch 34 bis 46 Runden, also 68 bis 92 Stunden deiner Zeit. Wie alle Zei
 
 - **Eigene Bosse sind teuer:** Jeder Boss mit eigenem Bannbruch kostet 3 bis 6 Runden, die große Wandernde Feste laut Plan 15 bis 20. Deshalb kommen zuerst graue Bosse aus vorhandenen Teilen.
 - **Zu starker Boss:** Flucht geht nur nach dem Boss. Ist er zu stark, scheitert der Lauf immer, und es bleiben nur die 30 %. Das müssen wir beim Testen abstimmen.
-- **Schwerer ohne Wachstum:** Ohne Omen wirst du im Lauf nicht stärker, die Gegner durch die Verderbnis aber schon. Auch das müssen wir beim Testen neu abstimmen.
+- **Schwerer ohne Wachstum:** Ohne Omen wirst du im Lauf nicht stärker. Die Gegner werden es seit dem Blutmond auch nicht mehr, aber die Wellen bei Aufgaben müssen wir beim Testen abstimmen.
 - **Viele Gravuren:** Jede Grundform braucht etwa 12 Gravuren und 3 Meisterstücke, dazu kommen 24 für die Rüstung. Deshalb kommen zuerst nur Langschwert und Stab.
 - **Balance allein:** Das kann niemand allein perfekt abstimmen. Die Grenzen bei den Werten, die festen Plätze und die freie Wahl in der Testarena halten das machbar.
 - **Zu stark werden:** Dauerhafte Verbesserungen machen das Spiel mit der Zeit leichter. Dagegen helfen später die Schwierigkeitsgrade aus Stufe 5.

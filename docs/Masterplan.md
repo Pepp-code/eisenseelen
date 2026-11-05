@@ -136,7 +136,7 @@ Die Punkte unter dieser Überschrift sind meine Deutung der Quellen.
 | [Risk of Rain 2](https://en.wikipedia.org/wiki/Risk_of_Rain_2) | Hopoo Games, Unity |  | über 1 Mio. im ersten Monat | Schwierigkeit steigt mit der Zeit |
 | [Vermintide 2](https://en.wikipedia.org/wiki/Warhammer:_Vermintide_2) | Fatshark, Stingray |  | 500.000 in 4 Tagen | Ego-Nahkampf gegen Horden funktioniert im Koop |
 
-Vermintide 2 ist die wichtigste Referenz für den Schwertkampf. Risk of Rain 2 liefert das Muster für die Zeit-Eskalation. Der [AI Director aus Left 4 Dead](https://en.wikipedia.org/wiki/Left_4_Dead) liefert das Muster für die Steuerung der Horde.
+Vermintide 2 ist die wichtigste Referenz für den Schwertkampf. Risk of Rain 2 lieferte das Muster für die Zeit-Eskalation, die am 5. November 2026 dem Blutmond gewichen ist. Der [AI Director aus Left 4 Dead](https://en.wikipedia.org/wiki/Left_4_Dead) liefert das Muster für die Steuerung der Horde.
 
 ### Was die Solo- und Kleinteam-Erfolge lehren
 
@@ -285,16 +285,17 @@ Wer scheitert, landet trotzdem in der Abrechnung: 30 % von Gold und Fraktionspun
 | Flucht | 13–15 | Signalfeuer entzünden, 60 Sekunden gegen Wellen halten, Barke besteigen | 2 |
 | Abrechnung | danach | Gold, Punkte und Zutaten, dann zurück zur Anlegestelle | 2 |
 
-### Verderbnis: die Uhr ohne Uhr
+### Blutmond: Gefahr nur bei Aufgaben
 
-Es gibt kein hartes Zeitlimit, die Gefahr steigt aber sichtbar. Das ist die billigste Quelle für Abwechslung im ganzen Spiel, denn dieselben Gegner wirken in Stufe 5 ganz anders als in Stufe 1.
+**Entschieden am 5. November 2026:** Die steigende Verderbnis ist gestrichen. Es gibt kein Zeitlimit und keine Stufen mehr, und die Gegner werden mit der Zeit nicht stärker. Wie beim Vorbild entsteht die Gefahr durch das, was du gerade tust.
 
-- Alle 2 Minuten steigt die **Verderbnis** um eine Stufe. Himmelsfarbe und Nebel ändern sich.
-- Jede Stufe bringt größere Gruppen, macht neue Gegner 10 % stärker und erhöht die Beute um 10 %. Vor der ersten Stufe kommt kein Nachschub, nur die Lager stehen da.
-- Ab Stufe 4 kann der Kettenkoloss auftauchen.
-- Stufe 6 heißt **Blutmond**: große Gruppen im schnellen Takt, die Beute steigt nicht mehr.
+- Sobald du eine Aufgabe hältst, steigt der **Blutmond** auf: Der Himmel färbt sich rot, und Wellen greifen an. Aufgaben sind Schrein oder Altar halten, Ankersteine halten, der Bosskampf, die Flucht nach dem Boss und das Signalfeuer.
+- Ist die Aufgabe vorbei, kommen keine Wellen mehr. Der Himmel bleibt noch 8 Sekunden rot.
+- Ohne Aufgabe kämpfst du nur gegen die Lager. Ein leeres Lager bleibt leer.
+- Belohnungen sind fest, und Gegner und Items bleiben gleich stark, egal wie lange der Lauf dauert.
+- Der Kettenkoloss kommt nur in Elite-Gruppen, also am Signalfeuer.
 
-Das Muster folgt [Risk of Rain 2](https://en.wikipedia.org/wiki/Risk_of_Rain_2), wo Dauer und Spielerzahl die Schwierigkeit bestimmen. Es ist nur eine Tabelle und wenige Zeilen Code.
+Länger bleiben ist damit nicht gefährlicher, aber jede weitere Aufgabe kostet Leben und Zeit. Welche Welle wann kommt, steht unter „Lager, Gruppen und Wellen“.
 
 ### Jagdbrief und Nebenaufträge
 
@@ -495,63 +496,71 @@ Auf der Karte helfen Sprungfelder. Das sind einfache Objekte mit großer Wirkung
 
 ## 7. Gegner, Bosse und Welt
 
-Am Ende gibt es 5 Gegnertypen, 1 Boss und 1 Karte. Das ist wenig, aber Gegner-Gruppen, Verderbnis und zufällige Orte holen daraus deutlich mehr heraus. Alle Gegner nutzen dasselbe Skelett und frei verfügbare Animationen.
+Am Ende gibt es 6 Gegnertypen, 1 Boss und 1 Karte. Das ist wenig, aber Gegner-Gruppen, Blutmond-Wellen und zufällige Orte holen daraus deutlich mehr heraus. Alle Gegner nutzen dasselbe Skelett und frei verfügbare Animationen.
 
 ### Gegner
 
 Skelette bestehen aus starren Knochen, und die [Universal Animation Library von Quaternius](https://quaternius.com/packs/universalanimationlibrary2.html) bietet über 130 Animationen für menschliche Skelette unter CC0-Lizenz. Jeder Gegner stellt dir eine eigene Frage.
 
-| Gegner | Bedrohung | Leben | Frage an dich | Ab Stufe |
-| --- | --- | --- | --- | --- |
-| Knochenläufer | 1 | 40 | Schwarm, schnell: Wie überstehst du die Zeit in der Zone? | 1 |
-| Knochenwerfer | 2 | 60 | Bleibt auf Distanz: Wann läufst du zu ihm hin? | 2 |
-| Schildträger | 4 | 220 | Frontalblock: Gehst du außen herum oder schlägst du schwer? | 2 |
-| Kettenkoloss | 10 | 900 | Elite mit markiertem Ansturm: Wohin weichst du aus? | 6 |
-| Totenrufer | 6 | 180 | Hebt Gefallene auf: Wen tötest du zuerst? | 6 |
+| Gegner | Bedrohung | Leben | Frage an dich |
+| --- | --- | --- | --- |
+| Knochenläufer | 1 | 40 | Schwarm, schnell: Wie überstehst du die Zeit in der Zone? |
+| Knochenwerfer | 2 | 60 | Bleibt auf Distanz und weicht zurück: Wann läufst du zu ihm hin? |
+| Schildträger | 4 | 220 | Frontalblock: Gehst du außen herum, wartest du auf seinen Hieb oder nimmst du einen Zauber? |
+| Glutschädel | 2 | 20 | Explodiert im markierten Kreis: Weichst du aus oder schießt du ihn vorher ab? |
+| Kettenkoloss | 10 | 900 | Elite mit markiertem Ansturm, den nichts aufhält: Wohin weichst du aus? |
+| Totenrufer | 6 | 180 | Hebt Gefallene auf: Wen tötest du zuerst? |
 
 Jeder Angriff hat eine sichtbare und hörbare Ankündigung von mindestens 0,4 s. Das Vorbild wird wegen [zu schwacher Gegner-Signale](https://themagicrain.com/2026/05/far-far-west-review/) kritisiert. Gegner sind Daten: Werte und Verhalten stehen in Textdateien.
 
-Knochenwerfer, Schildträger und Kettenkoloss sind seit dem 3. November 2026 im Spiel, alle noch als graue Kapseln. Der Koloss stürmt auf einem rot markierten Weg an.
+Knochenwerfer, Schildträger und Kettenkoloss sind seit dem 3. November 2026 im Spiel, alle noch als graue Kapseln. Der Koloss stürmt auf einem rot markierten Weg an. Der Totenrufer ist noch nicht gebaut.
+
+**Entschieden am 5. November 2026:** Jeder Gegner bekommt wie beim Vorbild eine klare Rolle:
+
+- **Knochenwerfer:** Kommst du näher als 6 m, weicht er nach dem Wurf zurück.
+- **Schildträger:** Der Schild hält von vorn Schüsse und leichte Hiebe. Ein schwerer Hieb geht durch, und Zauber, Runen und Explosionen gehen um den Schild herum. Nach seinem eigenen Hieb senkt er den Schild kurz und ist offen.
+- **Glutschädel:** Neu, ein dunkler Körper mit glühendem Kopf. Er läuft auf dich zu, zeigt einen Kreis am Boden und explodiert nach 1 Sekunde für 30 Schaden. Schießt du ihn vorher ab, explodiert er trotzdem, trifft dann aber nur Gegner mit 60 Schaden, und andere Glutschädel in der Nähe gehen mit hoch.
+- **Kettenkoloss:** Seinen Ansturm halten weder Parade noch Frost auf.
 
 ### Lager, Gruppen und Wellen
 
-**Entschieden am 3. November 2026:** Gegner kommen nicht mehr von überall und immer. Am Anfang eines Laufs stehen sie nur in festen Lagern, und erst wenn die Verderbnis steigt, kommt Nachschub.
+**Entschieden am 3. November 2026:** Gegner kommen nicht mehr von überall und immer. Am Anfang eines Laufs stehen sie nur in festen Lagern. **Seit dem 5. November 2026** gibt es keinen Nachschub mehr, Wellen kommen nur noch beim Blutmond.
 
 Alle Gegner kommen in Gruppen. Eine Gruppe ist eine Zeile in `Data/gruppen.json` und fühlt sich wie ein neuer Gegner an. Die Zahlen gelten für einen Spieler, mit mehr Spielern werden die Gruppen größer.
 
-- **Lager:** Auf der Karte stehen 18 feste Lager, jedes mit einer Gruppe. Ihre Gegner stehen Wache und kommen erst, wenn sie dich im Umkreis von 25 m frei sehen oder getroffen werden. Dann kommt die ganze Gruppe mit. Wer sich weiter als 50 m absetzt, wird in Ruhe gelassen, und die Gegner gehen zurück.
-- **Nachschub:** Ab der ersten Verderbnis-Stufe kommen Gruppen aus den Lagern in deiner Nähe, außerhalb deiner Sicht, und sie suchen dich von sich aus. Die erste Gruppe einer Stufe kommt sofort, danach kommen sie im Takt der Stufe. Ein leeres Lager füllt sich bei jeder neuen Stufe wieder, solange du nicht in der Nähe bist.
-- **Wellen:** Wer einen Schrein oder Altar hält, wird alle 12 Sekunden angegriffen, am Signalfeuer alle 15 Sekunden. Nach dem Boss jagen dich Gegner, bis die Barke da ist.
-- **Obergrenze:** Sind schon genug Gegner hinter dir her, kommt vorerst keine neue Gruppe.
-- **Stärke:** Jede Stufe macht neue Gegner 10 % stärker.
+- **Lager:** Auf der Karte stehen 18 feste Lager, jedes mit einer Gruppe. Ihre Gegner stehen Wache und kommen erst, wenn sie dich im Umkreis von 25 m frei sehen oder getroffen werden. Dann kommt die ganze Gruppe mit. Wer sich weiter als 50 m absetzt, wird in Ruhe gelassen, und die Gegner gehen zurück. Ein leeres Lager bleibt leer.
+- **Wellen:** Solange du eine Aufgabe hältst, steigt der Blutmond auf, und Wellen greifen an. Die Größe hängt nur von der Aufgabe ab, nicht von der Zeit.
+- **Truhe:** Die bewachte Truhe ruft eine mittlere Gruppe als Wächter.
+- **Obergrenze:** Sind schon Gegner mit 16 Bedrohung hinter dir her, kommt vorerst keine neue Gruppe.
 
-| Stufe | Zeit | Leeres Lager | Nachschub | Truhe | Altar | Signalfeuer | Obergrenze |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 0–2 min | klein | keiner | mittel | klein | klein | 10 |
-| 1 | 2–4 min | klein | klein, alle 45 s | mittel | klein | mittel | 12 |
-| 2 | 4–6 min | klein | klein, alle 35 s | mittel | klein | mittel | 14 |
-| 3 | 6–8 min | mittel | mittel, alle 40 s | mittel | mittel | groß | 16 |
-| 4 | 8–10 min | mittel | mittel, alle 30 s | groß | mittel | groß | 20 |
-| 5 | 10–12 min | groß | groß, alle 35 s | groß | groß | Elite | 24 |
-| 6 Blutmond | ab 12 min | groß | groß, alle 20 s | Elite | groß | Elite | 30 |
+| Aufgabe | Welle | Alle |
+| --- | --- | --- |
+| Schrein oder Altar halten | klein | 12 s |
+| Ankerstein halten | mittel | 15 s |
+| Bosskampf | mittel | 20 s |
+| Flucht nach dem Boss | groß | 15 s |
+| Signalfeuer | Elite | 20 s |
 
 Zum Start eines Laufs stehen 14 kleine und 4 mittlere Gruppen in den Lagern.
 
-| Größe | Gruppe | Bedrohung | Wer | Ab Stufe |
-| --- | --- | --- | --- | --- |
-| klein | Knochentrupp | 3 | 3 Läufer | 0 |
-| klein | Spähtrupp | 4 | 2 Läufer, 1 Werfer | 0 |
-| klein | Wurfpaar | 4 | 2 Werfer | 1 |
-| klein | Einzelwache | 4 | 1 Schildträger | 2 |
-| mittel | Knochenrudel | 6 | 6 Läufer | 0 |
-| mittel | Wurftrupp | 6 | 2 Läufer, 2 Werfer | 0 |
-| mittel | Schildwache | 7 | 3 Läufer, 1 Schildträger | 2 |
-| mittel | Schützenreihe | 7 | 1 Läufer, 3 Werfer | 3 |
-| groß | Knochenmeute | 10 | 10 Läufer | 3 |
-| groß | Sturmtrupp | 11 | 3 Läufer, 2 Werfer, 1 Schildträger | 3 |
-| groß | Schildwall | 12 | 2 Werfer, 2 Schildträger | 4 |
-| Elite | Koloss mit Gefolge | 14 | 4 Läufer, 1 Koloss | 4 |
-| Elite | Kriegshaufen | 20 | 2 Läufer, 2 Werfer, 1 Schildträger, 1 Koloss | 5 |
+| Größe | Gruppe | Bedrohung | Wer |
+| --- | --- | --- | --- |
+| klein | Knochentrupp | 3 | 3 Läufer |
+| klein | Spähtrupp | 4 | 2 Läufer, 1 Werfer |
+| klein | Wurfpaar | 4 | 2 Werfer |
+| klein | Einzelwache | 4 | 1 Schildträger |
+| klein | Glutläufer | 4 | 2 Läufer, 1 Glutschädel |
+| mittel | Knochenrudel | 6 | 6 Läufer |
+| mittel | Wurftrupp | 6 | 2 Läufer, 2 Werfer |
+| mittel | Schildwache | 7 | 3 Läufer, 1 Schildträger |
+| mittel | Schützenreihe | 7 | 1 Läufer, 3 Werfer |
+| mittel | Feuerrotte | 7 | 3 Läufer, 2 Glutschädel |
+| groß | Knochenmeute | 10 | 10 Läufer |
+| groß | Sturmtrupp | 11 | 3 Läufer, 2 Werfer, 1 Schildträger |
+| groß | Schildwall | 12 | 2 Werfer, 2 Schildträger |
+| groß | Brandhaufen | 14 | 4 Läufer, 2 Werfer, 3 Glutschädel |
+| Elite | Koloss mit Gefolge | 14 | 4 Läufer, 1 Koloss |
+| Elite | Kriegshaufen | 22 | 2 Läufer, 2 Werfer, 1 Schildträger, 1 Glutschädel, 1 Koloss |
 
 ### Der Boss
 
@@ -634,7 +643,7 @@ Wenige, klar getrennte Bereiche machen es dem Agenten leichter, und du behältst
 
 | Modul | Inhalt |
 | --- | --- |
-| Kern | Lauf-Ablauf, Verderbnis, Beute, Spielstand |
+| Kern | Lauf-Ablauf, Blutmond, Beute, Spielstand |
 | Held | Bewegung, Klassen, Waffen, Zauber, Gravuren |
 | Gegner | Gegnertypen, Direktor, Boss |
 | Welt | Karte, Orte, Sprungfelder, Nebenaufträge |
@@ -793,7 +802,7 @@ Die Monate sind grobe Schätzungen mit etwa 8 Runden im Monat, Pausen eingerechn
 
 - **Stufe 0, Aufsetzen:** Neues Projekt, Regeln für den Agenten, automatische Tests, leere Karte.
 - **Stufe 1, Spielgefühl:** Bewegung, Klingenwacht mit Schwert und Block, Arkanist mit Feuerstab und Mana, ein Zauber, Knochenläufer.
-- **Stufe 2, Erster Lauf:** Anlegestelle, Überfahrt, Jagdbriefe, Nebenaufträge, Bannbruch, Signalfeuer und Abflug, dazu Verderbnis, Lager, Gruppen und Wellen. Dazu Knochenwerfer, Schildträger und Kettenkoloss, die drei Runen und alle Reaktionen. Dazu Spielstand, Gold, Fraktionspunkte, Schmiede, Gravuren, Meisterstücke, Zutaten, Erfahrung, drei graue Bosse, zwei weitere graue Gebiete und das vierte Element Wind mit Windwaffen.
+- **Stufe 2, Erster Lauf:** Anlegestelle, Überfahrt, Jagdbriefe, Nebenaufträge, Bannbruch, Signalfeuer und Abflug, dazu Blutmond, Lager, Gruppen und Wellen. Dazu Knochenwerfer, Schildträger, Glutschädel und Kettenkoloss, die drei Runen und alle Reaktionen. Dazu Spielstand, Gold, Fraktionspunkte, Schmiede, Gravuren, Meisterstücke, Zutaten, Erfahrung, drei graue Bosse, zwei weitere graue Gebiete und das vierte Element Wind mit Windwaffen.
 - **Stufe 3, Zu zweit:** Beitreten über LAN oder IP, Niederschlag und Wiederbeleben, Seelenanker, Tests mit zwei Fenstern.
 - **Stufe 4, Aussehen:** Rüstungen und Waffen beider Klassen, die Karte Aschesteppe, Effekte, Sound und Himmel.
 - **Stufe 5, Fortschritt:** Taverne als Menü und Schwierigkeitsgrade. Spielstand, Schmiede und Erfahrung sind schon in Stufe 2 dazugekommen.

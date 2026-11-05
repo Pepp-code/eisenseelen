@@ -53,6 +53,7 @@ Prüfe vor jedem Bauen und vor jeder Änderung in `Data/`, ob ein Editor läuft.
 - Drücke und löse einen Sprung nie im selben Frame. `StopJumping` löscht ihn, bevor die Bewegung ihn liest.
 - Ein besiegter Gegner verschwindet 0,2 Sekunden später. Sichere Listen und Zeiger in Testschritten ab, sonst stürzt der ganze Lauf ab.
 - Ein Test, der die Gegner einer Karte zählt, muss auch die Anführer und den Boss abschalten. Dafür gibt es Helfer in `EIRunTest.cpp`.
+- Ein Test, der Schaden am Helden misst, muss die Blutmond-Wellen der Aufgabe leeren (zum Beispiel `StoneWave.Size` und `FightWave.Size`). Sonst trifft ein zufälliger Werfer, und der Test wird nur manchmal rot.
 - Tests und Vorschaubilder dürfen `Saved/Spielstand.json` nie anfassen (`GIsAutomationTesting`, `-KeinSpielstand`).
 - Ein Test mit Gast braucht `ULevelEditorPlaySettings` mit `AddToRoot`, sonst räumt die Engine sie während des Ladens weg.
 - `Landed` kommt vor dem Wechsel auf Laufen, und der löscht einen dort gedrückten Sprung. Springe aus `OnMovementModeChanged`.
@@ -96,5 +97,6 @@ Die Einzelheiten stehen im Plan. Hier steht der Weg dorthin, weil er erklärt, w
 - **3. November 2026:** Stil: leere Rüstungen, flach aus einfarbigen Flächen. Stufe 1 bestanden.
 - **4. November 2026:** Neues Prinzip: Dein Build entsteht zwischen den Läufen. Omen sind weg, im Lauf wird man nicht stärker. Nebenaufträge bringen nur Gold und Fraktionspunkte, nur der Boss bringt seltene Zutaten.
 - **5. November 2026:** Der Ablauf rückt näher ans Vorbild: Anlegestelle, gemeinsame Ankunft am Kartenrand, 3 zufällige Nebenaufträge, ein Bannbruch je Boss, keine geschlossene Arena, festes Signalfeuer erst nach dem Boss.
+- **5. November 2026, später:** Copilot hat übernommen, als Claude Code am Limit war. Die steigende Verderbnis ist gestrichen. Gefahr kommt nur noch durch Aufgaben: Beim Halten steigt der Blutmond mit Wellen, sonst gibt es nur die Lager, und die füllen sich nicht wieder. Gegner, Belohnungen und Items werden mit der Zeit nicht stärker. Danach bekam jeder Gegner eine klare Rolle wie beim Vorbild, und der Glutschädel kam neu dazu.
 
 Die gebauten Item-Regeln (sieben Plätze, Qualitäten, seltene Items von Gegnern) bleiben bis zur Schmiede in Schritt D. Danach fallen Qualitäten und Item-Funde weg. Bewusst noch leer: Herzkristalle.
