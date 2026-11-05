@@ -5,8 +5,6 @@
 #include "EIEnemy.h"
 #include "EIBoss.generated.h"
 
-class UStaticMeshComponent;
-
 /**
  * A boss, a big grey body for now. It stands bound at its place until its Bannbruch is done, and nothing can touch it in
  * that time. Then it fights around that place: it does not follow anybody far away, and whoever leaves it alone for long
@@ -28,9 +26,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
 	bool IsBound() const { return bBound; }
 
-	/** Whether the ring of its stomp lies on the ground right now. */
+	/** Whether the ring of its stomp lies on the floor right now. */
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
-	bool IsStompMarked() const { return bStompMarked; }
+	bool IsStompMarked() const { return GetGroundMark().bVisible && GetGroundMark().Shape == EEIMarkShape::Circle; }
 
 	/** Server only. The Bannbruch is done: it fights from now on, with more life for more players and later in a run. */
 	void BreakFree(float StrengthFactor, int32 PlayerCount);
@@ -39,7 +37,6 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-	virtual void BeginPlay() override;
 	virtual bool LoadEnemyValues(FEIEnemyValues& OutValues, FString& OutError) override;
 	virtual FLinearColor PickBaseColor() const override;
 	virtual bool IsUntouchable() const override { return bBound; }
@@ -50,24 +47,15 @@ private:
 	UFUNCTION()
 	void OnRep_Bound();
 
-	UFUNCTION()
-	void OnRep_StompMarked();
-
 	void LoadTable();
 	bool CanStartStomp(const AActor* Target) const;
 	void Stomp();
-
-	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UStaticMeshComponent> StompRing;
 
 	UPROPERTY(Replicated)
 	int32 BossIndex = 0;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Bound)
 	bool bBound = true;
-
-	UPROPERTY(ReplicatedUsing = OnRep_StompMarked)
-	bool bStompMarked = false;
 
 	FEIBossTable Table;
 	float StompLeft = 0.0f;

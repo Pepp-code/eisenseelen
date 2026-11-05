@@ -73,6 +73,7 @@ namespace
 		{
 			return false;
 		}
+		Out.Fight.Name = Out.Name;
 		if (Out.GoldTo < Out.GoldFrom)
 		{
 			OutError = FString::Printf(TEXT("Beim Boss %s liegt gold_bis unter gold_von."), *Out.Name);

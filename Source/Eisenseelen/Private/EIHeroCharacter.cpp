@@ -1,3 +1,4 @@
+#include "EIEnemy.h"
 #include "EIHeroCharacter.h"
 
 #include "Camera/CameraComponent.h"
@@ -25,6 +26,7 @@ namespace
 	constexpr float CameraKickSeconds = 0.14f;
 	constexpr float CameraKickRollShare = 0.6f;
 	constexpr float HurtFlashSeconds = 0.35f;
+	constexpr float HitNoteSeconds = 3.0f;
 	constexpr float HurtKickDegrees = 2.0f;
 	constexpr float DeadEyeDropCm = 110.0f;
 	constexpr float HardLandingSpeedCm = 1500.0f;
@@ -263,9 +265,12 @@ void AEIHeroCharacter::MulticastDied_Implementation()
 	ViewModel->SetVisibility(false, true);
 }
 
-void AEIHeroCharacter::ClientHurt_Implementation()
+void AEIHeroCharacter::ClientHurt_Implementation(FVector_NetQuantize From, const FString& What, float Amount)
 {
 	HurtFlashRemaining = HurtFlashSeconds;
+	LastHitFrom = From;
+	LastHitNote = What.IsEmpty() ? FString::Printf(TEXT("-%.0f"), Amount) : FString::Printf(TEXT("-%.0f  %s"), Amount, *What);
+	HitNoteRemaining = HitNoteSeconds;
 	AddCameraKick(HurtKickDegrees);
 	EIVisuals::PlaySound2D(this, TEXT("GegnerSchlag"));
 }
@@ -289,6 +294,7 @@ void AEIHeroCharacter::Tick(float DeltaSeconds)
 	}
 	UpdateCameraKick(DeltaSeconds);
 	HurtFlashRemaining = FMath::Max(0.0f, HurtFlashRemaining - DeltaSeconds);
+	HitNoteRemaining = FMath::Max(0.0f, HitNoteRemaining - DeltaSeconds);
 	if (HasAuthority())
 	{
 		UpdateRecovery(DeltaSeconds);
@@ -350,7 +356,9 @@ float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 	const float Applied = Health->ApplyDamage(Sword->BlockDamage(Incoming, DamageCauser) * (1.0f - Gear->GetArmorShare()));
 	if (Applied > 0.0f)
 	{
-		ClientHurt();
+		// A thrown bone tells of whoever threw it, so the screen points there.
+		const AActor* Source = DamageCauser != nullptr && DamageCauser->GetInstigator() != nullptr ? DamageCauser->GetInstigator() : DamageCauser;
+		ClientHurt(Source != nullptr ? Source->GetActorLocation() : GetActorLocation(), AEIEnemy::DescribeAttackOf(DamageCauser), Applied);
 	}
 	return Applied;
 }

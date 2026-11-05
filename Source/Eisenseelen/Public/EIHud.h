@@ -21,6 +21,9 @@ private:
 	/** Red marks at the screen edge for enemies winding up outside the view. */
 	void DrawThreats(const class AEIHeroCharacter* Hero);
 
+	/** What hit the hero last, and an arrow to where it came from. */
+	void DrawLastHit(const class AEIHeroCharacter* Hero);
+
 	/** Where the run stands, what to do next and where that is. Nothing on a map without a run. */
 	void DrawRun(const class AEIHeroCharacter* Hero, const class AEIGameState* State);
 	void DrawWorldMark(const FVector& Location, const FString& Label, const FLinearColor& Color);

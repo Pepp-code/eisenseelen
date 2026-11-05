@@ -1,7 +1,5 @@
 #include "EIBoss.h"
 
-#include "Components/CapsuleComponent.h"
-#include "Components/StaticMeshComponent.h"
 #include "EIDataFile.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
@@ -10,14 +8,10 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
-#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
-	const FLinearColor StompRingColor(1.0f, 0.1f, 0.03f);
-	constexpr float StompRingStrength = 0.5f;
-	constexpr float StompRingAboveFloorCm = 8.0f;
 	constexpr float HomeReachCm = 300.0f;
 	const FVector StompKnockback(900.0f, 0.0f, 500.0f);
 }
@@ -25,15 +19,6 @@ namespace
 AEIBoss::AEIBoss()
 {
 	bAlwaysRelevant = true;
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-
-	StompRing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StompRing"));
-	StompRing->SetupAttachment(GetCapsuleComponent());
-	StompRing->SetStaticMesh(Cylinder.Object);
-	StompRing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	StompRing->SetCastShadow(false);
-	StompRing->SetVisibility(false);
 }
 
 void AEIBoss::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -41,7 +26,6 @@ void AEIBoss::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AEIBoss, BossIndex);
 	DOREPLIFETIME(AEIBoss, bBound);
-	DOREPLIFETIME(AEIBoss, bStompMarked);
 }
 
 void AEIBoss::LoadTable()
@@ -79,35 +63,11 @@ FLinearColor AEIBoss::PickBaseColor() const
 	return Boss != nullptr ? Boss->Color : Super::PickBaseColor();
 }
 
-void AEIBoss::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (const FEIBossValues* Boss = GetBossValues())
-	{
-		// The sizes count within the boss, so they are divided by its own size. The engine's cylinder is 1 m wide.
-		const float Width = Boss->Stomp.RadiusMeters * 2.0f / GetValues().Scale;
-		const float HalfHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
-		StompRing->SetRelativeLocation(FVector(0.0f, 0.0f, StompRingAboveFloorCm / GetValues().Scale - HalfHeight));
-		StompRing->SetRelativeScale3D(FVector(Width, Width, 0.02f));
-		EIVisuals::SetGlow(StompRing, StompRingColor, StompRingStrength);
-	}
-}
-
 void AEIBoss::OnRep_Bound()
 {
 	if (!bBound)
 	{
 		EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), GetActorLocation());
-	}
-}
-
-void AEIBoss::OnRep_StompMarked()
-{
-	StompRing->SetVisibility(bStompMarked);
-	if (bStompMarked)
-	{
-		EIVisuals::PlaySoundAt(this, TEXT("GegnerAusholen"), GetActorLocation());
 	}
 }
 
@@ -137,8 +97,8 @@ bool AEIBoss::CanStartStomp(const AActor* Target) const
 void AEIBoss::Stomp()
 {
 	const FEIBossValues* Boss = GetBossValues();
-	bStompMarked = false;
-	OnRep_StompMarked();
+	const FEIGroundMarkData Ring = GetGroundMark();
+	HideGroundMark();
 	SetTelegraphing(false);
 	MulticastStrike();
 	MulticastStompSound();
@@ -147,18 +107,18 @@ void AEIBoss::Stomp()
 	{
 		return;
 	}
-	const double Radius = Boss->Stomp.RadiusMeters * CentimetersPerMeter;
+	NameAttack(TEXT("Stampfen"));
 	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
 	{
-		const FVector Away = It->GetActorLocation() - GetActorLocation();
-		if (It->IsDead() || Away.Size2D() > Radius)
+		if (It->IsDead() || !Ring.Contains(It->GetActorLocation()))
 		{
 			continue;
 		}
 		UGameplayStatics::ApplyDamage(*It, Boss->Stomp.Damage * DamageFactor, GetController(), this, nullptr);
 		if (It->CanBeDamaged())
 		{
-			It->LaunchCharacter(Away.GetSafeNormal2D() * StompKnockback.X + FVector(0.0f, 0.0f, StompKnockback.Z), true, true);
+			const FVector Away = (It->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+			It->LaunchCharacter(Away * StompKnockback.X + FVector(0.0f, 0.0f, StompKnockback.Z), true, true);
 		}
 	}
 }
@@ -169,23 +129,15 @@ void AEIBoss::TickServer(float DeltaSeconds)
 	{
 		return;
 	}
-	if (bStompMarked)
+	// A parry staggers it, which takes the ring away, and the stomp is off.
+	if (IsStompMarked())
 	{
-		// A parry staggers it, and the stomp is off.
-		if (IsStaggering())
+		StompLeft -= DeltaSeconds;
+		if (StompLeft <= 0.0f)
 		{
-			bStompMarked = false;
-			OnRep_StompMarked();
+			Stomp();
 		}
-		else
-		{
-			StompLeft -= DeltaSeconds;
-			if (StompLeft <= 0.0f)
-			{
-				Stomp();
-			}
-			return;
-		}
+		return;
 	}
 	if (IsWatching())
 	{
@@ -215,8 +167,7 @@ void AEIBoss::TickServer(float DeltaSeconds)
 		const FEIBossValues* Boss = GetBossValues();
 		StopWalking();
 		StompLeft = Boss->Stomp.WindupSeconds;
-		bStompMarked = true;
-		OnRep_StompMarked();
+		ShowGroundCircle(Boss->Stomp.RadiusMeters * CentimetersPerMeter, Boss->Stomp.WindupSeconds);
 		SetTelegraphing(true);
 		return;
 	}

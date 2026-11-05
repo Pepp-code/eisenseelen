@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EIGroundMark.h"
 #include "GameFramework/Character.h"
 #include "EIEnemy.generated.h"
 
@@ -52,13 +53,17 @@ EISENSEELEN_API FLinearColor EIElementColor(EEIElement Element);
 /** The numbers of one kind of enemy from Data/gegner.json. */
 struct EISENSEELEN_API FEIEnemyValues
 {
+	FString Name;
 	float Life = 40.0f;
 	float Threat = 1.0f;
 	float SpeedMetersPerSecond = 4.5f;
 	float Damage = 10.0f;
 	float AttackFromMeters = 1.7f;
 	float WindupSeconds = 0.5f;
+	float WindupFollowSeconds = 0.0f;
 	float HitZoneMeters = 2.2f;
+	float HitWidthMeters = 2.4f;
+	bool bMarksStrike = false;
 	float RecoverSeconds = 0.6f;
 	float HeavyHitStaggerFactor = 1.0f;
 	float SightMeters = 25.0f;
@@ -74,10 +79,12 @@ struct EISENSEELEN_API FEIEnemyValues
 	float ItemChance = 0.0f;
 	float ChargeSpeedMetersPerSecond = 0.0f;
 	float ChargeDistanceMeters = 0.0f;
+	float ChargeWidthMeters = 0.0f;
 	float ChargeFromMeters = 0.0f;
 	float ChargeToMeters = 0.0f;
 	float ChargeWindupSeconds = 0.0f;
 	float ChargeDamage = 0.0f;
+	float ChargeRecoverSeconds = 0.0f;
 	float ChargePauseSeconds = 0.0f;
 
 	static bool LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutValues, FString& OutError);
@@ -88,7 +95,7 @@ struct EISENSEELEN_API FEIEnemyValues
 
 /**
  * An enemy, a grey capsule for now. It stands watch or hunts, finds its way to the nearest hero, winds up visibly and audibly, and only then
- * strikes, so a hero who moves away in time takes no damage. A parry or a heavy hit staggers it, which interrupts
+ * strikes what lies in front of it, so a hero who gets out of the way in time takes no damage. A parry or a heavy hit staggers it, which interrupts
  * everything it does. All of its decisions happen on the server.
  */
 UCLASS()
@@ -153,8 +160,15 @@ public:
 	void Unfreeze();
 	bool IsFrozen() const { return bFrozen; }
 
-	/** Whether the path of its charge lies on the ground right now. */
-	bool IsChargeMarked() const { return bChargeMarked; }
+	/** What lies on the floor right now. It decides who gets hit. */
+	const FEIGroundMarkData& GetGroundMark() const { return GroundMark; }
+
+	/** Whether the strip of a strike or a charge lies on the floor right now. */
+	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
+	bool IsStripMarked() const { return GroundMark.bVisible && GroundMark.Shape == EEIMarkShape::Strip; }
+
+	/** Who did this to a hero, for the note on the screen. Empty if nobody can be named. */
+	static FString DescribeAttackOf(const AActor* Causer);
 
 	/** Server only. Leaves the element on the enemy for a while, or sets off what it does with the one already there. */
 	EEIReaction MarkElement(EEIElement Element, float WindowSeconds);
@@ -168,6 +182,21 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	/** Server only. The floor shows where the next attack lands. */
+	void ShowGroundCircle(float RadiusCm, float FillSeconds);
+	void ShowGroundStrip(const FVector& Start, const FVector& Direction, float LengthCm, float WidthCm, float FillSeconds);
+	void HideGroundMark();
+
+	/** Where it stands on the floor, whatever its size. */
+	FVector GetFloorSpot() const;
+
+	/** Its feet and its head are at about the same height as the other one's, so that a blow can reach. */
+	bool ReachesHeightOf(const AActor* Other) const;
+
+	/** What the screen calls the attack that comes next. */
+	void NameAttack(const TCHAR* Name) { AttackName = Name; }
 
 	/** Where its numbers come from. */
 	virtual bool LoadEnemyValues(FEIEnemyValues& OutValues, FString& OutError);
@@ -219,7 +248,7 @@ private:
 	void MulticastShieldBlocked();
 
 	UFUNCTION()
-	void OnRep_ChargeMarked();
+	void OnRep_GroundMark();
 
 	UFUNCTION()
 	void OnRep_LeaderScale();
@@ -243,6 +272,8 @@ private:
 	void UpdateCharge(float DeltaSeconds);
 	void EndCharge();
 	bool StandsOnPaths() const;
+	FEIGroundMarkData MakeStrikeZone() const;
+	void StartStrikeWindup(const AActor* Target);
 	void Strike();
 	void HandleDied();
 	void UpdateLook(float DeltaSeconds);
@@ -253,10 +284,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Head;
-
-	/** The path of a charge on the ground. */
-	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UStaticMeshComponent> ChargeMark;
 
 	/** The shield of a shield bearer, the bone of a thrower. */
 	UPROPERTY(VisibleAnywhere)
@@ -289,14 +316,19 @@ private:
 	UPROPERTY(Replicated)
 	bool bFrozen = false;
 
-	UPROPERTY(ReplicatedUsing = OnRep_ChargeMarked)
-	bool bChargeMarked = false;
+	UPROPERTY(ReplicatedUsing = OnRep_GroundMark)
+	FEIGroundMarkData GroundMark;
+
+	/** Every machine has its own, because it only is for the eye. */
+	UPROPERTY(Transient)
+	TObjectPtr<AEIGroundMark> ShownMark;
 
 	/** Above 0 only for a leader. */
 	UPROPERTY(ReplicatedUsing = OnRep_LeaderScale)
 	float LeaderScale = 0.0f;
 
 	FEIEnemyValues Values;
+	const TCHAR* AttackName = TEXT("");
 	FLinearColor BaseColor = FLinearColor::Gray;
 	bool bNextHitBreaksShield = false;
 	float SlowRemaining = 0.0f;
@@ -309,7 +341,9 @@ private:
 	double NextChargeAt = 0.0;
 	FVector ChargeDirection = FVector::ForwardVector;
 	float ChargeTravelledCm = 0.0f;
+	double ChargeAlongBeforeCm = 0.0;
 	TArray<TWeakObjectPtr<AActor>> ChargeHit;
+	float RecoverFor = 0.0f;
 	bool bGuard = false;
 	bool bHasHome = false;
 	FVector Home = FVector::ZeroVector;

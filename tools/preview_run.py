@@ -166,6 +166,17 @@ def scenario():
     yield 1.5
     shot()
     yield AFTER_SHOT_SECONDS
+
+    # What it marks on the floor: the blow from close by, then the way of its charge from afar. Either one comes first.
+    for distance in (420, 1500):
+        for _ in range(40):
+            place = boss.get_actor_location()
+            stand_looking_at((place.x + distance, place.y), (place.x, place.y, 100))
+            if boss.is_strip_marked():
+                break
+            yield 0.2
+        shot()
+        yield 5.0
     for _ in range(40):
         place = boss.get_actor_location()
         stand_looking_at((place.x + 700, place.y), (place.x, place.y, 200))

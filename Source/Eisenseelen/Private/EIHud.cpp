@@ -43,6 +43,13 @@ namespace
 	constexpr float ThreatInViewDot = 0.6f;
 	constexpr float ThreatMarkSize = 18.0f;
 	constexpr float ThreatEdgeShare = 0.42f;
+	constexpr float HitArrowSeconds = 1.5f;
+	constexpr float HitArrowFromCenter = 130.0f;
+	constexpr float HitArrowLength = 34.0f;
+	constexpr float HitArrowThickness = 5.0f;
+	constexpr float HitNoteFromBottom = 150.0f;
+	constexpr float HitNoteWidth = 170.0f;
+	constexpr float HitNoteLastSeconds = 3.0f;
 	const FLinearColor FireMarkColor(1.0f, 0.55f, 0.1f);
 	const FLinearColor BossMarkColor(1.0f, 0.2f, 0.25f);
 	const FLinearColor AnchorMarkColor(0.75f, 0.45f, 1.0f);
@@ -176,6 +183,7 @@ void AEIHud::DrawScreen()
 		return;
 	}
 	DrawThreats(Hero);
+	DrawLastHit(Hero);
 
 	DrawRect(TextColor, Width / 2.0f - CrosshairSize / 2.0f, Height / 2.0f - CrosshairSize / 2.0f, CrosshairSize, CrosshairSize);
 
@@ -645,6 +653,41 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 
 	default:
 		break;
+	}
+}
+
+void AEIHud::DrawLastHit(const AEIHeroCharacter* Hero)
+{
+	const float Left = Hero->GetHitNoteLeft();
+	if (Left <= 0.0f)
+	{
+		return;
+	}
+	FLinearColor NoteColor = RewardColor;
+	NoteColor.A = FMath::Min(1.0f, Left);
+	DrawLine(Hero->GetLastHitNote(), Canvas->SizeX / 2.0f - HitNoteWidth, Canvas->SizeY - HitNoteFromBottom, NoteColor, 1.25f);
+
+	// An arrow around the crosshair points to whoever did it, seen from above: up on the screen is straight ahead.
+	const float ArrowLeft = Left - (HitNoteLastSeconds - HitArrowSeconds);
+	if (ArrowLeft <= 0.0f)
+	{
+		return;
+	}
+	const FRotator View = Hero->GetViewRotation();
+	const FVector Forward = View.Vector().GetSafeNormal2D();
+	const FVector Right = FRotationMatrix(View).GetUnitAxis(EAxis::Y).GetSafeNormal2D();
+	const FVector ToSource = (Hero->GetLastHitFrom() - Hero->GetActorLocation()).GetSafeNormal2D();
+	const FVector2D Pointing(FVector::DotProduct(ToSource, Right), -FVector::DotProduct(ToSource, Forward));
+	const FVector2D Center(Canvas->SizeX / 2.0f, Canvas->SizeY / 2.0f);
+	const FVector2D Tip = Center + Pointing * HitArrowFromCenter;
+	const FVector2D Back = Tip - Pointing * HitArrowLength;
+	const FVector2D Side(-Pointing.Y, Pointing.X);
+	FLinearColor ArrowColor = ThreatColor;
+	ArrowColor.A = FMath::Min(1.0f, ArrowLeft / (HitArrowSeconds * 0.5f));
+	for (const float Sign : { -1.0f, 1.0f })
+	{
+		const FVector2D Wing = Back + Side * Sign * HitArrowLength;
+		AHUD::DrawLine(static_cast<float>(Tip.X), static_cast<float>(Tip.Y), static_cast<float>(Wing.X), static_cast<float>(Wing.Y), ArrowColor, HitArrowThickness);
 	}
 }
 

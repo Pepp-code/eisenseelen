@@ -38,10 +38,7 @@ namespace
 	const FLinearColor FrozenColor(0.7f, 0.9f, 1.0f);
 	const FLinearColor LeaderColor(0.75f, 0.55f, 0.1f);
 	constexpr float FrozenGlow = 2.0f;
-	const FLinearColor ChargeMarkColor(1.0f, 0.1f, 0.03f);
-	constexpr float ChargeMarkStrength = 0.8f;
-	constexpr float ChargeMarkWidthCm = 260.0f;
-	constexpr float ChargeMarkAboveFloorCm = 8.0f;
+	constexpr float ChargeContactMarginCm = 40.0f;
 	constexpr float ChargeBlockedAfterSeconds = 0.4f;
 	constexpr float ChargeBlockedBelowCm = 150.0f;
 	const FVector ChargeKnockback(700.0f, 0.0f, 350.0f);
@@ -171,13 +168,18 @@ bool FEIEnemyValues::LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutV
 bool FEIEnemyValues::ReadFrom(const FJsonObject& Section, FEIEnemyValues& OutValues, FString& OutError)
 {
 	FEIEnemyValues Loaded;
+	Section.TryGetStringField(TEXT("name"), Loaded.Name);
+	// Only a big enemy shows its blow on the floor. With many small ones that would say nothing any more.
+	Section.TryGetBoolField(TEXT("schlag_markiert"), Loaded.bMarksStrike);
 	if (!FEIDataFile::ReadNumber(Section, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("bedrohung"), 0.0, 1000.0, Loaded.Threat, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("tempo_m_pro_s"), 0.1, 30.0, Loaded.SpeedMetersPerSecond, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("schaden"), 0.0, 10000.0, Loaded.Damage, OutError)
-		|| !FEIDataFile::ReadNumber(Section, TEXT("angriff_ab_abstand_m"), 0.5, 20.0, Loaded.AttackFromMeters, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("angriff_ab_abstand_m"), 0.5, 40.0, Loaded.AttackFromMeters, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("ausholen_s"), 0.0, 10.0, Loaded.WindupSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("ausholen_folgen_s"), 0.0, 10.0, Loaded.WindupFollowSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("trefferzone_m"), 0.5, 20.0, Loaded.HitZoneMeters, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("trefferbreite_m"), 0.5, 20.0, Loaded.HitWidthMeters, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("erholung_s"), 0.0, 10.0, Loaded.RecoverSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("taumeln_faktor_schwerer_hieb_0_bis_1"), 0.0, 1.0, Loaded.HeavyHitStaggerFactor, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("sicht_m"), 1.0, 500.0, Loaded.SightMeters, OutError)
@@ -198,10 +200,12 @@ bool FEIEnemyValues::ReadFrom(const FJsonObject& Section, FEIEnemyValues& OutVal
 	if (Section.HasField(TEXT("ansturm_tempo_m_pro_s"))
 		&& (!FEIDataFile::ReadNumber(Section, TEXT("ansturm_tempo_m_pro_s"), 0.0, 100.0, Loaded.ChargeSpeedMetersPerSecond, OutError)
 			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_strecke_m"), 0.0, 200.0, Loaded.ChargeDistanceMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_breite_m"), 0.5, 50.0, Loaded.ChargeWidthMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_ab_abstand_m"), 0.0, 200.0, Loaded.ChargeFromMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_bis_abstand_m"), 0.0, 200.0, Loaded.ChargeToMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_ankuendigung_s"), 0.0, 20.0, Loaded.ChargeWindupSeconds, OutError)
 			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_schaden"), 0.0, 100000.0, Loaded.ChargeDamage, OutError)
+			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_erholung_s"), 0.0, 60.0, Loaded.ChargeRecoverSeconds, OutError)
 			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_pause_s"), 0.0, 600.0, Loaded.ChargePauseSeconds, OutError)))
 	{
 		return false;
@@ -249,13 +253,6 @@ AEIEnemy::AEIEnemy()
 	Held->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Held->SetVisibility(false);
 
-	ChargeMark = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ChargeMark"));
-	ChargeMark->SetupAttachment(GetCapsuleComponent());
-	ChargeMark->SetStaticMesh(Cube.Object);
-	ChargeMark->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	ChargeMark->SetCastShadow(false);
-	ChargeMark->SetVisibility(false);
-
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
 }
 
@@ -279,15 +276,6 @@ void AEIEnemy::BeginPlay()
 	{
 		OnRep_LeaderScale();
 	}
-	if (Values.ChargeSpeedMetersPerSecond > 0.0f)
-	{
-		// The sizes count within the enemy, so they are divided by its own size.
-		const float Length = Values.ChargeDistanceMeters * CentimetersPerMeter / Values.Scale;
-		const float HalfHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
-		ChargeMark->SetRelativeLocation(FVector(Length / 2.0f, 0.0f, ChargeMarkAboveFloorCm / Values.Scale - HalfHeight));
-		ChargeMark->SetRelativeScale3D(FVector(Length, ChargeMarkWidthCm / Values.Scale, 1.0f) / 100.0f);
-		EIVisuals::SetGlow(ChargeMark, ChargeMarkColor, ChargeMarkStrength);
-	}
 	if (!HasAuthority())
 	{
 		return;
@@ -296,6 +284,91 @@ void AEIEnemy::BeginPlay()
 	AddActorWorldOffset(FVector(0.0f, 0.0f, (Values.Scale - 1.0f) * GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()));
 	Health->Reset(Values.Life);
 	Health->OnDied.AddUObject(this, &AEIEnemy::HandleDied);
+}
+
+void AEIEnemy::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (ShownMark != nullptr)
+	{
+		ShownMark->Destroy();
+		ShownMark = nullptr;
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+FVector AEIEnemy::GetFloorSpot() const
+{
+	return GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+}
+
+bool AEIEnemy::ReachesHeightOf(const AActor* Other) const
+{
+	return FMath::Abs(Other->GetActorLocation().Z - GetActorLocation().Z) <= GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + Other->GetSimpleCollisionHalfHeight();
+}
+
+void AEIEnemy::ShowGroundCircle(float RadiusCm, float FillSeconds)
+{
+	FEIGroundMarkData Mark;
+	Mark.bVisible = true;
+	Mark.Shape = EEIMarkShape::Circle;
+	Mark.Location = GetFloorSpot();
+	Mark.LengthCm = RadiusCm * 2.0f;
+	Mark.WidthCm = RadiusCm * 2.0f;
+	Mark.FillSeconds = FillSeconds;
+	GroundMark = Mark;
+	OnRep_GroundMark();
+}
+
+void AEIEnemy::ShowGroundStrip(const FVector& Start, const FVector& Direction, float LengthCm, float WidthCm, float FillSeconds)
+{
+	FEIGroundMarkData Mark;
+	Mark.bVisible = true;
+	Mark.Shape = EEIMarkShape::Strip;
+	Mark.Location = Start;
+	Mark.YawDegrees = static_cast<float>(Direction.Rotation().Yaw);
+	Mark.LengthCm = LengthCm;
+	Mark.WidthCm = WidthCm;
+	Mark.FillSeconds = FillSeconds;
+	GroundMark = Mark;
+	OnRep_GroundMark();
+}
+
+void AEIEnemy::HideGroundMark()
+{
+	if (GroundMark.bVisible)
+	{
+		GroundMark.bVisible = false;
+		OnRep_GroundMark();
+	}
+}
+
+void AEIEnemy::OnRep_GroundMark()
+{
+	if (ShownMark != nullptr)
+	{
+		ShownMark->Destroy();
+		ShownMark = nullptr;
+	}
+	if (GroundMark.bVisible)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ShownMark = GetWorld()->SpawnActor<AEIGroundMark>(AEIGroundMark::StaticClass(), FTransform::Identity, Params);
+		if (ShownMark != nullptr)
+		{
+			ShownMark->Show(GroundMark);
+		}
+	}
+}
+
+FString AEIEnemy::DescribeAttackOf(const AActor* Causer)
+{
+	const AEIEnemy* Enemy = Cast<AEIEnemy>(Causer);
+	if (Enemy == nullptr && Causer != nullptr)
+	{
+		Enemy = Cast<AEIEnemy>(Causer->GetInstigator());
+	}
+	return Enemy != nullptr ? FString::Printf(TEXT("%s: %s"), *Enemy->Values.Name, Enemy->AttackName) : FString();
 }
 
 bool AEIEnemy::LoadEnemyValues(FEIEnemyValues& OutValues, FString& OutError)
@@ -438,8 +511,7 @@ void AEIEnemy::Freeze(float Seconds)
 	FrozenSeconds = Seconds;
 	bFrozen = true;
 	bStaggering = false;
-	bChargeMarked = false;
-	OnRep_ChargeMarked();
+	HideGroundMark();
 	bTelegraphing = false;
 	OnRep_Telegraphing();
 }
@@ -476,8 +548,11 @@ void AEIEnemy::StartChargeWindup(const AActor* Target)
 	SetActorRotation(ChargeDirection.Rotation());
 	State = EState::ChargeWindup;
 	StateTime = 0.0f;
-	bChargeMarked = true;
-	OnRep_ChargeMarked();
+
+	// The body covers the start and the end of the way too.
+	const float BodyRadius = GetCapsuleComponent()->GetScaledCapsuleRadius();
+	const float Length = Values.ChargeDistanceMeters * CentimetersPerMeter + BodyRadius * 2.0f;
+	ShowGroundStrip(GetFloorSpot() - ChargeDirection * BodyRadius, ChargeDirection, Length, Values.ChargeWidthMeters * CentimetersPerMeter, Values.ChargeWindupSeconds);
 	bTelegraphing = true;
 	OnRep_Telegraphing();
 }
@@ -486,19 +561,36 @@ void AEIEnemy::UpdateCharge(float DeltaSeconds)
 {
 	AddMovementInput(ChargeDirection);
 	ChargeTravelledCm += static_cast<float>(GetVelocity().Size2D()) * DeltaSeconds;
-	const double HitZone = Values.HitZoneMeters * CentimetersPerMeter;
+
+	// Whoever stands on the marked strip when the body gets there is hit, and nobody else.
+	const FVector Forward = GroundMark.GetDirection();
+	const double AlongNow = FVector::DotProduct(GetActorLocation() - GroundMark.Location, Forward);
+	const double BodyRadius = GetCapsuleComponent()->GetScaledCapsuleRadius();
 	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
 	{
-		if (!It->IsDead() && !ChargeHit.Contains(*It) && FVector::Dist(It->GetActorLocation(), GetActorLocation()) <= HitZone)
+		const FVector Spot = It->GetActorLocation();
+		if (It->IsDead() || ChargeHit.Contains(*It) || !GroundMark.Contains(Spot) || !ReachesHeightOf(*It))
+		{
+			continue;
+		}
+		// A little before the bodies touch, because a body in the way stops the charge just short of that.
+		const double Reach = BodyRadius + It->GetSimpleCollisionRadius() + ChargeContactMarginCm;
+		const double AlongHero = FVector::DotProduct(Spot - GroundMark.Location, Forward);
+		if (AlongHero >= ChargeAlongBeforeCm - Reach && AlongHero <= AlongNow + Reach)
 		{
 			ChargeHit.Add(*It);
+			NameAttack(TEXT("Ansturm"));
 			UGameplayStatics::ApplyDamage(*It, Values.ChargeDamage, GetController(), this, nullptr);
 			if (It->CanBeDamaged())
 			{
-				It->LaunchCharacter(ChargeDirection * ChargeKnockback.X + FVector(0.0f, 0.0f, ChargeKnockback.Z), true, true);
+				// Off the way to one side, so that it does not run into the same hero again.
+				const FVector Side(-Forward.Y, Forward.X, 0.0f);
+				const FVector Away = (Forward + Side * (FVector::DotProduct(Spot - GetActorLocation(), Side) >= 0.0 ? 1.0 : -1.0)).GetSafeNormal2D();
+				It->LaunchCharacter(Away * ChargeKnockback.X + FVector(0.0f, 0.0f, ChargeKnockback.Z), true, true);
 			}
 		}
 	}
+	ChargeAlongBeforeCm = AlongNow;
 	const bool bBlocked = StateTime > ChargeBlockedAfterSeconds && GetVelocity().Size2D() < ChargeBlockedBelowCm;
 	if (bBlocked || ChargeTravelledCm >= Values.ChargeDistanceMeters * CentimetersPerMeter)
 	{
@@ -510,6 +602,8 @@ void AEIEnemy::EndCharge()
 {
 	GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter;
 	NextChargeAt = GetWorld()->GetTimeSeconds() + Values.ChargePauseSeconds;
+	HideGroundMark();
+	RecoverFor = Values.ChargeRecoverSeconds;
 	State = EState::Recover;
 	StateTime = 0.0f;
 }
@@ -526,11 +620,6 @@ void AEIEnemy::OnRep_LeaderScale()
 {
 	BaseColor = LeaderColor;
 	SetActorScale3D(FVector(Values.Scale * LeaderScale));
-}
-
-void AEIEnemy::OnRep_ChargeMarked()
-{
-	ChargeMark->SetVisibility(bChargeMarked);
 }
 
 void AEIEnemy::UpdateStatus(float DeltaSeconds)
@@ -652,7 +741,7 @@ void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(AEIEnemy, bSlowed);
 	DOREPLIFETIME(AEIEnemy, bBurning);
 	DOREPLIFETIME(AEIEnemy, bFrozen);
-	DOREPLIFETIME(AEIEnemy, bChargeMarked);
+	DOREPLIFETIME(AEIEnemy, GroundMark);
 	DOREPLIFETIME(AEIEnemy, LeaderScale);
 }
 
@@ -717,19 +806,15 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		}
 		if (CanAttack(Target))
 		{
-			StopWalking();
-			State = EState::Windup;
-			StateTime = 0.0f;
-			bTelegraphing = true;
-			OnRep_Telegraphing();
+			StartStrikeWindup(Target);
 			return;
 		}
 		Steer(Target, DeltaSeconds);
 		return;
 
 	case EState::Windup:
-		// A throw goes where the thrower looks. A shield bearer does not turn now, which is the moment to get around him.
-		if (Values.ThrowSpeedMetersPerSecond > 0.0f && Target != nullptr)
+		// At first it still follows its target. After that it does not turn any more, which is the moment to get out of the way.
+		if (StateTime <= Values.WindupFollowSeconds && Target != nullptr)
 		{
 			const FRotator Facing = (Target->GetActorLocation() - GetActorLocation()).GetSafeNormal2D().Rotation();
 			SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), Facing, DeltaSeconds, Values.TurnDegreesPerSecond));
@@ -738,6 +823,7 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		{
 			bTelegraphing = false;
 			OnRep_Telegraphing();
+			RecoverFor = Values.RecoverSeconds;
 			State = EState::Recover;
 			StateTime = 0.0f;
 			// Last, because a parry during the strike changes the state.
@@ -746,7 +832,7 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		return;
 
 	case EState::Recover:
-		if (StateTime >= Values.RecoverSeconds)
+		if (StateTime >= RecoverFor)
 		{
 			State = EState::Chase;
 			StateTime = 0.0f;
@@ -772,14 +858,13 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 	case EState::ChargeWindup:
 		if (StateTime >= Values.ChargeWindupSeconds)
 		{
-			bChargeMarked = false;
-			OnRep_ChargeMarked();
 			bTelegraphing = false;
 			OnRep_Telegraphing();
 			MulticastStrike();
 			State = EState::Charging;
 			StateTime = 0.0f;
 			ChargeTravelledCm = 0.0f;
+			ChargeAlongBeforeCm = FVector::DotProduct(GetActorLocation() - GroundMark.Location, GroundMark.GetDirection());
 			ChargeHit.Reset();
 			GetCharacterMovement()->MaxWalkSpeed = Values.ChargeSpeedMetersPerSecond * CentimetersPerMeter;
 		}
@@ -824,8 +909,7 @@ void AEIEnemy::Stagger(float Seconds)
 	{
 		EndCharge();
 	}
-	bChargeMarked = false;
-	OnRep_ChargeMarked();
+	HideGroundMark();
 	StopWalking();
 	State = EState::Stagger;
 	StateTime = 0.0f;
@@ -963,18 +1047,52 @@ float AEIEnemy::ReduceByShield(float Amount, const AActor* DamageCauser)
 	return Amount * Values.ShieldDamageFactor;
 }
 
+FEIGroundMarkData AEIEnemy::MakeStrikeZone() const
+{
+	// It starts behind the middle of the body, so that nobody stands safely at its shoulder.
+	const float BodyRadius = GetCapsuleComponent()->GetScaledCapsuleRadius();
+	const FVector Forward = GetActorForwardVector().GetSafeNormal2D();
+	FEIGroundMarkData Zone;
+	Zone.Shape = EEIMarkShape::Strip;
+	Zone.Location = GetFloorSpot() - Forward * BodyRadius;
+	Zone.YawDegrees = static_cast<float>(Forward.Rotation().Yaw);
+	Zone.LengthCm = Values.HitZoneMeters * CentimetersPerMeter + BodyRadius;
+	Zone.WidthCm = Values.HitWidthMeters * CentimetersPerMeter;
+	Zone.FillSeconds = Values.WindupSeconds;
+	return Zone;
+}
+
+void AEIEnemy::StartStrikeWindup(const AActor* Target)
+{
+	StopWalking();
+	State = EState::Windup;
+	StateTime = 0.0f;
+	if (Values.bMarksStrike)
+	{
+		// What is marked stays as it is marked, so it looks at its target right away and does not turn any more.
+		SetActorRotation((Target->GetActorLocation() - GetActorLocation()).GetSafeNormal2D().Rotation());
+		const FEIGroundMarkData Zone = MakeStrikeZone();
+		ShowGroundStrip(Zone.Location, Zone.GetDirection(), Zone.LengthCm, Zone.WidthCm, Zone.FillSeconds);
+	}
+	bTelegraphing = true;
+	OnRep_Telegraphing();
+}
+
 void AEIEnemy::Strike()
 {
 	MulticastStrike();
 	if (Values.ThrowSpeedMetersPerSecond > 0.0f)
 	{
+		NameAttack(TEXT("Wurf"));
 		ThrowBone();
 		return;
 	}
-	const float HitZone = Values.HitZoneMeters * CentimetersPerMeter;
+	NameAttack(TEXT("Hieb"));
+	HideGroundMark();
+	const FEIGroundMarkData Zone = MakeStrikeZone();
 	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
 	{
-		if (!It->IsDead() && FVector::Dist(It->GetActorLocation(), GetActorLocation()) <= HitZone)
+		if (!It->IsDead() && Zone.Contains(It->GetActorLocation()) && ReachesHeightOf(*It))
 		{
 			UGameplayStatics::ApplyDamage(*It, Values.Damage, GetController(), this, nullptr);
 		}
@@ -1006,6 +1124,7 @@ float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, 
 
 void AEIEnemy::HandleDied()
 {
+	HideGroundMark();
 	if (const AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
 		GameMode->GetRun()->NoteEnemyDied(*this);

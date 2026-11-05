@@ -55,6 +55,12 @@ public:
 
 	/** Seconds of the red flash left after taking a hit. For the HUD. */
 	float GetHurtFlash() const { return HurtFlashRemaining; }
+
+	/** Where the last hit came from, what it was, and how long the screen still shows it. For the HUD. */
+	const FVector& GetLastHitFrom() const { return LastHitFrom; }
+	const FString& GetLastHitNote() const { return LastHitNote; }
+	float GetHitNoteLeft() const { return HitNoteRemaining; }
+
 	UEISwordComponent* GetSword() const { return Sword; }
 	UEICasterComponent* GetCaster() const { return Caster; }
 	UEIRuneComponent* GetRunes() const { return Runes; }
@@ -121,7 +127,7 @@ private:
 	void LoadClassValues();
 
 	UFUNCTION(Client, Unreliable)
-	void ClientHurt();
+	void ClientHurt(FVector_NetQuantize From, const FString& What, float Amount);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastDied();
@@ -171,6 +177,9 @@ private:
 	float CameraKickRemaining = 0.0f;
 	float CameraKickDegrees = 0.0f;
 	float HurtFlashRemaining = 0.0f;
+	FVector LastHitFrom = FVector::ZeroVector;
+	FString LastHitNote;
+	float HitNoteRemaining = 0.0f;
 	double LastCombatAt = -TNumericLimits<float>::Max();
 	double BufferedJumpUntil = -1.0;
 	bool bJumpOnGround = false;

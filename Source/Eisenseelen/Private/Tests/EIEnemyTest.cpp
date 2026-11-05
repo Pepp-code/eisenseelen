@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #include "EIEnemy.h"
+#include "EIGroundMark.h"
 #include "Engine/DamageEvents.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
@@ -153,7 +154,7 @@ bool FEIEnemyKindsTest::RunTest(const FString& Parameters)
 		State->Enemy = SpawnKindAhead(Context, EEIEnemyKind::Colossus, 1000.0f);
 		State->Life = Context.Hero->GetHealth()->GetHealth();
 	}));
-	Steps.Add(WaitUntil(TEXT("the colossus marks its path"), 1.0, [State](const FEIPlayContext& Context) { return State->Enemy->IsChargeMarked(); }));
+	Steps.Add(WaitUntil(TEXT("the colossus marks its path"), 1.0, [State](const FEIPlayContext& Context) { return State->Enemy->IsStripMarked(); }));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
 		Context.Test->TestEqual(TEXT("While it marks its path, nothing has happened yet"), Context.Hero->GetHealth()->GetHealth(), State->Life);
@@ -164,7 +165,150 @@ bool FEIEnemyKindsTest::RunTest(const FString& Parameters)
 		const float Lost = State->Life - Context.Hero->GetHealth()->GetHealth();
 		Context.Test->AddInfo(FString::Printf(TEXT("The charge from 1000 cm takes %.0f life"), Lost));
 		Context.Test->TestEqual(TEXT("The charge does its damage"), Lost, State->Enemy->GetValues().ChargeDamage);
-		Context.Test->TestFalse(TEXT("The mark is gone in the charge"), State->Enemy->IsChargeMarked());
+		Context.Test->TestTrue(TEXT("The way stays marked while it runs"), State->Enemy->IsStripMarked());
+		Context.Test->TestTrue(TEXT("The screen says what it was"), Context.Hero->GetLastHitNote().Contains(TEXT("Kettenkoloss: Ansturm")));
+		Context.Hero->SetCanBeDamaged(false);
+	}));
+	Steps.Add(WaitUntil(TEXT("the charge ends"), 4.0, [State](const FEIPlayContext& Context) { return !State->Enemy->IsStripMarked(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->Enemy->Destroy(); }));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIEnemyStrikeZoneTest,
+	"Eisenseelen.Play.Enemy.StrikeZone",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIEnemyStrikeZoneTest::RunTest(const FString& Parameters)
+{
+	// What a mark holds, whatever it looks like.
+	FEIGroundMarkData Strip;
+	Strip.Shape = EEIMarkShape::Strip;
+	Strip.Location = FVector(100.0f, 0.0f, 0.0f);
+	Strip.YawDegrees = 90.0f;
+	Strip.LengthCm = 500.0f;
+	Strip.WidthCm = 200.0f;
+	TestTrue(TEXT("On the strip"), Strip.Contains(FVector(100.0f, 300.0f, 50.0f)));
+	TestTrue(TEXT("At the edge of the strip"), Strip.Contains(FVector(195.0f, 300.0f, 0.0f)));
+	TestFalse(TEXT("Beside the strip"), Strip.Contains(FVector(205.0f, 300.0f, 0.0f)));
+	TestFalse(TEXT("Behind its start"), Strip.Contains(FVector(100.0f, -10.0f, 0.0f)));
+	TestFalse(TEXT("Beyond its end"), Strip.Contains(FVector(100.0f, 510.0f, 0.0f)));
+	FEIGroundMarkData Circle;
+	Circle.Shape = EEIMarkShape::Circle;
+	Circle.LengthCm = 400.0f;
+	TestTrue(TEXT("In the circle"), Circle.Contains(FVector(190.0f, 0.0f, 80.0f)));
+	TestFalse(TEXT("Outside the circle"), Circle.Contains(FVector(210.0f, 0.0f, 0.0f)));
+
+	struct FState
+	{
+		TWeakObjectPtr<AEIEnemy> Enemy;
+		float Life = 0.0f;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+	const auto WindsUp = [State](const TCHAR* What)
+	{
+		return WaitUntil(What, 4.0, [State](const FEIPlayContext& Context) { return State->Enemy.IsValid() && State->Enemy->IsTelegraphing(); });
+	};
+	const auto WindupEnds = [State](const TCHAR* What)
+	{
+		return WaitUntil(What, 4.0, [State](const FEIPlayContext& Context) { return !State->Enemy->IsTelegraphing(); });
+	};
+	constexpr double AfterFollowSeconds = 0.25;
+	constexpr float BehindCm = 150.0f;
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, 0.0f); }));
+	Steps.Add(Wait(0.2));
+
+	// A runner strikes what lies in front of it. Close behind it nothing happens.
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		State->Enemy = SpawnKindAhead(Context, EEIEnemyKind::Runner, 130.0f);
+		State->Life = Context.Hero->GetHealth()->GetHealth();
+	}));
+	Steps.Add(WindsUp(TEXT("the runner winds up")));
+	Steps.Add(Wait(AfterFollowSeconds));
+	Steps.Add(Do([State, BehindCm](const FEIPlayContext& Context)
+	{
+		const AEIEnemy* Enemy = State->Enemy.Get();
+		Teleport(Context, Enemy->GetActorLocation() - Enemy->GetActorForwardVector() * BehindCm, 0.0f);
+	}));
+	Steps.Add(WindupEnds(TEXT("the runner strikes")));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("Behind it the blow misses"), Context.Hero->GetHealth()->GetHealth(), State->Life);
+	}));
+
+	// In front of it the blow lands, and the screen says what it was.
+	Steps.Add(WindsUp(TEXT("the runner winds up again")));
+	Steps.Add(WindupEnds(TEXT("the runner strikes again")));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const float Lost = State->Life - Context.Hero->GetHealth()->GetHealth();
+		Context.Test->TestEqual(TEXT("In front of it the blow lands"), Lost, State->Enemy->GetValues().Damage);
+		Context.Test->TestTrue(TEXT("The screen says what it was"), Context.Hero->GetLastHitNote().Contains(TEXT("Knochenl\u00E4ufer: Hieb")));
+		Context.Test->TestTrue(TEXT("The screen says it for a while"), Context.Hero->GetHitNoteLeft() > 0.0f);
+		Context.Test->TestFalse(TEXT("A small enemy does not mark its blow"), State->Enemy->IsStripMarked());
+		State->Enemy->Destroy();
+		State->Life = Context.Hero->GetHealth()->GetHealth();
+	}));
+	Steps.Add(Wait(0.1));
+
+	// The blow of a colossus lies on the floor. Just beside it nothing happens, close as it may be.
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->Enemy = SpawnKindAhead(Context, EEIEnemyKind::Colossus, 250.0f); }));
+	Steps.Add(WindsUp(TEXT("the colossus winds up")));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const AEIEnemy* Enemy = State->Enemy.Get();
+		const FEIGroundMarkData& Mark = Enemy->GetGroundMark();
+		Context.Test->TestTrue(TEXT("Its blow is marked"), Enemy->IsStripMarked());
+		Context.Test->TestEqual(TEXT("As wide as its zone"), Mark.WidthCm, Enemy->GetValues().HitWidthMeters * CentimetersPerMeter);
+		Context.Test->TestEqual(TEXT("It fills up until the blow"), Mark.FillSeconds, Enemy->GetValues().WindupSeconds);
+		Context.Test->TestTrue(TEXT("The floor shows it"), TActorIterator<AEIGroundMark>(Context.World) ? true : false);
+		const FVector Side = FRotationMatrix(Enemy->GetActorRotation()).GetUnitAxis(EAxis::Y);
+		const FVector Spot = Enemy->GetActorLocation() + Enemy->GetActorForwardVector() * 100.0f + Side * (Mark.WidthCm / 2.0f + 60.0f);
+		Teleport(Context, FVector(Spot.X, Spot.Y, OpenFloor.Z), 0.0f);
+	}));
+	Steps.Add(WindupEnds(TEXT("the colossus strikes")));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("Beside the mark the blow misses"), Context.Hero->GetHealth()->GetHealth(), State->Life);
+		Context.Test->TestFalse(TEXT("The mark is gone"), State->Enemy->IsStripMarked());
+	}));
+	Steps.Add(Wait(0.05));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestFalse(TEXT("The floor is clean"), TActorIterator<AEIGroundMark>(Context.World) ? true : false);
+	}));
+
+	// Inside it lands.
+	Steps.Add(WindsUp(TEXT("the colossus winds up again")));
+	Steps.Add(WindupEnds(TEXT("the colossus strikes again")));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("On the mark the blow lands"), State->Life - Context.Hero->GetHealth()->GetHealth(), State->Enemy->GetValues().Damage);
+		State->Enemy->Destroy();
+		State->Life = Context.Hero->GetHealth()->GetHealth();
+	}));
+	Steps.Add(Wait(0.1));
+
+	// Beside the way of a charge nothing happens, even as it thunders past.
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->Enemy = SpawnKindAhead(Context, EEIEnemyKind::Colossus, 1000.0f); }));
+	Steps.Add(WaitUntil(TEXT("the colossus marks its way"), 1.0, [State](const FEIPlayContext& Context) { return State->Enemy->IsStripMarked(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const AEIEnemy* Enemy = State->Enemy.Get();
+		const FEIGroundMarkData& Mark = Enemy->GetGroundMark();
+		Context.Test->TestEqual(TEXT("The way is as wide as the file says"), Mark.WidthCm, Enemy->GetValues().ChargeWidthMeters * CentimetersPerMeter);
+		const FVector Side = FRotationMatrix(Enemy->GetActorRotation()).GetUnitAxis(EAxis::Y);
+		const FVector Spot = Enemy->GetActorLocation() + Enemy->GetActorForwardVector() * 500.0f + Side * (Mark.WidthCm / 2.0f + 80.0f);
+		Teleport(Context, FVector(Spot.X, Spot.Y, OpenFloor.Z), 0.0f);
+	}));
+	Steps.Add(WindupEnds(TEXT("the charge begins")));
+	Steps.Add(WaitUntil(TEXT("the charge ends"), 4.0, [State](const FEIPlayContext& Context) { return !State->Enemy->IsStripMarked(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("Beside the way the charge misses"), Context.Hero->GetHealth()->GetHealth(), State->Life);
 		Context.Hero->SetCanBeDamaged(false);
 		State->Enemy->Destroy();
 	}));

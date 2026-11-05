@@ -120,7 +120,7 @@ bool FEIBossDataTest::RunTest(const FString& Parameters)
 	}
 
 	// A small table, to see that the rules are kept.
-	const FString Fight = TEXT("{\"leben\": 100, \"bedrohung\": 0, \"tempo_m_pro_s\": 1, \"schaden\": 1, \"angriff_ab_abstand_m\": 1, \"ausholen_s\": 1, \"trefferzone_m\": 1, \"erholung_s\": 1, ")
+	const FString Fight = TEXT("{\"leben\": 100, \"bedrohung\": 0, \"tempo_m_pro_s\": 1, \"schaden\": 1, \"angriff_ab_abstand_m\": 1, \"ausholen_s\": 1, \"ausholen_folgen_s\": 0, \"trefferzone_m\": 1, \"trefferbreite_m\": 1, \"erholung_s\": 1, ")
 		TEXT("\"taumeln_faktor_schwerer_hieb_0_bis_1\": 0, \"sicht_m\": 1, \"alarm_umkreis_m\": 0, \"aufgeben_m\": 1, \"wach_mindestens_s\": 1, \"groesse_faktor\": 2, \"drehtempo_grad_pro_s\": 1, ")
 		TEXT("\"schild_schaden_faktor_0_bis_1\": 1, \"schild_winkel_grad\": 1, \"wurf_tempo_m_pro_s\": 0, \"erfahrung\": 7, \"item_chance_0_bis_1\": 0}");
 	const FString Valid = FString(TEXT("{\"platz_leine_m\": 32, \"erholung_anteil_pro_s\": 0.1, \"leben_je_weiterem_spieler\": 0.5, \"kampf_welle_alle_s\": 20, \"verfolgung_welle_alle_s\": 12, \"signalfeuer_mindestabstand_m\": 100, ")
@@ -329,6 +329,39 @@ bool FEIBossRunTest::RunTest(const FString& Parameters)
 		const float Lost = State->LifeBefore - Context.Hero->GetHealth()->GetHealth();
 		Context.Test->AddInfo(FString::Printf(TEXT("The stomp takes %.0f life"), Lost));
 		Context.Test->TestEqual(TEXT("The stomp hits"), Lost, GetBoss(Context)->GetBossValues()->Stomp.Damage);
+		Context.Test->TestTrue(TEXT("The screen says what it was"), Context.Hero->GetLastHitNote().Contains(TEXT("Der Gefesselte: Stampfen")));
+		Context.Hero->SetCanBeDamaged(false);
+
+		// Its charge has its own test, and here it would only take it somewhere else.
+		AEIBoss* Boss = GetBoss(Context);
+		FEIEnemyValues NoCharge = Boss->GetValues();
+		NoCharge.ChargeSpeedMetersPerSecond = 0.0f;
+		Boss->ApplyValues(NoCharge);
+	}));
+
+	// Whoever has left the ring by then is not hit, close as it may be. On the way towards its place, or it would leave it.
+	Steps.Add(WaitUntil(TEXT("the boss stomps again"), 15.0, [](const FEIPlayContext& Context)
+	{
+		const AEIBoss* Boss = GetBoss(Context);
+		const FVector Spot = Boss->GetActorLocation();
+		const FVector Towards = (GetRun(Context)->GetBossPlace() - Spot).GetSafeNormal2D();
+		const FVector Way = Towards.IsNearlyZero() ? FVector::ForwardVector : Towards;
+		const FVector Stand = Spot + Way * (Boss->GetBossValues()->Stomp.FromMeters * CentimetersPerMeter - 100.0f);
+		Teleport(Context, FVector(Stand.X, Stand.Y, HeroHeight), 0.0f);
+		return Boss->IsStompMarked();
+	}));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const AEIBoss* Boss = GetBoss(Context);
+		Context.Test->TestEqual(TEXT("The ring is as wide as the file says"), Boss->GetGroundMark().LengthCm, Boss->GetBossValues()->Stomp.RadiusMeters * CentimetersPerMeter * 2.0f);
+		Context.Hero->SetCanBeDamaged(true);
+		State->LifeBefore = Context.Hero->GetHealth()->GetHealth();
+		StandBeside(Context, Boss, Boss->GetBossValues()->Stomp.RadiusMeters * CentimetersPerMeter + 60.0f);
+	}));
+	Steps.Add(WaitUntil(TEXT("the second stomp lands"), 5.0, [](const FEIPlayContext& Context) { return !GetBoss(Context)->IsStompMarked(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("Outside the ring nothing happens"), Context.Hero->GetHealth()->GetHealth() >= State->LifeBefore);
 		Context.Hero->SetCanBeDamaged(false);
 
 		// Far from its place it turns back, and gets its life back on the way.
