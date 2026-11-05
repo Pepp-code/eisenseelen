@@ -5,6 +5,8 @@ Hobbyprojekt: ein Fantasy-Koop-Extraction-Shooter mit beseelten Rüstungen als H
 Der Masterplan ist ein Claude Doc: https://claude.ai/artifact/Syfr3Y3xcV8i1Rhfn2XXty
 Der Entwickler bearbeitet ihn auch selbst. Lies ihn, bevor du etwas darin änderst.
 
+Eine Kopie des Plans liegt in `docs/Masterplan.md` und `docs/Items-und-Builds.md`, bekannte Fallen und frühere Entscheidungen stehen in `docs/Arbeitsnotizen.md`. So kann auch ein anderes Werkzeug weiterarbeiten. Halte die Kopie und die Notizen aktuell, wenn sich Plan oder Stand ändern, und sichere am Ende eines Arbeitsblocks mit `git push origin main`.
+
 ## So arbeiten wir
 
 - Antworte auf Deutsch und in einfachen Worten. Der Entwickler liest keinen Code.
@@ -72,7 +74,7 @@ Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestan
 - **Runen:** Items mit einem Zauber auf E: Frostrune (Frostnova), Sturmrune (Sturmfeld), Flammenrune (Flammenwand). Frostnova friert kurz ein. Reaktionen innerhalb von 2 Sekunden: Feuer und Eis ergeben die Dampfexplosion mit Wolke, Feuer und Blitz den Funkenflug, Blitz oder ein schwerer Hieb auf Gefrorene den Splitterbruch. Werte in `Data/runen.json`.
 - **Nebenaufträge:** Das Spiel würfelt je Lauf 3 Stück, jeder mit zufälliger Fraktion (Feuer, Frost oder Blitz): Anführer jagen, Schrein halten (15 Sekunden), bewachte Truhe erobern (der Kreis ruft Wächter, erst danach öffnet F die Truhe) und Altar halten (30 Sekunden). Sie sind freiwillig und stehen ab der Ankunft auf der Karte (Taste M) und als Marken in der Welt. Omen gibt es nicht mehr, im Lauf wird man nicht stärker. Werte in `Data/nebenauftraege.json`. Im Code heißen sie noch Contract.
 - **Items:** Sieben Plätze: Waffe, Rune, Helm, Brustpanzer, Handschuhe, Schuhe und Herzkristall. Alles steht in `Data/items.json`, die Grundformen der Waffen in `Data/waffen.json`: 15 Waffen aus 5 Grundformen und 3 Elementen, 3 Runen, 5 Rüstungsarten mit je 4 Teilen, 3 Qualitäten. Items, Rüstungs-Boni und Attribute zählen in derselben Summe. Der Spielstand liegt in `Saved/Spielstand.json`, Tests und Vorschaubilder fassen ihn nicht an. Die Testarena hat einen eigenen Teil darin, dort ist alles frei.
-- **Ausrüstung:** Die Taste I öffnet das Menü auf der Barke, in der Testarena und nach dem Lauf, aber nicht während eines Laufs. Es zeigt die Plätze, was dazu passt, den Vergleich, die Summe der Werte und die Attribute.
+- **Ausrüstung:** Die Taste I öffnet das Menü an der Anlegestelle, in der Testarena und nach dem Lauf, aber nicht während eines Laufs. Es zeigt die Plätze, was dazu passt, den Vergleich, die Summe der Werte und die Attribute.
 - **Belohnungen:** Ein Nebenauftrag bringt 100 Gold und 25 Punkte seiner Fraktion, je Verderbnis-Stufe 10 % mehr, und zwar jedem Spieler im Umkreis von 40 m. Erst in der Barke ist alles sicher, beim Scheitern bleiben 30 % von Gold und Punkten, die Zutaten sind verloren, die Erfahrung bleibt immer. Gold, Punkte und Zutaten liegen im Spielstand und stehen im Menü, ausgeben kann man sie erst mit Schritt D. Normale Gegner geben Erfahrung und bis Schritt D noch selten ein Item, das wie bisher erst in der Barke sicher ist. Die Abrechnung zeigt alles am Ende.
 - **Erfahrung:** Level bis 20, jedes Level gibt einen Punkt für Kraft, Geist, Zähigkeit oder Gewandtheit. Die Punkte verteilt jede Klasse für sich und jederzeit neu, wenn das Menü offen ist. Werte in `Data/items.json`, Erfahrung und Item-Chance je Gegnerart in `Data/gegner.json`.
 
