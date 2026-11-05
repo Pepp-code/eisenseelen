@@ -7,14 +7,16 @@
 #include "EIHeroCharacter.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "LandscapeProxy.h"
 
 namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
-	constexpr float TraceStartHeightCm = 3000.0f;
-	constexpr float TraceDepthCm = 500.0f;
+	// Above the highest hill and below the deepest riverbed of the terrain.
+	constexpr float TraceStartHeightCm = 10000.0f;
+	constexpr float TraceDepthCm = 5000.0f;
 	constexpr float StandHeightCm = 92.0f;
-	// Higher than this, the place is on top of something and not on the ground.
+	// On a map without terrain, higher than this the place is on top of something and not on the ground.
 	constexpr float MaxGroundHeightCm = 50.0f;
 	constexpr int32 PlaceTries = 8;
 	constexpr float InViewDot = 0.35f;
@@ -123,7 +125,12 @@ bool UEIHordeDirector::FindStandingPlace(const FVector& Ground, FVector& OutLoca
 	FHitResult Floor;
 	const FVector TraceStart = Ground + FVector(0.0f, 0.0f, TraceStartHeightCm);
 	const FVector TraceEnd = Ground - FVector(0.0f, 0.0f, TraceDepthCm);
-	if (!GetWorld()->LineTraceSingleByObjectType(Floor, TraceStart, TraceEnd, FCollisionObjectQueryParams(ECC_WorldStatic)) || Floor.ImpactPoint.Z > MaxGroundHeightCm)
+	if (!GetWorld()->LineTraceSingleByObjectType(Floor, TraceStart, TraceEnd, FCollisionObjectQueryParams(ECC_WorldStatic)))
+	{
+		return false;
+	}
+	const bool bOnTerrain = Cast<ALandscapeProxy>(Floor.GetActor()) != nullptr;
+	if (!bOnTerrain && Floor.ImpactPoint.Z > MaxGroundHeightCm)
 	{
 		return false;
 	}

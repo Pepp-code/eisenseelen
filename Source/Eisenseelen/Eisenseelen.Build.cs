@@ -8,7 +8,7 @@ public class Eisenseelen : ModuleRules
 		// Small module: every file compiles alone, so names in anonymous namespaces cannot collide.
 		bUseUnity = false;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AIModule", "NavigationSystem", "ProceduralMeshComponent" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AIModule", "NavigationSystem", "ProceduralMeshComponent", "Landscape" });
 		PrivateDependencyModuleNames.Add("Json");
 
 		if (Target.bBuildEditor)

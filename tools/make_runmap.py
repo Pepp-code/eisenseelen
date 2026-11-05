@@ -1,4 +1,4 @@
-"""Builds the grey map of a whole run, /Game/Maps/L_ErsterLauf, from Data/laufkarte.json.
+"""Builds the grey map of a whole run, /Game/Maps/L_ErsterLauf, from Data/laufkarte.json and Data/gelaende.json.
 
 Run without an editor window:
     C:\\Games\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor-Cmd.exe Eisenseelen.uproject
@@ -8,11 +8,16 @@ import json
 import math
 import os
 import random
+import sys
 
 import unreal
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gelaende import Gelaende  # noqa: E402
+
 MAP_PATH = "/Game/Maps/L_ErsterLauf"
 MATERIAL_PATH = "/Game/Materials/M_Schachbrett"
+TERRAIN_MATERIAL_PATH = "/Game/Materials/M_Gelaende"
 CUBE_MESH = "/Engine/BasicShapes/Cube.Cube"
 
 CM_PER_M = 100
@@ -38,6 +43,11 @@ BOSS_CLEAR_M = 30
 COVER_MIN_SIZE_M = 2
 COVER_MAX_SIZE_M = 5
 COVER_MAX_HEIGHT_M = 3
+# Blocks reach this far into the ground, so they do not float on a slope.
+COVER_SINK_M = 1
+# Cover and chests stay off mesa tops, out of deep hollows and off slopes.
+OPEN_GROUND_MAX_HEIGHT_M = 2.5
+OPEN_GROUND_MAX_SLOPE_DEG = 20
 # A chest needs room for the fight around it, away from the altars and fires, where the fights already are.
 CHEST_CLEAR_EDGE_M = 16
 CHEST_CLEAR_PLACE_M = 32
@@ -47,9 +57,30 @@ CHEST_CLEAR_CAMP_M = 26
 CHEST_CLEAR_CHEST_M = 35
 # A new volume's brush is a cube of this size. Paths are only needed near the floor.
 VOLUME_BRUSH_M = 2
-NAVIGATION_HEIGHT_M = 12
+# Paths are needed from the riverbed up to the mesa tops.
+NAVIGATION_BOTTOM_M = -10
+NAVIGATION_TOP_M = 30
 # Everything the script builds carries this tag. A rebuild removes only these, so art placed by hand stays.
 GENERATED_TAG = "EI_Generiert"
+
+terrain = Gelaende()
+
+
+def ground_m(x, y):
+    return terrain.height_m(x, y)
+
+
+def is_open_ground(x, y):
+    """Level enough and at the height of the plain, so a block or chest belongs there."""
+    height = ground_m(x, y)
+    step = 1.0
+    rise = max(abs(ground_m(x + step, y) - height), abs(ground_m(x, y + step) - height)) / step
+    return abs(height) <= OPEN_GROUND_MAX_HEIGHT_M and math.degrees(math.atan(rise)) <= OPEN_GROUND_MAX_SLOPE_DEG
+
+
+def on_ground(x_m, y_m):
+    """Location in centimetres for an actor that stands on the terrain."""
+    return (x_m * CM_PER_M, y_m * CM_PER_M, ground_m(x_m, y_m) * CM_PER_M)
 
 
 def spawn(actors, actor_class, location=(0, 0, 0), rotation=(0, 0, 0), label=""):
@@ -118,7 +149,8 @@ def add_place(actors, place, index):
         center_x = x + offset_x * math.cos(yaw) - offset_y * math.sin(yaw)
         center_y = y + offset_x * math.sin(yaw) + offset_y * math.cos(yaw)
         size = (PLACE_WALL_LENGTH_M, PLACE_WALL_THICKNESS_M, PLACE_WALL_HEIGHT_M)
-        add_box(actors, f"Ort {index + 1}", (center_x, center_y, PLACE_WALL_HEIGHT_M / 2), size, rotation=(0, 0, math.degrees(yaw) + wall_yaw))
+        floor_z = ground_m(center_x, center_y)
+        add_box(actors, f"Ort {index + 1}", (center_x, center_y, floor_z + PLACE_WALL_HEIGHT_M / 2), size, rotation=(0, 0, math.degrees(yaw) + wall_yaw))
 
 
 def add_cover(actors, layout):
@@ -135,9 +167,12 @@ def add_cover(actors, layout):
             continue
         if any(math.hypot(x - other_x, y - other_y) < BOSS_CLEAR_M for other_x, other_y in bosses):
             continue
+        if not is_open_ground(x, y):
+            continue
         size_x, size_y = rng.uniform(COVER_MIN_SIZE_M, COVER_MAX_SIZE_M), rng.uniform(COVER_MIN_SIZE_M, COVER_MAX_SIZE_M)
         height = rng.uniform(1, COVER_MAX_HEIGHT_M)
-        add_box(actors, "Deckung", (x, y, height / 2), (size_x, size_y, height), rotation=(0, 0, rng.uniform(0, 90)))
+        bottom = ground_m(x, y) - COVER_SINK_M
+        add_box(actors, "Deckung", (x, y, bottom + (height + COVER_SINK_M) / 2), (size_x, size_y, height + COVER_SINK_M), rotation=(0, 0, rng.uniform(0, 90)))
         taken.append((x, y))
         placed += 1
     return taken
@@ -147,7 +182,7 @@ def add_camps(actors, layout):
     """The fixed places where enemies stand watch. The game fills them when a run begins."""
     camp_class = unreal.load_class(None, "/Script/Eisenseelen.EIEnemyCamp")
     for camp in layout["lager"]:
-        actor = spawn(actors, camp_class, location=(camp["x_m"] * CM_PER_M, camp["y_m"] * CM_PER_M, 0), label="Lager")
+        actor = spawn(actors, camp_class, location=on_ground(camp["x_m"], camp["y_m"]), label="Lager")
         actor.set_editor_property("start_size", camp["groesse"])
 
 
@@ -168,7 +203,9 @@ def add_chests(actors, layout, cover):
         x, y = rng.uniform(-half, half), rng.uniform(-half, half)
         if any(math.hypot(x - other_x, y - other_y) < clear for (other_x, other_y), clear in keep_clear):
             continue
-        spawn(actors, chest_class, location=(x * CM_PER_M, y * CM_PER_M, 0), rotation=(0, 0, rng.uniform(0, 360)), label="Truhe")
+        if not is_open_ground(x, y):
+            continue
+        spawn(actors, chest_class, location=on_ground(x, y), rotation=(0, 0, rng.uniform(0, 360)), label="Truhe")
         keep_clear.append(((x, y), CHEST_CLEAR_CHEST_M))
         placed += 1
 
@@ -177,8 +214,19 @@ def add_launch_pads(actors, pads):
     pad_class = unreal.load_class(None, "/Script/Eisenseelen.EILaunchPad")
     for pad in pads:
         x, y, tower_height = pad["x_m"], pad["y_m"], pad["turm_hoehe_m"]
-        spawn(actors, pad_class, location=(x * CM_PER_M, y * CM_PER_M, 0), label="Sprungfeld")
-        add_box(actors, "Turm", (x + TOWER_DISTANCE_M, y, tower_height / 2), (TOWER_SIZE_M, TOWER_SIZE_M, tower_height))
+        spawn(actors, pad_class, location=on_ground(x, y), label="Sprungfeld")
+        tower_floor = ground_m(x + TOWER_DISTANCE_M, y)
+        add_box(actors, "Turm", (x + TOWER_DISTANCE_M, y, tower_floor + tower_height / 2), (TOWER_SIZE_M, TOWER_SIZE_M, tower_height))
+
+
+def add_terrain():
+    """The landscape. Its heights come from tools/gelaende.py, so the PNG preview shows the same ground."""
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    components, quads, quad_cm, _ = terrain.resolution()
+    material = unreal.load_asset(TERRAIN_MATERIAL_PATH)
+    landscape = unreal.EIWorldTools.build_landscape(world, terrain.grid_cm(), components, quads, quad_cm, material, GENERATED_TAG)
+    if landscape is None:
+        raise RuntimeError("could not build the landscape")
 
 
 def main():
@@ -197,24 +245,25 @@ def main():
         raise RuntimeError(f"could not create {MAP_PATH}")
 
     floor_size = layout["boden_m"]
-    add_box(actors, "Boden", (0, 0, -0.5), (floor_size, floor_size, 1))
+    add_terrain()
     add_walls(actors, "Rand", (0, 0), floor_size, floor_size, 0, layout["rand_hoehe_m"], EDGE_THICKNESS_M, EDGE_BLOCKER_HEIGHT_M)
     altar_class = unreal.load_class(None, "/Script/Eisenseelen.EIAltar")
     for index, place in enumerate(layout["orte"]):
         add_place(actors, place, index)
-        spawn(actors, altar_class, location=(place["x_m"] * CM_PER_M, place["y_m"] * CM_PER_M, 0), label="Altar")
+        spawn(actors, altar_class, location=on_ground(place["x_m"], place["y_m"]), label="Altar")
     taken = add_cover(actors, layout)
     add_camps(actors, layout)
     add_chests(actors, layout, taken)
     add_launch_pads(actors, layout["sprungfelder"])
 
-    navigation = spawn(actors, unreal.NavMeshBoundsVolume, label="Wegfindung")
+    navigation_middle_cm = (NAVIGATION_BOTTOM_M + NAVIGATION_TOP_M) / 2 * CM_PER_M
+    navigation = spawn(actors, unreal.NavMeshBoundsVolume, location=(0, 0, navigation_middle_cm), label="Wegfindung")
     scale = floor_size / VOLUME_BRUSH_M
-    navigation.set_actor_scale3d(unreal.Vector(scale, scale, NAVIGATION_HEIGHT_M / VOLUME_BRUSH_M))
+    navigation.set_actor_scale3d(unreal.Vector(scale, scale, (NAVIGATION_TOP_M - NAVIGATION_BOTTOM_M) / VOLUME_BRUSH_M))
 
     fire_class = unreal.load_class(None, "/Script/Eisenseelen.EISignalFire")
     for fire in layout["signalfeuer"]:
-        spawn(actors, fire_class, location=(fire["x_m"] * CM_PER_M, fire["y_m"] * CM_PER_M, 0), label="Signalfeuer")
+        spawn(actors, fire_class, location=on_ground(fire["x_m"], fire["y_m"]), label="Signalfeuer")
 
     add_dock(actors, layout["anlegestelle"])
 
@@ -226,6 +275,11 @@ def main():
     sky_light = spawn(actors, unreal.SkyLight, location=(0, 0, 1000), label="Himmelslicht")
     sky_light.light_component.set_editor_property("real_time_capture", True)
     spawn(actors, unreal.ExponentialHeightFog, label="Nebel")
+
+    # The game builds the paths itself when the run starts. Paths saved here would only cover what stood when the volume was new.
+    for actor in actors.get_all_level_actors():
+        if isinstance(actor, unreal.RecastNavMesh):
+            actors.destroy_actor(actor)
 
     if not levels.save_current_level():
         raise RuntimeError(f"could not save {MAP_PATH}")

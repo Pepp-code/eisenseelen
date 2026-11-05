@@ -18,6 +18,13 @@ CHECKER_DARK = 0.13
 CHECKER_ROUGHNESS = 0.85
 # The shimmer over a model is this strong in its middle and grows towards its edges, so the shape stays readable.
 OVERLAY_MIDDLE = 0.35
+# The terrain: dusty steppe on flat ground, dark rock where it is too steep to walk.
+TERRAIN_ASH = unreal.LinearColor(0.32, 0.22, 0.13, 1)
+TERRAIN_ROCK = unreal.LinearColor(0.11, 0.075, 0.06, 1)
+TERRAIN_DARK_CELL = 0.8
+TERRAIN_ROCK_BELOW_UP = 0.8
+TERRAIN_ROCK_SHARPNESS = 6.0
+TERRAIN_ROUGHNESS = 0.95
 
 library = unreal.MaterialEditingLibrary
 
@@ -70,9 +77,8 @@ class Graph:
             raise RuntimeError(f"could not save {self.path}")
 
 
-def make_checker():
-    """A checker fixed in the world: it does not stretch on scaled cubes, and its 1 m cells show size and speed."""
-    graph = Graph("M_Schachbrett")
+def checker_is_odd(graph):
+    """0 or 1 in 1 m cells fixed in the world."""
     cells = graph.node(
         unreal.MaterialExpressionDivide,
         ("A", graph.node(unreal.MaterialExpressionWorldPosition)),
@@ -83,7 +89,13 @@ def make_checker():
     # The sum of the cell numbers alternates between even and odd from one cell to the next, on every axis.
     cell_sum = graph.node(unreal.MaterialExpressionDotProduct, ("A", whole_cells), ("B", graph.grey(1)))
     positive_sum = graph.node(unreal.MaterialExpressionAbs, ("", cell_sum))
-    is_odd = graph.node(unreal.MaterialExpressionFmod, ("A", positive_sum), ("B", graph.number(2)))
+    return graph.node(unreal.MaterialExpressionFmod, ("A", positive_sum), ("B", graph.number(2)))
+
+
+def make_checker():
+    """A checker fixed in the world: it does not stretch on scaled cubes, and its 1 m cells show size and speed."""
+    graph = Graph("M_Schachbrett")
+    is_odd = checker_is_odd(graph)
     color = graph.node(
         unreal.MaterialExpressionLinearInterpolate,
         ("A", graph.grey(CHECKER_LIGHT)),
@@ -92,6 +104,38 @@ def make_checker():
     )
     graph.output(color, unreal.MaterialProperty.MP_BASE_COLOR)
     graph.output(graph.number(CHECKER_ROUGHNESS), unreal.MaterialProperty.MP_ROUGHNESS)
+    graph.finish()
+
+
+def make_terrain():
+    """The stand-in for the landscape until painted layers come: steppe colour with 1 m cells, rock on steep slopes."""
+    graph = Graph("M_Gelaende")
+    cell_shade = graph.node(
+        unreal.MaterialExpressionLinearInterpolate,
+        ("A", graph.number(1.0)),
+        ("B", graph.number(TERRAIN_DARK_CELL)),
+        ("Alpha", checker_is_odd(graph)),
+    )
+    up = graph.node(
+        unreal.MaterialExpressionComponentMask,
+        ("", graph.node(unreal.MaterialExpressionVertexNormalWS)),
+        r=False, g=False, b=True, a=False,
+    )
+    flatness = graph.node(
+        unreal.MaterialExpressionSaturate,
+        ("", graph.multiply(
+            graph.node(unreal.MaterialExpressionSubtract, ("A", up), ("B", graph.number(TERRAIN_ROCK_BELOW_UP))),
+            graph.number(TERRAIN_ROCK_SHARPNESS),
+        )),
+    )
+    surface = graph.node(
+        unreal.MaterialExpressionLinearInterpolate,
+        ("A", graph.color_parameter("Fels", TERRAIN_ROCK)),
+        ("B", graph.color_parameter("Steppe", TERRAIN_ASH)),
+        ("Alpha", flatness),
+    )
+    graph.output(graph.multiply(surface, cell_shade), unreal.MaterialProperty.MP_BASE_COLOR)
+    graph.output(graph.number(TERRAIN_ROUGHNESS), unreal.MaterialProperty.MP_ROUGHNESS)
     graph.finish()
 
 
@@ -158,6 +202,7 @@ def import_sounds():
 
 def main():
     make_checker()
+    make_terrain()
     make_color()
     make_glow()
     make_overlay()

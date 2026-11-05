@@ -1,0 +1,36 @@
+{
+	"_info": "Entwurf für das Gelände der Aschesteppe. Alle Maße in Metern. Jeder Spielort aus laufkarte.json bleibt eben auf Höhe 0, das Gelände dazwischen steigt und fällt. Nach einer Änderung: pwsh tools/rebuild_content.ps1, die Draufsicht zeigt py -3.12 tools/gelaende.py.",
+	"zufall": 7,
+	"wellen_hoehe_m": 3.5,
+	"wellen_laenge_m": 55,
+	"_rand": "Steile Hänge am Kartenrand, damit die Karte nicht an einer Wand endet.",
+	"rand": { "breite_m": 14, "hoehe_m": 18 },
+	"_eben_um": "Um jeden Spielort ist es in diesem Umkreis eben, danach geht es über uebergang_m ins Gelände über.",
+	"eben_um": {
+		"orte_m": 14,
+		"bossplaetze_m": 26,
+		"signalfeuer_m": 13,
+		"ankunft_m": 10,
+		"lager_m": 8,
+		"sprungfelder_m": 9,
+		"mitte_m": 16,
+		"uebergang_m": 12
+	},
+	"_tafelberge": "Flache Kuppen mit steilen Wänden. Hinauf kommt man über die Rampe (rampe_grad: in diese Richtung fällt sie ab, 0 ist Osten, 90 Norden) oder mit einem Sprungfeld. Ohne rampe_grad gibt es keine Rampe.",
+	"tafelberge": [
+		{ "name": "Wachhügel", "x_m": 0, "y_m": 42, "radius_m": 10, "hoehe_m": 7, "rampe_grad": 270 },
+		{ "name": "Westkuppe", "x_m": -125, "y_m": -75, "radius_m": 9, "hoehe_m": 9, "rampe_grad": 0 },
+		{ "name": "Nordkuppe", "x_m": 90, "y_m": 115, "radius_m": 9, "hoehe_m": 10, "rampe_grad": 180 },
+		{ "name": "Aschezinne", "x_m": -88, "y_m": 125, "radius_m": 8, "hoehe_m": 11, "rampe_grad": 0 },
+		{ "name": "Südostkuppe", "x_m": 122, "y_m": -128, "radius_m": 10, "hoehe_m": 12 }
+	],
+	"rampe": { "breite_m": 6, "steigung_grad": 22 },
+	"_flussbett": "Ein ausgetrockneter Fluss, in dem man Deckung findet. An Spielorten ist er zugeschüttet, dort liegt eine Furt.",
+	"flussbett": {
+		"punkte": [[-150, -55], [-105, -60], [-62, -68], [-25, -78], [10, -72], [52, -66], [88, -64], [122, -78], [150, -82]],
+		"sohle_m": 6,
+		"ufer_m": 6,
+		"tiefe_m": 3
+	},
+	"aufloesung": { "teile_pro_seite": 5, "quadrate_pro_teil": 63, "quadrat_cm": 100 }
+}

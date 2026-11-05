@@ -23,7 +23,10 @@
 #include "Engine/StaticMeshActor.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "LandscapeProxy.h"
+#include "EILaunchPad.h"
 #include "NavigationSystem.h"
+#include "NavigationPath.h"
 #include "Navigation/PathFollowingComponent.h"
 
 using namespace EITestScript;
@@ -103,6 +106,15 @@ namespace
 	{
 		SwitchOffReinforcements(Context);
 		EmptyCamps(Context);
+	}
+
+	/** Standing height on the terrain at this spot, for something the size of the hero. */
+	FVector OnGround(const FEIPlayContext& Context, const FVector& Where)
+	{
+		constexpr float SearchCm = 10000.0f;
+		FHitResult Hit;
+		Context.World->LineTraceSingleByObjectType(Hit, FVector(Where.X, Where.Y, SearchCm), FVector(Where.X, Where.Y, -SearchCm), FCollisionObjectQueryParams(ECC_WorldStatic));
+		return FVector(Where.X, Where.Y, (Hit.bBlockingHit ? Hit.ImpactPoint.Z : 0.0) + HeroHeight);
 	}
 
 	/** Stands next to the fire of this run, far enough from it to look at it. */
@@ -542,7 +554,7 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("At the limit nobody more comes"), Threat(Context), State->Threat);
 
 		// Far away from everyone: such an enemy makes way.
-		State->LeftBehind = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), Context.Hero->GetActorLocation() + FVector(9000.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+		State->LeftBehind = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), OnGround(Context, Context.Hero->GetActorLocation() + FVector(9000.0f, 0.0f, 0.0f)), FRotator::ZeroRotator);
 		Context.Test->TestTrue(TEXT("An enemy can be far away"), State->LeftBehind.IsValid());
 	}));
 	Steps.Add(WaitUntil(TEXT("the enemy left behind is gone"), 3.0, [State](const FEIPlayContext& Context) { return !State->LeftBehind.IsValid(); }));
@@ -801,7 +813,7 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 	const auto StandBeside = [](const FEIPlayContext& Context, const AEIChest* Chest, float DistanceCm)
 	{
 		const FVector Location = Chest->GetActorLocation();
-		Teleport(Context, FVector(Location.X + DistanceCm, Location.Y, HeroHeight), 180.0f);
+		Teleport(Context, FVector(Location.X + DistanceCm, Location.Y, Location.Z + HeroHeight), 180.0f);
 	};
 	const auto DefeatGuards = [](const FEIPlayContext& Context, int32 HowMany)
 	{
@@ -1240,6 +1252,108 @@ bool FEIPathfindingTest::RunTest(const FString& Parameters)
 		Context.Test->AddInfo(FString::Printf(TEXT("Around the wall in %.1f s, %.0f cm from the hero"), Context.Now - *StartedAt, FVector::Dist(Enemy->GetActorLocation(), Context.Hero->GetActorLocation())));
 		const AAIController* AI = Enemy->GetController<AAIController>();
 		Context.Test->TestNotEqual(TEXT("The enemy stands still to strike"), AI->GetMoveStatus(), EPathFollowingStatus::Moving);
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIRunTerrainTest,
+	"Eisenseelen.Play.Run.Terrain",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIRunTerrainTest::RunTest(const FString& Parameters)
+{
+	// Data/gelaende.json keeps every place of the game level; around it the ground may rise and fall.
+	constexpr float FlatToleranceCm = 30.0f;
+	constexpr float LookAroundCm = 500.0f;
+	// Altars and fires are solid, so a way ends in front of them.
+	constexpr float CloseEnoughCm = 400.0f;
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(WaitUntil(TEXT("the paths are built"), 60.0, [](const FEIPlayContext& Context)
+	{
+		const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
+		return Navigation != nullptr && Navigation->GetDefaultNavDataInstance() != nullptr && !Navigation->IsNavigationBeingBuilt(Context.World);
+	}));
+	Steps.Add(Do([CloseEnoughCm](const FEIPlayContext& Context)
+	{
+		SwitchOffDirector(Context);
+		TActorIterator<ALandscapeProxy> Landscape(Context.World);
+		if (!Context.Test->TestTrue(TEXT("The run map has a landscape"), static_cast<bool>(Landscape)))
+		{
+			return;
+		}
+		const ALandscapeProxy* Ground = *Landscape;
+		const auto GroundAt = [Ground](const FVector& Where, double& Height)
+		{
+			const TOptional<float> Found = Ground->GetHeightAtLocation(Where);
+			Height = Found.Get(0.0f);
+			return Found.IsSet();
+		};
+		double Lowest = TNumericLimits<double>::Max();
+		double Highest = TNumericLimits<double>::Lowest();
+		for (int32 X = -14000; X <= 14000; X += 2000)
+		{
+			for (int32 Y = -14000; Y <= 14000; Y += 2000)
+			{
+				double Height = 0.0;
+				if (GroundAt(FVector(X, Y, 0.0), Height))
+				{
+					Lowest = FMath::Min(Lowest, Height);
+					Highest = FMath::Max(Highest, Height);
+				}
+			}
+		}
+		Context.Test->AddInfo(FString::Printf(TEXT("The ground lies between %.1f m and %.1f m"), Lowest / CentimetersPerMeter, Highest / CentimetersPerMeter));
+		Context.Test->TestTrue(TEXT("The ground is not flat everywhere"), Highest - Lowest > 500.0);
+
+		TArray<TPair<FString, FVector>> Places;
+		const TArray<FEIArrivalPoint>& Arrivals = GetGameMode(Context)->GetRun()->GetArrivals();
+		for (const FEIArrivalPoint& Arrival : Arrivals)
+		{
+			Places.Emplace(TEXT("arrival"), Arrival.Location);
+		}
+		for (TActorIterator<AEIAltar> It(Context.World); It; ++It) { Places.Emplace(TEXT("altar"), It->GetActorLocation()); }
+		for (TActorIterator<AEISignalFire> It(Context.World); It; ++It) { Places.Emplace(TEXT("fire"), It->GetActorLocation()); }
+		for (TActorIterator<AEIEnemyCamp> It(Context.World); It; ++It) { Places.Emplace(TEXT("camp"), It->GetActorLocation()); }
+		for (TActorIterator<AEILaunchPad> It(Context.World); It; ++It) { Places.Emplace(TEXT("launch pad"), It->GetActorLocation()); }
+		Context.Test->TestTrue(TEXT("The map has its places"), Places.Num() > 30);
+
+		int32 NotFlat = 0;
+		for (const TPair<FString, FVector>& Place : Places)
+		{
+			for (const FVector Offset : { FVector::ZeroVector, FVector(LookAroundCm, 0, 0), FVector(-LookAroundCm, 0, 0), FVector(0, LookAroundCm, 0), FVector(0, -LookAroundCm, 0) })
+			{
+				double Height = 0.0;
+				if (!GroundAt(Place.Value + Offset, Height) || FMath::Abs(Height) > FlatToleranceCm)
+				{
+					Context.Test->AddError(FString::Printf(TEXT("The %s at %.0f, %.0f m is not on flat ground at height 0 (%.0f cm)"), *Place.Key, Place.Value.X / CentimetersPerMeter, Place.Value.Y / CentimetersPerMeter, Height));
+					++NotFlat;
+					break;
+				}
+			}
+		}
+		Context.Test->TestEqual(TEXT("Every place lies flat at height 0"), NotFlat, 0);
+
+		// Everything a team has to reach can be reached on foot from where the barge sets it down.
+		TArray<TPair<FString, FVector>> Goals = Places;
+		for (TActorIterator<AEIChest> It(Context.World); It; ++It) { Goals.Emplace(TEXT("chest"), It->GetActorLocation()); }
+		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
+		const FVector Start = Arrivals[0].Location;
+		Goals.RemoveAt(0);
+		int32 Unreachable = 0;
+		for (const TPair<FString, FVector>& Goal : Goals)
+		{
+			const UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(Context.World, Start, Goal.Value);
+			const bool bArrives = Path != nullptr && Path->IsValid() && Path->PathPoints.Num() > 0 && FVector::Dist2D(Path->PathPoints.Last(), Goal.Value) < CloseEnoughCm;
+			if (!bArrives)
+			{
+				Context.Test->AddError(FString::Printf(TEXT("No way on foot to the %s at %.0f, %.0f m"), *Goal.Key, Goal.Value.X / CentimetersPerMeter, Goal.Value.Y / CentimetersPerMeter));
+				++Unreachable;
+			}
+		}
+		Context.Test->AddInfo(FString::Printf(TEXT("%d goals checked for a way on foot"), Goals.Num()));
+		Context.Test->TestEqual(TEXT("Every goal can be reached on foot"), Unreachable, 0);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

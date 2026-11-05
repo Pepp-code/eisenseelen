@@ -15,6 +15,8 @@ SETTLE_SECONDS = 1.5
 AFTER_SHOT_SECONDS = 1.0
 RESOLUTION = "1600x900"
 STAND_HEIGHT = 92
+# From up here the camera behind the hero sees across the whole terrain.
+OVERVIEW_HEIGHT = 4500
 
 
 def world():
@@ -43,8 +45,17 @@ def tap(key):
     player().preview_key(key, False)
 
 
-def stand_looking_at(location, target, height=STAND_HEIGHT):
+def ground_at(x, y):
+    """The height of the terrain, or 0 where nothing is below."""
+    start, end = unreal.Vector(x, y, 10000), unreal.Vector(x, y, -10000)
+    hit = unreal.SystemLibrary.line_trace_single(world(), start, end, unreal.TraceTypeQuery.ECC_VISIBILITY, False, [pawn()], unreal.DrawDebugTrace.NONE, True)
+    return hit.to_tuple()[4].z if hit is not None and hit.to_tuple()[0] else 0.0
+
+
+def stand_looking_at(location, target, height=None):
     """Stands on the ground and looks at a point, horizontally aimed at its height."""
+    if height is None:
+        height = ground_at(location[0], location[1]) + STAND_HEIGHT
     pawn().set_actor_location(unreal.Vector(location[0], location[1], height), False, True)
     movement().set_movement_mode(unreal.MovementMode.MOVE_WALKING)
     yaw = math.degrees(math.atan2(target[1] - location[1], target[0] - location[0]))
@@ -201,6 +212,15 @@ def scenario():
     player().preview_blood_moon(False)
     yield 6.0
 
+    # The terrain from above: from the south edge across the map, and from the south-west corner to the middle.
+    for x, y, yaw in ((0, -12000, 90), (-11000, -11000, 45)):
+        movement().set_movement_mode(unreal.MovementMode.MOVE_FLYING)
+        pawn().set_actor_location(unreal.Vector(x, y, OVERVIEW_HEIGHT), False, True)
+        player().set_control_rotation(unreal.Rotator(0, -22, yaw))
+        yield SETTLE_SECONDS
+        shot()
+        yield AFTER_SHOT_SECONDS
+
     # The overview of the side jobs.
     yield from tap("M")
     yield 0.2
@@ -213,16 +233,16 @@ def scenario():
     if chest is not None:
         spot = chest.get_actor_location()
         front = chest.get_actor_forward_vector()
-        stand_looking_at((spot.x + 1500 * front.x, spot.y + 1500 * front.y), (spot.x, spot.y, 100))
+        stand_looking_at((spot.x + 1500 * front.x, spot.y + 1500 * front.y), (spot.x, spot.y, spot.z + 100))
         yield SETTLE_SECONDS
         shot()
         yield AFTER_SHOT_SECONDS
-        stand_looking_at((spot.x + 900 * front.x, spot.y + 900 * front.y), (spot.x, spot.y, 100))
+        stand_looking_at((spot.x + 900 * front.x, spot.y + 900 * front.y), (spot.x, spot.y, spot.z + 100))
         yield 0.6
         shot()
         yield AFTER_SHOT_SECONDS
         player().preview_defeat_guards()
-        stand_looking_at((spot.x + 220 * front.x, spot.y + 220 * front.y), (spot.x, spot.y, 60))
+        stand_looking_at((spot.x + 220 * front.x, spot.y + 220 * front.y), (spot.x, spot.y, spot.z + 60))
         yield SETTLE_SECONDS
         shot()
         yield AFTER_SHOT_SECONDS
