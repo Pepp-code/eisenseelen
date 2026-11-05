@@ -75,6 +75,8 @@ Prüfe vor jedem Bauen und vor jeder Änderung in `Data/`, ob ein Editor läuft.
 - `tools/preview.ps1` nutzt `-game -RenderOffscreen` und braucht kein Fenster. Ein Durchlauf dauert etwa 5 Minuten.
 - Python kann nur Funktionen mit `BlueprintPure` oder `BlueprintCallable` aufrufen.
 - Der Lauf hat nicht immer Truhe, Altar und Anführer, weil die Aufträge gewürfelt werden. Darum zählen die Bilder ab Bild 16 vom Ende her.
+- `-Szene seelenrufer` spielt denselben Lauf mit dem Seelenrufer (`EI_VORSCHAU_BOSS`). Ein Boss ist unverwundbar, solange er gefesselt ist oder seine Schutzblase steht. `PreviewDefeatBoss` besiegt deshalb zuerst die gerufenen Gegner (`AEIBoss::DefeatSummons`), sonst hängt der Durchlauf.
+- Die Bilder 4 und 5 im Lauf sind schwarz. Das ist die Überblendung der Überfahrt und gewollt.
 
 **Karten und Skripte**
 

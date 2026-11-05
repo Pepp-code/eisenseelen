@@ -3,7 +3,7 @@
 
 # Items und Builds
 
-**Stand: 5. November 2026.** Der Ablauf wurde am 5. November noch einmal geändert und folgt jetzt enger dem Vorbild. Die Schritte A und B sind gebaut: Anlegestelle, Überfahrt, 3 Nebenaufträge, Der Gefesselte mit Beute-Set und das Signalfeuer. Noch nicht gebaut sind die Jagdbriefe, das Beutebuch, die Schmiede und alles danach. Bis zur Schmiede geben Gegner noch selten ein Item, und die drei Qualitäten sind noch da. Alle Zahlen sind erste Annahmen. Was schon gebaut ist, steht in Textdateien, die du selbst ändern kannst.
+**Stand: 5. November 2026.** Der Ablauf wurde am 5. November noch einmal geändert und folgt jetzt enger dem Vorbild. Die Schritte A bis C sind gebaut: Anlegestelle, Überfahrt, 3 Nebenaufträge, das Signalfeuer, die Jagdbriefe, die zwei Bosse Der Gefesselte und Der Seelenrufer mit je einem Beute-Set und das Beutebuch. Noch nicht gebaut sind die Schmiede und alles danach. Bis zur Schmiede geben Gegner noch selten ein Item, und die drei Qualitäten sind noch da. Alle Zahlen sind erste Annahmen. Was schon gebaut ist, steht in Textdateien, die du selbst ändern kannst.
 
 ## Kurzfassung
 
@@ -70,7 +70,7 @@ Jeder Boss hat ein eigenes Beute-Set in einer Textdatei. Gold gibt es immer, jed
 | Schwere Kette | 15 % |
 | Herz des Gefesselten | 3 % |
 
-So kannst du gezielt jagen: Ein Meisterstück braucht eine Zutat, die Zutat hat ein bestimmter Boss mit einer Chance, also wählst du seinen Jagdbrief. Damit du weißt, wen du jagen musst, listet ein **Beutebuch** im Menü je Boss die möglichen Zutaten. Noch nicht gefundene stehen dort als „???“, die Chance steht nur in Worten da, zum Beispiel „selten“.
+So kannst du gezielt jagen: Ein Meisterstück braucht eine Zutat, die Zutat hat ein bestimmter Boss mit einer Chance, also wählst du seinen Jagdbrief. Damit du weißt, wen du jagen musst, listet ein **Beutebuch** im Menü je Boss die möglichen Zutaten. Noch nicht gefundene stehen dort als „???“, die Chance steht nur in Worten da, zum Beispiel „selten“. Das Beutebuch öffnest du mit dem Knopf oben rechts im Ausrüstungsmenü (Taste I). Eine Zutat gilt als gefunden, sobald der Boss sie dir fallen lässt, auch wenn der Lauf danach scheitert. Der Seelenrufer lässt Seelenasche (40 %), Grabkerze (15 %) und Herz des Seelenrufers (3 %) fallen.
 
 Zutaten und Rezepte sind Zeilen in einer Datendatei, eine neue kostet also fast nichts. Damit dir nicht dauerhaft eine fehlt, kannst du in der Schmiede 3 überzählige gegen 1 andere tauschen.
 
@@ -305,13 +305,13 @@ Eine Runde ist wie im Masterplan etwa 2 Stunden deiner Zeit. Alles bleibt zuerst
 | 1 | Omen raus, Nebenaufträge mit Gold und Punkten | gebaut | fertig |
 | A | Anlegestelle, Überfahrt, Ankunft, Signalfeuer, 3 Nebenaufträge | gebaut, wird zusammen mit B gespielt | 3–4 |
 | B | Boss-Grundlage, Der Gefesselte, Beute-Set, Verfolgung | gebaut. Trägt der ganze Lauf? | 5–6 |
-| C | Der Seelenrufer, Jagdbriefe, Beutebuch | Wen jagst du? | 4–6 |
+| C | Der Seelenrufer, Jagdbriefe, Beutebuch | gebaut. Wen jagst du? | 4–6 |
 | D | Schmiede: Waffen und Rüstung kaufen, Item-Belohnungen raus | Worauf sparst du? | 2 |
 | E | Gravuren für Langschwert und Stab | Spürt man die Gravuren wirklich? | 3–4 |
 | F | Die Leere Wacht, 2 weitere graue Gebiete | Bleibt der Lauf abwechslungsreich? | 5–7 |
 | G | Meisterstücke, Rüstungs-Gravuren und 4-Teile-Regeln, weitere Waffen, Wind | Eigene Builds bauen | 12–17 |
 
-Das sind noch 34 bis 46 Runden, also 68 bis 92 Stunden deiner Zeit. Wie alle Zeiten im Plan kann das um die Hälfte danebenliegen. Nach Schritt B spielst du den ganzen Lauf, bevor Schmiede und Gravuren darauf aufbauen. Wird es dir zu viel, lassen sich die Leere Wacht und die weiteren Gebiete nach hinten schieben.
+Das sind noch 22 bis 30 Runden, also 44 bis 60 Stunden deiner Zeit. Wie alle Zeiten im Plan kann das um die Hälfte danebenliegen. Nach Schritt B spielst du den ganzen Lauf, bevor Schmiede und Gravuren darauf aufbauen. Wird es dir zu viel, lassen sich die Leere Wacht und die weiteren Gebiete nach hinten schieben.
 
 ## Risiken
 
@@ -358,5 +358,7 @@ Von mir festgelegt, du kannst es ändern:
 - **Fallen im Koop:** Wer gefallen ist, während die anderen entkommen, behält seine Beute.
 - **Menü im Lauf:** Während eines Laufs öffnet sich das Ausrüstungsmenü nicht.
 - **Start:** Zum Start hast du Flammenschwert, Feuerstab und Frostrune.
+- **Beutebuch:** Eine Zutat gilt als gefunden, sobald sie fällt, nicht erst nach der Flucht.
+- **Weniger Briefe:** Solange es nur 2 Bosse gibt, hängen nur 2 Jagdbriefe am Brett, denn jeder Brief zeigt einen anderen Boss.
 - **Umkreis:** Für Nebenaufträge und normale Gegner zählt, wer im Umkreis von 40 m steht.
 - **Level:** Level 2 braucht 100 Erfahrung, jede weitere Stufe 50 mehr. Level 20 liegt damit bei rund 10.500 Erfahrung.
