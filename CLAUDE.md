@@ -5,7 +5,7 @@ Hobbyprojekt: ein Fantasy-Koop-Extraction-Shooter mit beseelten Rüstungen als H
 Der Masterplan ist ein Claude Doc: https://claude.ai/artifact/Syfr3Y3xcV8i1Rhfn2XXty
 Der Entwickler bearbeitet ihn auch selbst. Lies ihn, bevor du etwas darin änderst.
 
-Eine Kopie des Plans liegt in `docs/Masterplan.md` und `docs/Items-und-Builds.md`, bekannte Fallen und frühere Entscheidungen stehen in `docs/Arbeitsnotizen.md`. So kann auch ein anderes Werkzeug weiterarbeiten. Halte die Kopie und die Notizen aktuell, wenn sich Plan oder Stand ändern, und sichere am Ende eines Arbeitsblocks mit `git push origin main`.
+Eine Kopie des Plans liegt in `docs/Masterplan.md` und `docs/Items-und-Builds.md`, bekannte Fallen und frühere Entscheidungen stehen in `docs/Arbeitsnotizen.md`, die Regeln für 3D-Modelle in `docs/Kunst-Leitfaden.md`. So kann auch ein anderes Werkzeug weiterarbeiten. Halte die Kopie und die Notizen aktuell, wenn sich Plan oder Stand ändern, und sichere am Ende eines Arbeitsblocks mit `git push origin main`.
 
 ## So arbeiten wir
 
@@ -20,6 +20,7 @@ Eine Kopie des Plans liegt in `docs/Masterplan.md` und `docs/Items-und-Builds.md
 - Eine Aufgabe, ein Commit. Kein Commit ohne grüne Tests.
 - Werte stehen nie im Code, sondern in `Data/*.json`, damit der Entwickler sie selbst ändern kann.
 - Keine Blueprints mit Logik. Sie dürfen höchstens Modelle und Werte zuordnen.
+- Was man sieht, hängt an `UEILookComponent`. Neue Figuren, Waffen und Orte bekommen eine Zeile in `Data/aussehen.json`, ihre Klötze bleiben für Treffer und Wände zuständig.
 - Der Server entscheidet von Anfang an: Treffer, Schaden und Spawns nur mit `HasAuthority()`.
 - Eigene Namen im Spiel, nie Begriffe des Vorbilds Far Far West.
 - Klassen-Präfix ist `EI`, Tests heißen `Eisenseelen.*`.
@@ -44,7 +45,7 @@ Materialien, Töne und beide Karten neu erzeugen:
 pwsh tools/rebuild_content.ps1
 ```
 
-Der Aufbau der Karten steht in `Data/testarena.json` und `Data/laufkarte.json`. Nach einer Änderung dort muss die Karte neu erzeugt werden. Alle anderen Dateien in `Data/` liest das Spiel beim Start und nach der Taste R.
+Der Aufbau der Karten steht in `Data/testarena.json` und `Data/laufkarte.json`. Nach einer Änderung dort muss die Karte neu erzeugt werden. Der Neubau ersetzt nur Dinge mit dem Tag `EI_Generiert`, von Hand gesetzte Dinge bleiben. Alle anderen Dateien in `Data/` liest das Spiel beim Start und nach der Taste R.
 
 Läuft noch ein Editor, kann der Linker die DLL nicht schreiben. Prüfe dann, wem der Prozess gehört, bevor du etwas beendest.
 
@@ -61,7 +62,7 @@ Der Entwickler startet den Editor mit `Editor_starten.bat` (Laufkarte) oder `Tes
 
 ## Aktueller Stand
 
-Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 53 Tests sind grün, darunter sechs mit echtem Gast im Netz.
+Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 57 Tests sind grün, darunter sechs mit echtem Gast im Netz.
 
 - **Bewegung:** Laufen, Sprint auf Shift, Sprung 1 m, Schwerkraft-Faktor 1,6, Luftlenkung, Sprungfelder. Das Ausweichen ist auf Wunsch des Entwicklers ganz gestrichen. Bunnyhop und Tempo-Kette sind auf Wunsch des Entwicklers gestrichen: Ein Sprung nimmt nie mehr Tempo mit als am Boden erlaubt.
 - **Leben:** Wer 6 Sekunden weder getroffen wurde noch selbst getroffen hat, bekommt Leben zurück. Werte in `Data/held.json`.
@@ -78,13 +79,14 @@ Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestan
 - **Items:** Sieben Plätze: Waffe, Rune, Helm, Brustpanzer, Handschuhe, Schuhe und Herzkristall. Alles steht in `Data/items.json`, die Grundformen der Waffen in `Data/waffen.json`: 15 Waffen aus 5 Grundformen und 3 Elementen, 3 Runen, 5 Rüstungsarten mit je 4 Teilen. Jedes Teil hat einen Preis (`preis_gold`) und ein Level, ab dem es in der Schmiede steht (`ab_level`). Items und Rüstungs-Boni zählen in derselben Summe. Der Spielstand liegt in `Saved/Spielstand.json`, Tests und Vorschaubilder fassen ihn nicht an. Die Testarena hat einen eigenen Teil darin, dort ist alles frei.
 - **Ausrüstung:** Die Taste I öffnet das Menü an der Anlegestelle, in der Testarena und nach dem Lauf, aber nicht während eines Laufs. Oben hat es drei Reiter. „Ausrüstung“ zeigt die Plätze, was du davon gekauft hast, den Vergleich und die Summe der Werte. „Schmiede“ zeigt je Platz alle Teile für die Klasse: gekauft, kaufbar, zu wenig Gold oder ab welchem Level. Kaufen geht nur an der Anlegestelle, dort steht auch die Schmiede selbst, F davor öffnet direkt diesen Reiter. „Beutebuch“ zeigt je Boss seinen Bannbruch und seine Zutaten, noch nicht gefundene als „???“, die Chance nur in Worten (`chance_worte` in `Data/bosse.json`). Eine Zutat gilt als gefunden, sobald sie fällt, das steht im Spielstand.
 - **Belohnungen:** Ein Nebenauftrag bringt 100 Gold und 25 Punkte seiner Fraktion, und zwar jedem Spieler im Umkreis von 40 m. Erst in der Barke ist alles sicher, beim Scheitern bleiben 30 % von Gold und Punkten, die Zutaten sind verloren, die Erfahrung bleibt immer. Gold, Punkte und Zutaten liegen im Spielstand und stehen im Menü, Gold gibt man in der Schmiede aus. Normale Gegner geben nur Erfahrung und nie ein Item. Die Abrechnung zeigt alles am Ende.
+- **Aussehen:** Alles ist noch grau, aber für echte 3D-Modelle vorbereitet. `Data/aussehen.json` hat eine leere Zeile für jeden Helden, jede Hand, jeden Gegner, jeden Boss, jede Waffe, jedes Rüstungsteil und jeden Ort. Ein Pfad dort legt ein Modell über die Klötze, Animationen und Warnfarben inklusive. Die Mitspieler sehen einander als Körper aus Klötzen, man selbst sieht nur seine Hand. Wie es geht, steht in `docs/Kunst-Leitfaden.md`.
 - **Erfahrung:** Level bis 20, für beide Klassen gemeinsam. Ein Level macht nicht stärker, es öffnet neue Teile in der Schmiede, und eine Meldung sagt, welche. Attribute und Qualitäten sind auf Wunsch des Entwicklers gestrichen, alte Spielstände werden beim Laden umgeschrieben. Werte in `Data/items.json`, Erfahrung je Gegnerart in `Data/gegner.json`.
 
 Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war ein Wunsch nach dem ersten Spielen. Alles andere wurde noch nicht selbst gespielt.
 
 **Als Nächstes:** Der Umbau nach dem Plan-Reiter „Items und Builds“ läuft, die Schritte heißen dort A bis G. Die Schritte A (Anlegestelle, Überfahrt, Signalfeuer), B (der erste Boss) C (Seelenrufer, Jagdbriefe, Beutebuch) und D (Schmiede) sind gebaut. Jetzt spielt der Entwickler alles zusammen. Danach kommt Schritt E: Gravuren für Langschwert und Stab.
 
-**Bewusst noch nicht dabei:** Die Leere Wacht und weitere Bosse, Gravuren und Meisterstücke (Schritte E bis G im Plan), das vierte Element Wind mit Windwaffen (Schritt G), Herzkristalle (der Platz ist da, er bleibt leer), die Rute, vier weitere Rüstungsarten, der Auftrag Ruine säubern, Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Totenrufer, Klassen-Passive.
+**Bewusst noch nicht dabei:** Echte Modelle (nur die Anschlüsse sind gebaut), Effekte für Zauber, die Leere Wacht und weitere Bosse, Gravuren und Meisterstücke (Schritte E bis G im Plan), das vierte Element Wind mit Windwaffen (Schritt G), Herzkristalle (der Platz ist da, er bleibt leer), die Rute, vier weitere Rüstungsarten, der Auftrag Ruine säubern, Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Totenrufer, Klassen-Passive.
 
 **Nicht geprüft:** Töne kann der Agent nicht hören, und die Klingenspur erscheint in keinem Standbild. Der echte Mauszeiger im Menü läuft ohne Fenster nicht, die Tests klicken das Menü direkt an. Viele Items, Erfahrung und Belohnungen sind erste Annahmen und nicht abgestimmt. Ob der Lauf ohne Omen noch schaffbar ist und wie stark der Boss sein darf, zeigt erst das Spielen.
 

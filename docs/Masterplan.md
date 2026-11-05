@@ -723,6 +723,12 @@ Der Stil ist flach, kräftig und starr. Er ist so gewählt, dass Fehler kaum auf
 
 Du beurteilst Vorschaubilder, der Agent ändert die Skripte. Damit bleibt die Entscheidung bei dir, ohne dass du Blender lernen musst.
 
+### Wie Modelle ins Spiel kommen
+
+**Gebaut am 5. November 2026:** Die grauen Klötze bleiben die Wahrheit für Treffer, Wände und Wege. Ein Modell liegt nur darüber und versteckt sie. Welches Modell wo liegt, steht in `Data/aussehen.json`: Jeder Held, jede Hand, jeder Gegner, jeder Boss, jede Waffe, jedes Rüstungsteil und jeder Ort hat dort schon eine leere Zeile. Ein Pfad genügt, und das Modell erscheint beim nächsten Start. Fehlt es, bleiben die Klötze. Die Mitspieler sehen dich jetzt als Körper, du selbst siehst nur deine Hand.
+
+Die Reihenfolge: zuerst Modelle über diese Datei, dann Effekte für Zauber und Treffer, dann die Umgebung von Hand in den Karten. Selbst gesetzte Dinge überstehen jeden Neubau der Karten, denn das Skript ersetzt nur, was es selbst gebaut hat. Alle Regeln zu Maßstab, Richtung, Sockeln und Animationen stehen in `docs/Kunst-Leitfaden.md`.
+
 ### Sound und Musik
 
 Sound trägt das Trefferfühl und kostet fast nichts. Die [Sonniss-GDC-Pakete](https://sonniss.com/gameaudiogdc/) sind kostenlos und kommerziell nutzbar, ohne Namensnennung. [Ihre Lizenz](https://sonniss.com/gdc-bundle-license/) verbietet aber KI-Training. Musik kommt als CC0-Stücke oder bleibt am Anfang ganz weg. Vertonung gibt es keine.

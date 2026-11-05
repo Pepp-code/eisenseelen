@@ -10,6 +10,7 @@ Was hier steht, steht nicht in `CLAUDE.md`, und jeder Punkt hat schon einmal Zei
 | Plan: Stufen, Reihenfolge, Ideen | Claude Doc, Kopie in `docs/Masterplan.md` und `docs/Items-und-Builds.md` |
 | Code | `Source/Eisenseelen`, Tests in `Private/Tests` |
 | Werte, die der Entwickler selbst ändert | `Data/*.json` |
+| Welches 3D-Modell wo liegt, Regeln dafür | `Data/aussehen.json`, `docs/Kunst-Leitfaden.md` |
 | Sicherung | privates Repo `Pepp-code/eisenseelen` auf GitHub, Zweig `main` |
 | Spielstand des Entwicklers | `Saved/Spielstand.json`, liegt nicht im Repo |
 
@@ -57,6 +58,8 @@ Prüfe vor jedem Bauen und vor jeder Änderung in `Data/`, ob ein Editor läuft.
 - Tests und Vorschaubilder dürfen `Saved/Spielstand.json` nie anfassen (`GIsAutomationTesting`, `-KeinSpielstand`).
 - Ein Test mit Gast braucht `ULevelEditorPlaySettings` mit `AddToRoot`, sonst räumt die Engine sie während des Ladens weg.
 - `Landed` kommt vor dem Wechsel auf Laufen, und der löscht einen dort gedrückten Sprung. Springe aus `OnMovementModeChanged`.
+- Modelle im Test: `FEILookTable::SetTestOverride` gilt nur, solange etwas gebaut wird. Setze die Tabelle, spawne und setze sie im selben Schritt zurück. `UEILookComponent::Setup` baut nur neu, wenn sich die Schlüssel ändern, also wirkt eine Tabelle nur auf neue Dinge oder nach einem Wechsel von Klasse oder Waffe.
+- Ein fehlendes Modell meldet das Spiel nur einmal je Pfad und Editor-Sitzung. Ein Test, der die Meldung erwartet, braucht deshalb jedes Mal einen neuen Pfad (`FGuid`).
 
 **Netzwerk**
 
@@ -80,7 +83,7 @@ Prüfe vor jedem Bauen und vor jeder Änderung in `Data/`, ob ein Editor läuft.
 
 **Karten und Skripte**
 
-- `levels.new_level()` verweigert eine Karte, die schon bekannt ist. Zum Neubau: laden und alle Dinge darin löschen (siehe `tools/make_testarena.py`).
+- `levels.new_level()` verweigert eine Karte, die schon bekannt ist. Zum Neubau: laden und alles löschen, was das Tag `EI_Generiert` trägt (`clear_generated` in `tools/make_testarena.py`). Was der Entwickler selbst in die Karte stellt, bleibt so stehen. Eine alte Karte ganz ohne Tags wird einmal ganz geleert.
 - `save_current_level()` scheitert still, wenn die Datei schreibgeschützt ist. Prüfe den Rückgabewert.
 - `AndroidFileServer` ist abgeschaltet, weil es sonst bei jedem Lauf etwas in `DefaultEngine.ini` schreibt.
 - `tools/preview_run.py` und die Karten-Skripte laufen mit Python in Unreal, sie brauchen kein eigenes Python.
@@ -102,3 +105,4 @@ Die Einzelheiten stehen im Plan. Hier steht der Weg dorthin, weil er erklärt, w
 - **5. November 2026, später:** Copilot hat übernommen, als Claude Code am Limit war. Die steigende Verderbnis ist gestrichen. Gefahr kommt nur noch durch Aufgaben: Beim Halten steigt der Blutmond mit Wellen, sonst gibt es nur die Lager, und die füllen sich nicht wieder. Gegner, Belohnungen und Items werden mit der Zeit nicht stärker. Danach bekam jeder Gegner eine klare Rolle wie beim Vorbild, und der Glutschädel kam neu dazu.
 
 - **5. November 2026, abends:** Das Level erhöht keine Werte mehr, die Attribute sind gestrichen, denn das passte nicht zum Prinzip. Jedes Level öffnet stattdessen neue Teile in der Schmiede, gekauft wird mit Gold. Qualitäten und Item-Funde von Gegnern sind mit der Schmiede weggefallen. Bewusst noch leer: Herzkristalle.
+- **5. November 2026, nachts:** Alles ist für echte 3D-Modelle vorbereitet. Die Klötze bleiben für Treffer und Wände zuständig, ein Modell aus `Data/aussehen.json` liegt nur darüber. Ein Modell ohne eigene Animationen zerfällt beim Tod wie bisher in Knochen. Runen haben keine Zeile, denn sie sieht man nur als Zauber. Effekte (Niagara) und Umgebung kommen danach.

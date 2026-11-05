@@ -308,6 +308,8 @@ Die Belohnungen sind fest und steigen nicht mit der Zeit. Mehr bekommst du nur d
 
 Dein flacher Stil spart hier am meisten. Am Anfang ist jede Rüstungsart nur ein eigenes Farbpaar, jeder Kristall eine Farbe des Kristallherzens und jedes Element eine Leuchtfarbe. Eigene Formen bekommen später nur deine Lieblingsteile, zuerst die Handschuhe, weil du sie in der Ego-Sicht selbst siehst. Eine ganze Rüstung kostet laut Plan 3 bis 4 Runden, deshalb kann nicht jedes Teil ein eigenes Modell haben.
 
+Seit dem 5. November hat jede Waffe, jede Grundform und jedes Rüstungsteil eine eigene Zeile in `Data/aussehen.json`. Ein Modell lässt sich also jederzeit einsetzen, ohne dass sich am Spiel etwas ändert. Eine Waffe ohne eigenes Modell nutzt das ihrer Grundform, so reichen am Anfang fünf Waffenmodelle. Wie es geht, steht in `docs/Kunst-Leitfaden.md`.
+
 ## Reihenfolge und Aufwand
 
 Eine Runde ist wie im Masterplan etwa 2 Stunden deiner Zeit. Alles bleibt zuerst grau.
