@@ -8,8 +8,8 @@ class UStaticMesh;
 class UStaticMeshComponent;
 
 /**
- * The flying barge, grey boxes for now. A run starts on its deck high above the map. Once a beacon burns it flies down
- * to it, and whoever steps into its boarding zone rides it away. The run director on the server moves it.
+ * The flying barge, grey boxes for now. It waits at the dock, takes the team across, and comes for them when the signal
+ * fire burns. While it flies nobody can land on it or get under it.
  */
 UCLASS()
 class EISENSEELEN_API AEISkyBarge : public AActor

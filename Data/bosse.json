@@ -1,0 +1,70 @@
+{
+	"platz_leine_m": 32,
+	"erholung_anteil_pro_s": 0.05,
+	"leben_je_weiterem_spieler": 0.65,
+	"kampf_welle_alle_s": 20,
+	"verfolgung_welle_alle_s": 12,
+	"signalfeuer_mindestabstand_m": 100,
+	"bosse": [
+		{
+			"name": "Der Gefesselte",
+			"auftritt": "Der Gefesselte reißt sich los!",
+			"farbe": [0.3, 0.26, 0.3],
+			"bannbruch": {
+				"art": "ankersteine",
+				"name": "Ankersteine",
+				"teil": "Ankerstein",
+				"anleitung": "Halte die Ankersteine. Mit jedem fällt eine Kette.",
+				"anzahl": 3,
+				"halten_s": 20,
+				"zone_m": 7,
+				"abstand_m": 18
+			},
+			"werte": {
+				"leben": 4000,
+				"bedrohung": 0,
+				"tempo_m_pro_s": 4,
+				"schaden": 35,
+				"angriff_ab_abstand_m": 5,
+				"ausholen_s": 0.9,
+				"trefferzone_m": 6,
+				"erholung_s": 1.4,
+				"taumeln_faktor_schwerer_hieb_0_bis_1": 0,
+				"sicht_m": 40,
+				"alarm_umkreis_m": 0,
+				"aufgeben_m": 70,
+				"wach_mindestens_s": 12,
+				"groesse_faktor": 3,
+				"drehtempo_grad_pro_s": 150,
+				"schild_schaden_faktor_0_bis_1": 1,
+				"schild_winkel_grad": 120,
+				"wurf_tempo_m_pro_s": 0,
+				"erfahrung": 50,
+				"item_chance_0_bis_1": 0,
+				"ansturm_tempo_m_pro_s": 16,
+				"ansturm_strecke_m": 24,
+				"ansturm_ab_abstand_m": 9,
+				"ansturm_bis_abstand_m": 26,
+				"ansturm_ankuendigung_s": 1.1,
+				"ansturm_schaden": 50,
+				"ansturm_pause_s": 8
+			},
+			"stampfen": {
+				"radius_m": 9,
+				"ab_abstand_m": 8,
+				"ankuendigung_s": 1.4,
+				"schaden": 45,
+				"pause_s": 7
+			},
+			"beute": {
+				"gold_von": 800,
+				"gold_bis": 1200,
+				"zutaten": [
+					{ "name": "Glutkern", "chance": 0.4 },
+					{ "name": "Schwere Kette", "chance": 0.15 },
+					{ "name": "Herz des Gefesselten", "chance": 0.03 }
+				]
+			}
+		}
+	]
+}

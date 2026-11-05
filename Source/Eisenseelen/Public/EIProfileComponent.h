@@ -74,6 +74,8 @@ public:
 	int32 GetRunExperience() const { return RunExperience; }
 	int32 GetRunGold() const { return RunGold; }
 	int32 GetRunPoints(const FString& Faction) const { return RunPoints.FindRef(Faction); }
+	const TArray<FString>& GetRunIngredients() const { return RunIngredients; }
+	bool WasLastRunEscaped() const { return bLastRunEscaped; }
 
 	/** Owner only. What stays of an amount this run has earned, once the run is over. */
 	int32 GetSecured(int32 Amount) const;
@@ -88,6 +90,9 @@ public:
 	/** Server only. A side job was finished with this player near. */
 	void GrantContract(int32 Faction, int32 Gold, int32 Points);
 
+	/** Server only. A boss has fallen, and this is what it dropped for this player. */
+	void GrantBossLoot(const FString& BossName, int32 Gold, const TArray<FString>& Ingredients);
+
 	/** Tells the player something in the middle of the screen. */
 	UFUNCTION(Client, Reliable)
 	void ClientShowNote(const FString& Text);
@@ -95,7 +100,7 @@ public:
 	/** Server only. A fallen enemy brings a little experience, and very rarely an item. */
 	void GrantEnemyReward(float Experience, float ItemChance);
 
-	/** Server only. In the barge all of it is safe. Without the barge a share of the gold and points stays, and the items are gone. The experience stays either way. */
+	/** Server only. In the barge all of it is safe. Without the barge a share of the gold and points stays, and the items and ingredients are gone. The experience stays either way. */
 	void EndRun(bool bEscaped);
 
 	/** Server only. A new run begins, and the data files are read again. */
@@ -116,6 +121,9 @@ private:
 
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveContract(int32 Faction, int32 Gold, int32 Points);
+
+	UFUNCTION(Client, Reliable)
+	void ClientReceiveBossLoot(const FString& BossName, int32 Gold, const TArray<FString>& Ingredients);
 
 	UFUNCTION(Client, Reliable)
 	void ClientEndRun(bool bEscaped);
@@ -147,6 +155,7 @@ private:
 	int32 RunExperience = 0;
 	int32 RunGold = 0;
 	TMap<FString, int32> RunPoints;
+	TArray<FString> RunIngredients;
 	bool bLastRunEscaped = true;
 	float RewardNoteRemaining = 0.0f;
 	FString RewardText;

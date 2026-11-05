@@ -1,5 +1,6 @@
 #include "EIPlayerController.h"
 
+#include "EIBoss.h"
 #include "EIEnemy.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
@@ -134,6 +135,22 @@ void AEIPlayerController::PreviewBeginRun()
 	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
 		GameMode->GetRun()->BeginRunNow();
+	}
+}
+
+void AEIPlayerController::PreviewSkipBannbruch()
+{
+	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
+	{
+		GameMode->GetRun()->SkipBannbruch();
+	}
+}
+
+void AEIPlayerController::PreviewDefeatBoss()
+{
+	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>(); GameMode != nullptr && GameMode->GetRun()->GetBoss() != nullptr)
+	{
+		GameMode->GetRun()->GetBoss()->TakeDamage(100000000.0f, FDamageEvent(), nullptr, nullptr);
 	}
 }
 

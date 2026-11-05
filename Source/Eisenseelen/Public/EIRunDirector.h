@@ -2,10 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "EIBosses.h"
 #include "EIContracts.h"
 #include "EIEnemyGroups.h"
 #include "EIRunDirector.generated.h"
 
+class AEIAnchorStone;
+class AEIBoss;
 class AEIChest;
 class AEIEnemy;
 class AEIEnemyCamp;
@@ -74,6 +77,12 @@ public:
 
 	const TArray<FEIArrivalPoint>& GetArrivals() const { return Arrivals; }
 
+	/** Which bosses there are. Tests may change it, and it counts from the next reset on. With an empty table a run has no boss. */
+	FEIBossTable& GetBossTable() { return BossTable; }
+	AEIBoss* GetBoss() const { return Boss; }
+	const FVector& GetBossPlace() const { return BossPlace; }
+	const TArray<TObjectPtr<AEIAnchorStone>>& GetAnchors() const { return Anchors; }
+
 	/** Puts everything back to the dock, with new contracts. */
 	void ResetRun();
 
@@ -92,15 +101,24 @@ public:
 	/** The clock raises it by itself. Directly only for preview pictures. */
 	void SetCorruptionStage(int32 Stage);
 
+	/** For tests and preview pictures: the Bannbruch is done at once, as if somebody had just finished it. */
+	void SkipBannbruch();
+
 	/** For tests and preview pictures: so many open contracts count as done, as if somebody had just finished them. */
 	void SkipContracts(int32 Count);
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	void PrepareBoss();
 	void PrepareContracts();
 	void PrepareSignalFire();
 	void SpawnLeaders();
+	void SpawnBoss(int32 HeroCount);
+	void UpdateBannbruch(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	void BreakBossFree(int32 HeroCount);
+	void BossFell();
+	bool IsAnchorHeld() const;
 	void UpdateDock(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void UpdateContracts(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void UpdateChest(AEIChest* Chest, const TArray<AEIHeroCharacter*>& LivingHeroes);
@@ -124,6 +142,16 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<AEISignalFire> ActiveFire;
 
+	UPROPERTY(Transient)
+	TObjectPtr<AEIBoss> Boss;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AEIAnchorStone>> Anchors;
+
+	FEIBossTable BossTable;
+	TArray<FVector> BossPlaces;
+	int32 BossIndex = INDEX_NONE;
+	FVector BossPlace = FVector::ZeroVector;
 	FEIRunValues Values;
 	FEIEnemyGroups Groups;
 	FEIContractTable ContractTable;

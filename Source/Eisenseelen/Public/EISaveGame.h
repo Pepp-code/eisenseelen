@@ -27,6 +27,9 @@ struct EISENSEELEN_API FEISaveGame
 	/** Name of a faction and the points earned with it. */
 	TMap<FString, int32> FactionPoints;
 
+	/** Name of an ingredient and how many there are. */
+	TMap<FString, int32> Ingredients;
+
 	/** Name of an item and its quality. Whatever stands in here is owned. */
 	TMap<FString, int32> Items;
 

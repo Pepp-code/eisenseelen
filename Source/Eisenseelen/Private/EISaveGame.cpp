@@ -95,6 +95,12 @@ FString FEISaveGame::ToJson() const
 		Points->SetNumberField(Pair.Key, Pair.Value);
 	}
 	Root->SetObjectField(TEXT("fraktionspunkte"), Points);
+	const TSharedRef<FJsonObject> Found = MakeShared<FJsonObject>();
+	for (const TPair<FString, int32>& Pair : Ingredients)
+	{
+		Found->SetNumberField(Pair.Key, Pair.Value);
+	}
+	Root->SetObjectField(TEXT("zutaten"), Found);
 
 	const TSharedRef<FJsonObject> Owned = MakeShared<FJsonObject>();
 	for (const TPair<FString, int32>& Pair : Items)
@@ -158,6 +164,17 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 		double Quality = 0.0;
 		Pair.Value->TryGetNumber(Quality);
 		Loaded.Items.Add(Pair.Key, FMath::RoundToInt32(Quality));
+	}
+	Loaded.Ingredients.Reset();
+	const TSharedPtr<FJsonObject>* Found = nullptr;
+	if (Root->TryGetObjectField(TEXT("zutaten"), Found))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Found)->Values)
+		{
+			double Amount = 0.0;
+			Pair.Value->TryGetNumber(Amount);
+			Loaded.Ingredients.Add(Pair.Key, FMath::RoundToInt32(Amount));
+		}
 	}
 	const TSharedPtr<FJsonObject>* Arena = nullptr;
 	const bool bHasArena = Root->TryGetObjectField(TEXT("testarena"), Arena);

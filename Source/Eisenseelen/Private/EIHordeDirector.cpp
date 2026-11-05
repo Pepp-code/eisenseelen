@@ -109,7 +109,7 @@ int32 UEIHordeDirector::CountEnemies() const
 	int32 Count = 0;
 	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
 	{
-		Count += It->IsDead() ? 0 : 1;
+		Count += It->IsDead() || It->IsBoss() ? 0 : 1;
 	}
 	return Count;
 }

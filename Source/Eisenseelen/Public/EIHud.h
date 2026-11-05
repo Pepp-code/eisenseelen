@@ -34,6 +34,9 @@ private:
 	/** The marks of the open contracts in the world, and what to do at the one the hero stands at. */
 	void DrawContracts(const class AEIHeroCharacter* Hero, const class AEIGameState* State, const struct FEIContractTable& Table, float PromptY);
 
+	/** The mark and the life bar of the boss, and what its Bannbruch asks for. */
+	void DrawBoss(const class AEIHeroCharacter* Hero, const class AEIGameState* State, float LineY, float PromptY);
+
 	/** Where the team stands at the dock, and what to do there. */
 	void DrawDock(const class AEIHeroCharacter* Hero, const class AEIGameState* State, float LineY, float PromptY);
 

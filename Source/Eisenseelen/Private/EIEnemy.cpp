@@ -165,39 +165,44 @@ bool FEIEnemyValues::LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutV
 		OutError = FString::Printf(TEXT("Der Abschnitt %s fehlt."), EIEnemyKindKey(Kind));
 		return false;
 	}
+	return ReadFrom(**Section, OutValues, OutError);
+}
+
+bool FEIEnemyValues::ReadFrom(const FJsonObject& Section, FEIEnemyValues& OutValues, FString& OutError)
+{
 	FEIEnemyValues Loaded;
-	if (!FEIDataFile::ReadNumber(**Section, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("bedrohung"), 0.0, 1000.0, Loaded.Threat, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("tempo_m_pro_s"), 0.1, 30.0, Loaded.SpeedMetersPerSecond, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("schaden"), 0.0, 10000.0, Loaded.Damage, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("angriff_ab_abstand_m"), 0.5, 20.0, Loaded.AttackFromMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("ausholen_s"), 0.0, 10.0, Loaded.WindupSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("trefferzone_m"), 0.5, 20.0, Loaded.HitZoneMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("erholung_s"), 0.0, 10.0, Loaded.RecoverSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("taumeln_faktor_schwerer_hieb_0_bis_1"), 0.0, 1.0, Loaded.HeavyHitStaggerFactor, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("sicht_m"), 1.0, 500.0, Loaded.SightMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("alarm_umkreis_m"), 0.0, 500.0, Loaded.AlarmMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("aufgeben_m"), 1.0, 1000.0, Loaded.GiveUpMeters, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("wach_mindestens_s"), 0.0, 600.0, Loaded.StayAwakeSeconds, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("groesse_faktor"), 0.2, 10.0, Loaded.Scale, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("drehtempo_grad_pro_s"), 1.0, 3600.0, Loaded.TurnDegreesPerSecond, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("schild_schaden_faktor_0_bis_1"), 0.0, 1.0, Loaded.ShieldDamageFactor, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("schild_winkel_grad"), 0.0, 360.0, Loaded.ShieldAngleDegrees, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("erfahrung"), 0.0, 1000000.0, Loaded.Experience, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("item_chance_0_bis_1"), 0.0, 1.0, Loaded.ItemChance, OutError)
-		|| !FEIDataFile::ReadNumber(**Section, TEXT("wurf_tempo_m_pro_s"), 0.0, 200.0, Loaded.ThrowSpeedMetersPerSecond, OutError))
+	if (!FEIDataFile::ReadNumber(Section, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("bedrohung"), 0.0, 1000.0, Loaded.Threat, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("tempo_m_pro_s"), 0.1, 30.0, Loaded.SpeedMetersPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("schaden"), 0.0, 10000.0, Loaded.Damage, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("angriff_ab_abstand_m"), 0.5, 20.0, Loaded.AttackFromMeters, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("ausholen_s"), 0.0, 10.0, Loaded.WindupSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("trefferzone_m"), 0.5, 20.0, Loaded.HitZoneMeters, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("erholung_s"), 0.0, 10.0, Loaded.RecoverSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("taumeln_faktor_schwerer_hieb_0_bis_1"), 0.0, 1.0, Loaded.HeavyHitStaggerFactor, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("sicht_m"), 1.0, 500.0, Loaded.SightMeters, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("alarm_umkreis_m"), 0.0, 500.0, Loaded.AlarmMeters, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("aufgeben_m"), 1.0, 1000.0, Loaded.GiveUpMeters, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("wach_mindestens_s"), 0.0, 600.0, Loaded.StayAwakeSeconds, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("groesse_faktor"), 0.2, 10.0, Loaded.Scale, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("drehtempo_grad_pro_s"), 1.0, 3600.0, Loaded.TurnDegreesPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("schild_schaden_faktor_0_bis_1"), 0.0, 1.0, Loaded.ShieldDamageFactor, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("schild_winkel_grad"), 0.0, 360.0, Loaded.ShieldAngleDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("erfahrung"), 0.0, 1000000.0, Loaded.Experience, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("item_chance_0_bis_1"), 0.0, 1.0, Loaded.ItemChance, OutError)
+		|| !FEIDataFile::ReadNumber(Section, TEXT("wurf_tempo_m_pro_s"), 0.0, 200.0, Loaded.ThrowSpeedMetersPerSecond, OutError))
 	{
 		return false;
 	}
 	// Only a kind with a charge has these numbers.
-	if ((*Section)->HasField(TEXT("ansturm_tempo_m_pro_s"))
-		&& (!FEIDataFile::ReadNumber(**Section, TEXT("ansturm_tempo_m_pro_s"), 0.0, 100.0, Loaded.ChargeSpeedMetersPerSecond, OutError)
-			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_strecke_m"), 0.0, 200.0, Loaded.ChargeDistanceMeters, OutError)
-			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_ab_abstand_m"), 0.0, 200.0, Loaded.ChargeFromMeters, OutError)
-			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_bis_abstand_m"), 0.0, 200.0, Loaded.ChargeToMeters, OutError)
-			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_ankuendigung_s"), 0.0, 20.0, Loaded.ChargeWindupSeconds, OutError)
-			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_schaden"), 0.0, 100000.0, Loaded.ChargeDamage, OutError)
-			|| !FEIDataFile::ReadNumber(**Section, TEXT("ansturm_pause_s"), 0.0, 600.0, Loaded.ChargePauseSeconds, OutError)))
+	if (Section.HasField(TEXT("ansturm_tempo_m_pro_s"))
+		&& (!FEIDataFile::ReadNumber(Section, TEXT("ansturm_tempo_m_pro_s"), 0.0, 100.0, Loaded.ChargeSpeedMetersPerSecond, OutError)
+			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_strecke_m"), 0.0, 200.0, Loaded.ChargeDistanceMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_ab_abstand_m"), 0.0, 200.0, Loaded.ChargeFromMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_bis_abstand_m"), 0.0, 200.0, Loaded.ChargeToMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_ankuendigung_s"), 0.0, 20.0, Loaded.ChargeWindupSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_schaden"), 0.0, 100000.0, Loaded.ChargeDamage, OutError)
+			|| !FEIDataFile::ReadNumber(Section, TEXT("ansturm_pause_s"), 0.0, 600.0, Loaded.ChargePauseSeconds, OutError)))
 	{
 		return false;
 	}
@@ -260,26 +265,12 @@ void AEIEnemy::BeginPlay()
 
 	FString Error;
 	FEIEnemyValues Loaded;
-	if (!FEIEnemyValues::LoadFromProjectFile(Kind, Loaded, Error))
+	if (!LoadEnemyValues(Loaded, Error))
 	{
 		FEIDataFile::ReportError(TEXT("gegner.json"), Error);
 	}
 	ApplyValues(Loaded);
-	switch (Kind)
-	{
-	case EEIEnemyKind::Thrower:
-		BaseColor = ThrowerColor;
-		break;
-	case EEIEnemyKind::ShieldBearer:
-		BaseColor = ShieldBearerColor;
-		break;
-	case EEIEnemyKind::Colossus:
-		BaseColor = ColossusColor;
-		break;
-	default:
-		BaseColor = BoneColor;
-		break;
-	}
+	BaseColor = PickBaseColor();
 	BodyMaterial = EIVisuals::SetColor(Body, BaseColor);
 	HeadMaterial = EIVisuals::SetColor(Head, BaseColor);
 	ShowHeldPart();
@@ -305,6 +296,51 @@ void AEIEnemy::BeginPlay()
 	AddActorWorldOffset(FVector(0.0f, 0.0f, (Values.Scale - 1.0f) * GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()));
 	Health->Reset(Values.Life);
 	Health->OnDied.AddUObject(this, &AEIEnemy::HandleDied);
+}
+
+bool AEIEnemy::LoadEnemyValues(FEIEnemyValues& OutValues, FString& OutError)
+{
+	return FEIEnemyValues::LoadFromProjectFile(Kind, OutValues, OutError);
+}
+
+FLinearColor AEIEnemy::PickBaseColor() const
+{
+	switch (Kind)
+	{
+	case EEIEnemyKind::Thrower:
+		return ThrowerColor;
+	case EEIEnemyKind::ShieldBearer:
+		return ShieldBearerColor;
+	case EEIEnemyKind::Colossus:
+		return ColossusColor;
+	default:
+		return BoneColor;
+	}
+}
+
+void AEIEnemy::SetTelegraphing(bool bNow)
+{
+	bTelegraphing = bNow;
+	OnRep_Telegraphing();
+}
+
+void AEIEnemy::GoHomeNow()
+{
+	StopWalking();
+	State = EState::GoHome;
+	StateTime = 0.0f;
+}
+
+void AEIEnemy::ArriveHome()
+{
+	StopWalking();
+	State = EState::Watch;
+	StateTime = 0.0f;
+}
+
+void AEIEnemy::MulticastStompSound_Implementation()
+{
+	EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), GetActorLocation());
 }
 
 void AEIEnemy::ApplyValues(const FEIEnemyValues& NewValues)
@@ -340,6 +376,10 @@ void AEIEnemy::ApplyStrength(float Factor)
 
 void AEIEnemy::ApplySlow(float Share, float Seconds)
 {
+	if (IsUntouchable())
+	{
+		return;
+	}
 	SlowRemaining = Seconds;
 	bSlowed = true;
 	GetCharacterMovement()->MaxWalkSpeed = Values.SpeedMetersPerSecond * CentimetersPerMeter * (1.0f - Share);
@@ -347,6 +387,10 @@ void AEIEnemy::ApplySlow(float Share, float Seconds)
 
 void AEIEnemy::ApplyBurn(float PerSecond, float Seconds)
 {
+	if (IsUntouchable())
+	{
+		return;
+	}
 	if (!bBurning)
 	{
 		BurnTickRemaining = BurnTickSeconds;
@@ -359,6 +403,10 @@ void AEIEnemy::ApplyBurn(float PerSecond, float Seconds)
 EEIReaction AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds)
 {
 	EEIReaction Reaction = EEIReaction::None;
+	if (IsUntouchable())
+	{
+		return Reaction;
+	}
 	if (ElementMarkRemaining > 0.0f)
 	{
 		const auto Between = [Element, this](EEIElement A, EEIElement B) { return (Element == A && ElementMark == B) || (Element == B && ElementMark == A); };
@@ -376,7 +424,7 @@ EEIReaction AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds)
 
 void AEIEnemy::Freeze(float Seconds)
 {
-	if (IsDead())
+	if (IsDead() || IsUntouchable() || !CanBeFrozen())
 	{
 		return;
 	}
@@ -549,6 +597,10 @@ bool AEIEnemy::NoticesHero(float DeltaSeconds)
 
 void AEIEnemy::WakeUp(bool bTellNeighbours)
 {
+	if (IsUntouchable())
+	{
+		return;
+	}
 	AwakeUntil = GetWorld()->GetTimeSeconds() + Values.StayAwakeSeconds;
 	if (!IsWatching())
 	{
@@ -764,7 +816,7 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 
 void AEIEnemy::Stagger(float Seconds)
 {
-	if (!HasAuthority() || IsDead() || bFrozen)
+	if (!HasAuthority() || IsDead() || bFrozen || IsUntouchable())
 	{
 		return;
 	}
@@ -931,6 +983,10 @@ void AEIEnemy::Strike()
 
 float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
+	if (IsUntouchable())
+	{
+		return 0.0f;
+	}
 	const float Incoming = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	const float Applied = Health->ApplyDamage(ReduceByShield(Incoming, DamageCauser));
 	if (AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(DamageCauser); Hero != nullptr && Applied > 0.0f)

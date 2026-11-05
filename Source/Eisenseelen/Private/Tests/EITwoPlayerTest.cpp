@@ -3,6 +3,8 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #include "EICasterComponent.h"
+#include "EIAnchorStone.h"
+#include "EIBoss.h"
 #include "EIChest.h"
 #include "EIEnemy.h"
 #include "EIGearComponent.h"
@@ -445,6 +447,7 @@ public:
 			Short.CrossingSeconds = 0.3f;
 			GameMode->GetRun()->ApplyValues(Short);
 			GameMode->GetRun()->GetContractTable().Tasks.RemoveAll([](const FEIContractTask& Task) { return Task.Kind != EEIContractKind::Chest; });
+			GameMode->GetRun()->GetBossTable().Bosses.Empty();
 			GameMode->GetRun()->ResetRun();
 
 			// Both walk up to the barge, and the guest goes first.
@@ -692,6 +695,166 @@ private:
 	double HeightAtBoarding = 0.0;
 	const AEIChest* OpenedChest = nullptr;
 	AEIHeroCharacter* HostHero = nullptr;
+};
+
+/**
+ * Guest and host meet a boss: the guest sees it bound and big, breaks a stone with the use of its own feet, sees it break
+ * free with more life for two, and each player gets their own loot on their own side.
+ */
+class FEITwoPlayerBossCommand : public IAutomationLatentCommand
+{
+public:
+	explicit FEITwoPlayerBossCommand(FAutomationTestBase* InTest) : Test(InTest), StartedAt(FPlatformTime::Seconds()) {}
+
+	virtual bool Update() override
+	{
+		if (FPlatformTime::Seconds() - StartedAt > TimeoutSeconds)
+		{
+			Test->AddError(FString::Printf(TEXT("The two-player boss test timed out in step %d"), Step));
+			return true;
+		}
+		const FTwoPlayerSession Session = FTwoPlayerSession::Find();
+		if (!Session.IsReady() && Step == 0)
+		{
+			return false;
+		}
+		if (Session.ClientHero == nullptr || Session.ServerCopyOfClientHero == nullptr)
+		{
+			Test->AddError(TEXT("The guest disappeared from the session"));
+			return true;
+		}
+		const double Now = Session.ClientWorld->GetTimeSeconds();
+		const auto EnterStep = [this, Now](int32 NewStep)
+		{
+			Step = NewStep;
+			StepAt = Now;
+		};
+		UWorld* ServerWorld = Session.ServerCopyOfClientHero->GetWorld();
+		AEIGameMode* GameMode = ServerWorld->GetAuthGameMode<AEIGameMode>();
+		const AEIGameState* GuestState = Session.ClientWorld->GetGameState<AEIGameState>();
+		const auto FindGuestBoss = [&Session]() -> const AEIBoss*
+		{
+			TActorIterator<AEIBoss> It(Session.ClientWorld);
+			return It ? *It : nullptr;
+		};
+		switch (Step)
+		{
+		case 0:
+		{
+			UEIRunDirector* Run = GameMode->GetRun();
+			FEIRunValues Short = Run->GetValues();
+			Short.CampFactor = 0.0f;
+			Run->ApplyValues(Short);
+			Run->GetContractTable().ContractsPerRun = 0.0f;
+			for (FEIGroupStage& Stage : Run->GetGroups().Stages)
+			{
+				Stage.Reinforcement.Empty();
+				Stage.AltarWave.Empty();
+				Stage.SignalWave.Empty();
+			}
+			for (FEIBossValues& Boss : Run->GetBossTable().Bosses)
+			{
+				Boss.Bannbruch.HoldSeconds = 0.3f;
+				for (FEILootItem& Item : Boss.Loot)
+				{
+					Item.Chance = 1.0f;
+				}
+			}
+			Run->ResetRun();
+			Run->BeginRunNow();
+			Session.ServerCopyOfClientHero->SetCanBeDamaged(false);
+			for (FConstPlayerControllerIterator It = ServerWorld->GetPlayerControllerIterator(); It; ++It)
+			{
+				if (It->Get()->IsLocalController())
+				{
+					Host = Cast<AEIPlayerController>(It->Get());
+					Host->GetPawn()->SetCanBeDamaged(false);
+				}
+			}
+			EnterStep(1);
+			return false;
+		}
+		case 1:
+		{
+			if (Now - StepAt < 0.6)
+			{
+				return false;
+			}
+			const AEIBoss* Boss = FindGuestBoss();
+			Test->TestNotNull(TEXT("The guest sees the boss"), Boss);
+			if (Boss == nullptr || Boss->GetBossValues() == nullptr)
+			{
+				return true;
+			}
+			Test->TestEqual(TEXT("The guest knows it is sealed"), GuestState->GetBossStage(), EEIBossStage::Sealed);
+			Test->TestTrue(TEXT("The guest sees it bound"), Boss->IsBound());
+			Test->TestEqual(TEXT("The guest sees it big"), static_cast<float>(Boss->GetActorScale3D().X), Boss->GetBossValues()->Fight.Scale);
+			Test->TestEqual(TEXT("The guest knows who it is"), Boss->GetBossValues()->Name, GameMode->GetRun()->GetBossTable().Bosses[0].Name);
+			int32 Stones = 0;
+			for (TActorIterator<AEIAnchorStone> It(Session.ClientWorld); It; ++It)
+			{
+				++Stones;
+			}
+			Test->TestEqual(TEXT("The guest sees the stones"), Stones, GuestState->GetBannbruchTotal());
+			// Three stones, broken by the guest standing in their zones.
+			Session.ServerCopyOfClientHero->TeleportTo(GameMode->GetRun()->GetAnchors()[0]->GetActorLocation() + FVector(200.0f, 0.0f, 100.0f), FRotator::ZeroRotator);
+			EnterStep(2);
+			return false;
+		}
+		case 2:
+		{
+			if (GuestState->GetBannbruchDone() < 1)
+			{
+				return false;
+			}
+			Test->TestEqual(TEXT("The guest's feet break the stone"), GuestState->GetBannbruchDone(), 1);
+			GameMode->GetRun()->SkipBannbruch();
+			EnterStep(3);
+			return false;
+		}
+		case 3:
+		{
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			const AEIBoss* Boss = FindGuestBoss();
+			Test->TestEqual(TEXT("The guest knows the fight is on"), GuestState->GetBossStage(), EEIBossStage::Awake);
+			Test->TestFalse(TEXT("The guest sees it free"), Boss->IsBound());
+			const FEIBossTable& Table = GameMode->GetRun()->GetBossTable();
+			const float Expected = Table.Bosses[0].Fight.Life * (1.0f + Table.LifePerExtraPlayer);
+			Test->TestEqual(TEXT("With two players it has more life, and the guest knows"), Boss->GetHealth()->GetMaxHealth(), Expected);
+			GameMode->GetRun()->GetBoss()->TakeDamage(100000000.0f, FDamageEvent(), nullptr, nullptr);
+			EnterStep(4);
+			return false;
+		}
+		case 4:
+		{
+			if (Now - StepAt < 0.4)
+			{
+				return false;
+			}
+			const FEIBossValues& Boss = GameMode->GetRun()->GetBossTable().Bosses[0];
+			const UEIProfileComponent* Guest = Session.ClientPlayer->GetProfile();
+			Test->TestEqual(TEXT("The guest knows the boss is down"), GuestState->GetBossStage(), EEIBossStage::Down);
+			Test->TestTrue(TEXT("The guest knows the fire can burn"), GuestState->CanLightSignal());
+			Test->TestTrue(TEXT("The guest gets gold"), Guest->GetRunGold() >= FMath::RoundToInt32(Boss.GoldFrom));
+			Test->TestEqual(TEXT("The guest gets the ingredients"), Guest->GetRunIngredients().Num(), Boss.Loot.Num());
+			Test->TestTrue(TEXT("The guest is told"), Guest->GetRewardText().Contains(Boss.Name));
+			Test->TestEqual(TEXT("The host rolls for themselves"), Host->GetProfile()->GetRunIngredients().Num(), Boss.Loot.Num());
+			return true;
+		}
+		default:
+			return true;
+		}
+	}
+
+private:
+	FAutomationTestBase* Test;
+	double StartedAt;
+	int32 Step = 0;
+	double StepAt = 0.0;
+	AEIPlayerController* Host = nullptr;
 };
 
 /**
@@ -1061,6 +1224,20 @@ bool FEITwoPlayerBlockTest::RunTest(const FString& Parameters)
 	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(ArenaMap)));
 	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
 	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerBlockCommand(this));
+	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEITwoPlayerBossTest,
+	"Eisenseelen.Net.GuestBoss",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEITwoPlayerBossTest::RunTest(const FString& Parameters)
+{
+	ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(FString(TEXT("/Game/Maps/L_ErsterLauf"))));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(MakeTwoPlayerSession()));
+	ADD_LATENT_AUTOMATION_COMMAND(FEITwoPlayerBossCommand(this));
 	ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
 	return true;
 }

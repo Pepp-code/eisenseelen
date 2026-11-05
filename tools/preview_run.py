@@ -149,6 +149,36 @@ def scenario():
         shot()
         yield AFTER_SHOT_SECONDS
 
+    # The boss: bound from afar, at a stone, free and stomping, and fallen.
+    boss = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIBoss)[0]
+    spot = boss.get_actor_location()
+    stand_looking_at((spot.x + 3200, spot.y + 600), (spot.x, spot.y, 400))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    anchor = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAnchorStone)[0].get_actor_location()
+    stand_looking_at((anchor.x + (anchor.x - spot.x) * 0.25, anchor.y + (anchor.y - spot.y) * 0.25), (spot.x, spot.y, 300))
+    yield 2.0
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_skip_bannbruch()
+    stand_looking_at((spot.x + 1500, spot.y), (spot.x, spot.y, 300))
+    yield 1.5
+    shot()
+    yield AFTER_SHOT_SECONDS
+    for _ in range(40):
+        place = boss.get_actor_location()
+        stand_looking_at((place.x + 700, place.y), (place.x, place.y, 200))
+        if boss.is_stomp_marked():
+            break
+        yield 0.5
+    shot()
+    yield 2.5
+    player().preview_defeat_boss()
+    yield 1.0
+    shot()
+    yield AFTER_SHOT_SECONDS
+
     # The fire from afar, and from right beside it.
     fire = next(f for f in unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EISignalFire) if f.is_in_use())
     spot = fire.get_actor_location()

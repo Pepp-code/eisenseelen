@@ -228,6 +228,7 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	Save.Experience = 340;
 	Save.Gold = 1250;
 	Save.FactionPoints.Add(TEXT("Feuer"), 40);
+	Save.Ingredients.Add(TEXT("Glutkern"), 3);
 	Save.Items.Add(TEXT("Sturmrune"), 2);
 	Save.Classes[0].Slots[RuneSlot] = TEXT("Sturmrune");
 	Save.Classes[0].Attributes.Add(TEXT("Kraft"), 3);
@@ -241,6 +242,7 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("The experience stays"), Loaded.Experience, 340);
 	TestEqual(TEXT("The gold stays"), Loaded.Gold, 1250);
 	TestEqual(TEXT("The points of a faction stay"), Loaded.FactionPoints.FindRef(TEXT("Feuer")), 40);
+	TestEqual(TEXT("The ingredients stay"), Loaded.Ingredients.FindRef(TEXT("Glutkern")), 3);
 	TestEqual(TEXT("The quality stays"), Loaded.Items.FindRef(TEXT("Sturmrune")), 2);
 	TestEqual(TEXT("What is on stays on"), Loaded.Classes[0].Slots[RuneSlot], FString(TEXT("Sturmrune")));
 	TestEqual(TEXT("The points stay"), Loaded.Classes[0].Attributes.FindRef(TEXT("Kraft")), 3);

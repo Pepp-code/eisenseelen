@@ -2,6 +2,8 @@
 
 #include "Dom/JsonObject.h"
 #include "EIAltar.h"
+#include "EIAnchorStone.h"
+#include "EIBoss.h"
 #include "EIChest.h"
 #include "EIDataFile.h"
 #include "EIEnemy.h"
@@ -25,6 +27,38 @@ namespace
 	const FVector BargeAtArrivalCm(800.0f, 1400.0f, 300.0f);
 	constexpr float GroundSearchCm = 5000.0f;
 	constexpr float AboveGroundCm = 5.0f;
+	constexpr float BossAboveGroundCm = 100.0f;
+
+	bool LoadPlaces(const TCHAR* Key, TArray<FVector>& OutPlaces, FString& OutError)
+	{
+		const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("laufkarte.json"), OutError);
+		const TArray<TSharedPtr<FJsonValue>>* Lines = nullptr;
+		if (!Root.IsValid())
+		{
+			return false;
+		}
+		if (!Root->TryGetArrayField(Key, Lines) || Lines->IsEmpty())
+		{
+			OutError = FString::Printf(TEXT("Die Liste %s fehlt oder ist leer."), Key);
+			return false;
+		}
+		TArray<FVector> Loaded;
+		for (const TSharedPtr<FJsonValue>& Line : *Lines)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			float X = 0.0f;
+			float Y = 0.0f;
+			if (!Line->TryGetObject(Object)
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("x_m"), -100000.0, 100000.0, X, OutError)
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("y_m"), -100000.0, 100000.0, Y, OutError))
+			{
+				return false;
+			}
+			Loaded.Add(FVector(X, Y, 0.0f) * CentimetersPerMeter);
+		}
+		OutPlaces = Loaded;
+		return true;
+	}
 
 	bool LoadArrivals(TArray<FEIArrivalPoint>& OutArrivals, FString& OutError)
 	{
@@ -147,9 +181,13 @@ void UEIRunDirector::LoadValues()
 	{
 		FEIDataFile::ReportError(TEXT("nebenauftraege.json"), Error);
 	}
-	if (!LoadArrivals(Arrivals, Error))
+	if (!LoadArrivals(Arrivals, Error) || !LoadPlaces(TEXT("bossplaetze"), BossPlaces, Error))
 	{
 		FEIDataFile::ReportError(TEXT("laufkarte.json"), Error);
+	}
+	if (!FEIBossTable::LoadFromProjectFile(BossTable, Error))
+	{
+		FEIDataFile::ReportError(TEXT("bosse.json"), Error);
 	}
 }
 
@@ -170,6 +208,7 @@ void UEIRunDirector::ResetRun()
 	LastStage = 0;
 	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetEnemyStrength(1.0f);
 
+	PrepareBoss();
 	PrepareContracts();
 	PrepareSignalFire();
 	if (Barge == nullptr)
@@ -181,16 +220,160 @@ void UEIRunDirector::ResetRun()
 	State->SetRunPhase(EEIRunPhase::AtDock);
 }
 
+void UEIRunDirector::PrepareBoss()
+{
+	for (AEIAnchorStone* Anchor : Anchors)
+	{
+		if (Anchor != nullptr)
+		{
+			Anchor->Destroy();
+		}
+	}
+	Anchors.Reset();
+	if (Boss != nullptr)
+	{
+		Boss->Destroy();
+		Boss = nullptr;
+	}
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	const bool bHasBoss = Barge != nullptr && !BossTable.Bosses.IsEmpty() && !BossPlaces.IsEmpty();
+	BossIndex = bHasBoss ? FMath::RandRange(0, BossTable.Bosses.Num() - 1) : INDEX_NONE;
+	BossPlace = bHasBoss ? BossPlaces[FMath::RandRange(0, BossPlaces.Num() - 1)] : FVector::ZeroVector;
+	State->SetBossStage(bHasBoss ? EEIBossStage::Sealed : EEIBossStage::None);
+	State->SetBannbruchProgress(0, bHasBoss ? BossTable.Bosses[BossIndex].Bannbruch.Count : 0);
+}
+
+void UEIRunDirector::SpawnBoss(int32 HeroCount)
+{
+	if (BossIndex == INDEX_NONE)
+	{
+		return;
+	}
+	FVector Ground = BossPlace;
+	FindGround(BossPlace, Ground);
+	const FEIBannbruch& Bannbruch = BossTable.Bosses[BossIndex].Bannbruch;
+	const FTransform Spawn(FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f), Ground + FVector(0.0f, 0.0f, BossAboveGroundCm));
+	Boss = GetWorld()->SpawnActorDeferred<AEIBoss>(AEIBoss::StaticClass(), Spawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Boss == nullptr)
+	{
+		return;
+	}
+	Boss->SetKind(EEIEnemyKind::Colossus);
+	Boss->SetBossIndex(BossIndex);
+	Boss->FinishSpawning(Spawn);
+	Boss->StandWatch(Boss->GetActorLocation());
+
+	// The stones stand in a ring around the boss, each with a chain to it.
+	const FVector ChainEnd = Boss->GetActorLocation();
+	const float Turn = FMath::FRandRange(0.0f, 360.0f);
+	for (int32 Index = 0; Index < Bannbruch.Count; ++Index)
+	{
+		const FVector Direction = FVector::ForwardVector.RotateAngleAxis(Turn + Index * 360.0f / Bannbruch.Count, FVector::UpVector);
+		const FTransform StoneSpawn(Ground + Direction * Bannbruch.DistanceMeters * CentimetersPerMeter);
+		if (AEIAnchorStone* Anchor = GetWorld()->SpawnActorDeferred<AEIAnchorStone>(AEIAnchorStone::StaticClass(), StoneSpawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+		{
+			Anchor->Setup(ChainEnd, Bannbruch.ZoneMeters, Bannbruch.HoldSeconds);
+			Anchor->FinishSpawning(StoneSpawn);
+			Anchors.Add(Anchor);
+		}
+	}
+}
+
+void UEIRunDirector::UpdateBannbruch(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (State->GetBossStage() != EEIBossStage::Sealed || Boss == nullptr)
+	{
+		return;
+	}
+	int32 Broken = 0;
+	for (AEIAnchorStone* Anchor : Anchors)
+	{
+		Anchor->UpdateHold(LivingHeroes.ContainsByPredicate([Anchor](const AEIHeroCharacter* Hero) { return Anchor->IsInZone(Hero); }), DeltaTime);
+		Broken += Anchor->IsBroken() ? 1 : 0;
+	}
+	State->SetBannbruchProgress(Broken, Anchors.Num());
+	if (Broken == Anchors.Num())
+	{
+		BreakBossFree(LivingHeroes.Num());
+	}
+}
+
+void UEIRunDirector::BreakBossFree(int32 HeroCount)
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	State->SetBossStage(EEIBossStage::Awake);
+	WaveLeft = 0.0f;
+	Boss->BreakFree(1.0f + Values.CorruptionStrengthPerStage * State->GetCorruptionStage(), HeroCount);
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get()))
+		{
+			Player->GetProfile()->ClientShowNote(BossTable.Bosses[BossIndex].Entrance);
+		}
+	}
+}
+
+void UEIRunDirector::SkipBannbruch()
+{
+	for (AEIAnchorStone* Anchor : Anchors)
+	{
+		Anchor->SetHoldLeft(0.0f);
+		Anchor->UpdateHold(false, 0.0f);
+	}
+	if (Boss != nullptr && GetWorld()->GetGameState<AEIGameState>()->GetBossStage() == EEIBossStage::Sealed)
+	{
+		GetWorld()->GetGameState<AEIGameState>()->SetBannbruchProgress(Anchors.Num(), Anchors.Num());
+		int32 Heroes = 0;
+		for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+		{
+			Heroes += It->IsDead() ? 0 : 1;
+		}
+		BreakBossFree(Heroes);
+	}
+}
+
+bool UEIRunDirector::IsAnchorHeld() const
+{
+	return Anchors.ContainsByPredicate([](const AEIAnchorStone* Anchor) { return Anchor != nullptr && Anchor->IsHeld(); });
+}
+
+void UEIRunDirector::BossFell()
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	State->SetBossStage(EEIBossStage::Down);
+	WaveLeft = 0.0f;
+	const FEIBossValues& Fallen = BossTable.Bosses[BossIndex];
+	const float Bonus = 1.0f + ContractTable.CorruptionBonusPerStage * State->GetCorruptionStage();
+
+	// Everybody rolls for themselves, and whoever has fallen in the fight still has a share of it.
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (const AEIPlayerController* Player = Cast<AEIPlayerController>(It->Get()))
+		{
+			Player->GetProfile()->GrantBossLoot(Fallen.Name, FMath::RoundToInt32(Fallen.RollGold() * Bonus), Fallen.RollLoot());
+		}
+	}
+}
+
 void UEIRunDirector::PrepareSignalFire()
 {
 	TArray<AEISignalFire*> Fires;
+	TArray<AEISignalFire*> FarFires;
+	const double MinDistance = BossTable.FireMinDistanceMeters * CentimetersPerMeter;
 	for (TActorIterator<AEISignalFire> It(GetWorld()); It; ++It)
 	{
 		It->SetLit(false);
 		It->SetInUse(false);
 		Fires.Add(*It);
+		if (BossIndex == INDEX_NONE || FVector::Dist2D(It->GetActorLocation(), BossPlace) >= MinDistance)
+		{
+			FarFires.Add(*It);
+		}
 	}
-	ActiveFire = Barge != nullptr && !Fires.IsEmpty() ? Fires[FMath::RandRange(0, Fires.Num() - 1)] : nullptr;
+	// After the boss there should be a way to run.
+	const TArray<AEISignalFire*>& Choice = !FarFires.IsEmpty() ? FarFires : Fires;
+	ActiveFire = Barge != nullptr && !Choice.IsEmpty() ? Choice[FMath::RandRange(0, Choice.Num() - 1)] : nullptr;
 	if (ActiveFire != nullptr)
 	{
 		ActiveFire->SetInUse(true);
@@ -261,6 +444,7 @@ void UEIRunDirector::BeginRunNow()
 		FillCamp(*Camp, Camp->GetStartSize(), LivingHeroes.Num());
 	}
 	SpawnLeaders();
+	SpawnBoss(LivingHeroes.Num());
 	CastChecked<AEIGameMode>(GetOwner())->GetHorde()->SetRemovingLeftBehind(true);
 }
 
@@ -288,6 +472,10 @@ void UEIRunDirector::PrepareContracts()
 	TArray<FEIContract> Contracts = Barge != nullptr ? ContractTable.RollContracts() : TArray<FEIContract>();
 	const double MinDistance = ContractTable.MinDistanceMeters * CentimetersPerMeter;
 	TArray<FVector> Taken;
+	if (BossIndex != INDEX_NONE)
+	{
+		Taken.Add(BossPlace);
+	}
 	for (FEIContract& Contract : Contracts)
 	{
 		if (Contract.Kind == EEIContractKind::Leader)
@@ -499,6 +687,10 @@ void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
 	{
 		return;
 	}
+	if (Boss != nullptr && &Enemy == Boss.Get())
+	{
+		BossFell();
+	}
 	TArray<FEIContract>& Contracts = State->EditContracts();
 	for (int32 Index = 0; Index < Contracts.Num(); ++Index)
 	{
@@ -551,9 +743,16 @@ void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 	{
 		return;
 	}
-	if (State->CanLightSignal() && ActiveFire != nullptr && ActiveFire->IsInReach(Hero))
+	if (Phase == EEIRunPhase::Exploring && ActiveFire != nullptr && ActiveFire->IsInReach(Hero))
 	{
-		LightSignal();
+		if (State->CanLightSignal())
+		{
+			LightSignal();
+		}
+		else if (const AEIPlayerController* Player = Hero->GetController<AEIPlayerController>())
+		{
+			Player->GetProfile()->ClientShowNote(TEXT("Das Signalfeuer brennt erst, wenn der Boss gefallen ist."));
+		}
 	}
 	else if (Phase == EEIRunPhase::BargeWaiting && !Hero->IsAboard() && Barge->IsInBoardingZone(Hero))
 	{
@@ -642,18 +841,22 @@ void UEIRunDirector::UpdateEnemyGroups(EEIRunPhase Phase, const TArray<AEIHeroCh
 		}
 	}
 
-	// Waves attack whoever holds an altar or the fire. Whoever comes back gets the next one at once.
-	const bool bAtAltar = State->IsContractHeld();
+	// Waves attack whoever holds something, whoever fights the boss, and everybody after it has fallen. Whoever comes back gets the next one at once.
+	const bool bAtAltar = State->IsContractHeld() || IsAnchorHeld();
 	const bool bAtFire = Phase == EEIRunPhase::SignalLit && State->IsSignalHeld();
-	if (!bAtAltar && !bAtFire)
+	const bool bPursuit = State->GetBossStage() == EEIBossStage::Down;
+	const bool bFight = State->GetBossStage() == EEIBossStage::Awake;
+	if (!bAtAltar && !bAtFire && !bPursuit && !bFight)
 	{
 		WaveLeft = 0.0f;
 		return;
 	}
+	const bool bBigWave = bAtFire || bPursuit;
+	const float EverySeconds = bAtFire ? Groups.SignalWaveEverySeconds : (bPursuit ? BossTable.PursuitWaveEverySeconds : (bFight ? BossTable.FightWaveEverySeconds : Groups.AltarWaveEverySeconds));
 	WaveLeft -= DeltaTime;
-	if (WaveLeft <= 0.0f && SendGroup(bAtFire ? Row.SignalWave : Row.AltarWave, HeroCount))
+	if (WaveLeft <= 0.0f && SendGroup(bBigWave ? Row.SignalWave : Row.AltarWave, HeroCount))
 	{
-		WaveLeft = bAtFire ? Groups.SignalWaveEverySeconds : Groups.AltarWaveEverySeconds;
+		WaveLeft = EverySeconds;
 	}
 }
 
@@ -731,6 +934,7 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		UpdateCorruption();
 		UpdateEnemyGroups(Phase, LivingHeroes, DeltaTime);
 		UpdateContracts(LivingHeroes, DeltaTime);
+		UpdateBannbruch(LivingHeroes, DeltaTime);
 	}
 
 	switch (Phase)

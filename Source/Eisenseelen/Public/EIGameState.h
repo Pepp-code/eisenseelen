@@ -19,6 +19,16 @@ enum class EEIRunPhase : uint8
 	Failed
 };
 
+/** Where the boss of a run stands. None means this run has no boss, and the fire burns any time. */
+UENUM()
+enum class EEIBossStage : uint8
+{
+	None,
+	Sealed,
+	Awake,
+	Down
+};
+
 /** What every player needs to know about the session. */
 UCLASS()
 class EISENSEELEN_API AEIGameState : public AGameStateBase
@@ -45,8 +55,12 @@ public:
 	/** Whether somebody stands in the zone of a contract right now. */
 	bool IsContractHeld() const;
 
-	/** The run is on, and the fire does not burn yet. */
+	/** The run is on, the boss has fallen and the fire does not burn yet. */
 	bool CanLightSignal() const;
+
+	EEIBossStage GetBossStage() const { return BossStage; }
+	int32 GetBannbruchDone() const { return BannbruchDone; }
+	int32 GetBannbruchTotal() const { return BannbruchTotal; }
 
 	int32 GetCorruptionStage() const { return CorruptionStage; }
 	bool IsBloodMoon() const { return bBloodMoon; }
@@ -61,6 +75,8 @@ public:
 	void StopRunClock();
 	void SetSignalHold(float SecondsLeft, bool bHeld);
 	void SetCastingOff(bool bNewCastingOff) { bCastingOff = bNewCastingOff; }
+	void SetBossStage(EEIBossStage NewStage) { BossStage = NewStage; }
+	void SetBannbruchProgress(int32 Done, int32 Total);
 	void SetContracts(const TArray<FEIContract>& NewContracts);
 	TArray<FEIContract>& EditContracts() { return Contracts; }
 
@@ -96,6 +112,15 @@ private:
 
 	UPROPERTY(Replicated)
 	bool bCastingOff = false;
+
+	UPROPERTY(Replicated)
+	EEIBossStage BossStage = EEIBossStage::None;
+
+	UPROPERTY(Replicated)
+	int32 BannbruchDone = 0;
+
+	UPROPERTY(Replicated)
+	int32 BannbruchTotal = 0;
 
 	UPROPERTY(Replicated)
 	TArray<FEIContract> Contracts;

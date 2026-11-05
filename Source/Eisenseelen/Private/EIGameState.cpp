@@ -24,6 +24,9 @@ void AEIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIGameState, SignalHoldLeft);
 	DOREPLIFETIME(AEIGameState, bSignalHeld);
 	DOREPLIFETIME(AEIGameState, bCastingOff);
+	DOREPLIFETIME(AEIGameState, BossStage);
+	DOREPLIFETIME(AEIGameState, BannbruchDone);
+	DOREPLIFETIME(AEIGameState, BannbruchTotal);
 	DOREPLIFETIME(AEIGameState, Contracts);
 	DOREPLIFETIME(AEIGameState, CorruptionStage);
 	DOREPLIFETIME(AEIGameState, CorruptionShare);
@@ -84,7 +87,13 @@ bool AEIGameState::IsContractHeld() const
 
 bool AEIGameState::CanLightSignal() const
 {
-	return RunPhase == EEIRunPhase::Exploring;
+	return RunPhase == EEIRunPhase::Exploring && (BossStage == EEIBossStage::None || BossStage == EEIBossStage::Down);
+}
+
+void AEIGameState::SetBannbruchProgress(int32 Done, int32 Total)
+{
+	BannbruchDone = Done;
+	BannbruchTotal = Total;
 }
 
 void AEIGameState::SetCorruption(int32 Stage, float Share, bool bIsBloodMoon)

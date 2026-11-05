@@ -87,7 +87,7 @@ namespace
 		Run->ResetRun();
 	}
 
-	/** The camps stay empty, and no contract asks for a leader. It only works for a run that has not left the barge yet. */
+	/** The camps stay empty, no contract asks for a leader, and there is no boss, so the fire can burn at once. It only works for a run that has not left the barge yet. */
 	void EmptyCamps(const FEIPlayContext& Context)
 	{
 		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
@@ -95,6 +95,7 @@ namespace
 		Values.CampFactor = 0.0f;
 		Run->ApplyValues(Values);
 		Run->GetContractTable().Tasks.RemoveAll([](const FEIContractTask& Task) { return Task.Kind == EEIContractKind::Leader; });
+		Run->GetBossTable().Bosses.Empty();
 		Run->ResetRun();
 	}
 

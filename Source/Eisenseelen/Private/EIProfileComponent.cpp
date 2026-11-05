@@ -442,6 +442,24 @@ void UEIProfileComponent::ClientReceiveContract_Implementation(int32 Faction, in
 	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
 }
 
+void UEIProfileComponent::GrantBossLoot(const FString& BossName, int32 Gold, const TArray<FString>& Ingredients)
+{
+	ClientReceiveBossLoot(BossName, Gold, Ingredients);
+}
+
+void UEIProfileComponent::ClientReceiveBossLoot_Implementation(const FString& BossName, int32 Gold, const TArray<FString>& Ingredients)
+{
+	RunGold += Gold;
+	RunIngredients.Append(Ingredients);
+	FString Note = FString::Printf(TEXT("%s ist gefallen: +%d Gold"), *BossName, Gold);
+	for (const FString& Ingredient : Ingredients)
+	{
+		Note += TEXT(", ") + Ingredient;
+	}
+	ClientShowNote_Implementation(Note);
+	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
+}
+
 int32 UEIProfileComponent::GetSecured(int32 Amount) const
 {
 	return bLastRunEscaped ? Amount : ContractTable.GetKeptOnFailure(Amount);
@@ -481,6 +499,13 @@ void UEIProfileComponent::ClientEndRun_Implementation(bool bEscaped)
 	{
 		Save.FactionPoints.FindOrAdd(Pair.Key) += GetSecured(Pair.Value);
 	}
+	if (bEscaped)
+	{
+		for (const FString& Ingredient : RunIngredients)
+		{
+			Save.Ingredients.FindOrAdd(Ingredient) += 1;
+		}
+	}
 	for (FEILootLine& Line : Loot)
 	{
 		Line.Result = bEscaped ? AddToSave(Line.Item, Line.Quality) : FString(TEXT("verloren"));
@@ -502,6 +527,7 @@ void UEIProfileComponent::ClientStartFresh_Implementation()
 	RunExperience = 0;
 	RunGold = 0;
 	RunPoints.Reset();
+	RunIngredients.Reset();
 	RewardNoteRemaining = 0.0f;
 	WriteSave();
 	SendSetups();

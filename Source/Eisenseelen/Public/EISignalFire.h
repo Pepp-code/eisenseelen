@@ -21,7 +21,9 @@ class EISENSEELEN_API AEISignalFire : public AActor
 public:
 	AEISignalFire();
 
+	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
 	bool IsInUse() const { return bInUse; }
+
 	bool IsLit() const { return bLit; }
 
 	/** Server only. A fire not in use is gone for this run. */

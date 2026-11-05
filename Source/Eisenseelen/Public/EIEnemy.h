@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "EIEnemy.generated.h"
 
+class FJsonObject;
 class UEIHealthComponent;
 class UMaterialInstanceDynamic;
 class UProjectileMovementComponent;
@@ -80,6 +81,9 @@ struct EISENSEELEN_API FEIEnemyValues
 	float ChargePauseSeconds = 0.0f;
 
 	static bool LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutValues, FString& OutError);
+
+	/** From a section with the keys of Data/gegner.json. OutValues only changes when all of it is valid. */
+	static bool ReadFrom(const FJsonObject& Section, FEIEnemyValues& OutValues, FString& OutError);
 };
 
 /**
@@ -113,6 +117,9 @@ public:
 	void StaggerFromHeavyHit(float Seconds);
 
 	bool IsDead() const;
+
+	/** Bosses have their own place in the counting and the rewards. */
+	virtual bool IsBoss() const { return false; }
 
 	/** Server only. It gets stronger and bigger, stands out by its color, and brings a reward when it falls. */
 	void MakeLeader(float LifeFactor, float DamageFactor, float ScaleFactor);
@@ -162,6 +169,32 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	/** Where its numbers come from. */
+	virtual bool LoadEnemyValues(FEIEnemyValues& OutValues, FString& OutError);
+	virtual FLinearColor PickBaseColor() const;
+
+	/** As long as this is true nothing can hurt it, slow it or wake it. */
+	virtual bool IsUntouchable() const { return false; }
+	virtual bool CanBeFrozen() const { return true; }
+
+	virtual void TickServer(float DeltaSeconds);
+	AActor* FindNearestHero() const;
+	void StopWalking();
+	void WakeUp(bool bTellNeighbours);
+	void WalkHome(float DeltaSeconds);
+	void SetTelegraphing(bool bNow);
+	const FVector& GetHome() const { return Home; }
+	bool IsChasing() const { return State == EState::Chase; }
+	bool IsGoingHome() const { return State == EState::GoHome; }
+	void GoHomeNow();
+	void ArriveHome();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStrike();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStompSound();
+
 private:
 	enum class EState : uint8
 	{
@@ -194,19 +227,12 @@ private:
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHurt();
 
-	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastStrike();
-
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastDie();
 
-	void TickServer(float DeltaSeconds);
-	AActor* FindNearestHero() const;
 	void Steer(AActor* Target, float DeltaSeconds);
 	void SteerStraight(const AActor* Target, float DeltaSeconds);
 	bool NoticesHero(float DeltaSeconds);
-	void WakeUp(bool bTellNeighbours);
-	void WalkHome(float DeltaSeconds);
 	bool CanAttack(const AActor* Target) const;
 	void ThrowBone();
 	float ReduceByShield(float Amount, const AActor* DamageCauser);
@@ -217,7 +243,6 @@ private:
 	void UpdateCharge(float DeltaSeconds);
 	void EndCharge();
 	bool StandsOnPaths() const;
-	void StopWalking();
 	void Strike();
 	void HandleDied();
 	void UpdateLook(float DeltaSeconds);

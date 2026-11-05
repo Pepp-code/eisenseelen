@@ -1,5 +1,7 @@
 #include "EIHud.h"
 
+#include "EIAnchorStone.h"
+#include "EIBoss.h"
 #include "EICasterComponent.h"
 #include "EIChest.h"
 #include "EIContracts.h"
@@ -42,6 +44,14 @@ namespace
 	constexpr float ThreatMarkSize = 18.0f;
 	constexpr float ThreatEdgeShare = 0.42f;
 	const FLinearColor FireMarkColor(1.0f, 0.55f, 0.1f);
+	const FLinearColor BossMarkColor(1.0f, 0.2f, 0.25f);
+	const FLinearColor AnchorMarkColor(0.75f, 0.45f, 1.0f);
+	const FLinearColor BossLifeColor(0.75f, 0.1f, 0.15f);
+	constexpr float BossBarWidth = 620.0f;
+	constexpr float BossBarHeight = 18.0f;
+	constexpr float BossBarY = 172.0f;
+	constexpr float BossMarkAboveCm = 620.0f;
+	constexpr double BossMarkFromCm = 3000.0;
 	constexpr float CrossingFadePerSecond = 2.0f;
 	const FLinearColor TextShadowColor(0.0f, 0.0f, 0.0f, 0.75f);
 	constexpr float TextShadowOffset = 1.5f;
@@ -276,7 +286,8 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 	}
 
 	const int32 LootLines = Loot.IsEmpty() ? 0 : Loot.Num() + 1;
-	const float PanelHeight = PanelPadding * 2.0f + PanelLine * (4 + Earned.Num() + LootLines) + 40.0f;
+	const int32 IngredientLines = Profile->GetRunIngredients().IsEmpty() ? 0 : 1;
+	const float PanelHeight = PanelPadding * 2.0f + PanelLine * (4 + Earned.Num() + LootLines + IngredientLines) + 40.0f;
 	const float X = Canvas->SizeX / 2.0f - PanelWidth / 2.0f;
 	float Y = FMath::Max(Margin, Canvas->SizeY / 2.0f - PanelHeight / 2.0f);
 	DrawRect(PanelColor, X, Y, PanelWidth, PanelHeight);
@@ -293,6 +304,11 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 	}
 	DrawLine(FString::Printf(TEXT("Erfahrung: +%d, sie bleibt in jedem Fall. Du bist Level %d."), Profile->GetRunExperience(), Profile->GetLevel()), TextX, Y, TextColor);
 	Y += PanelLine;
+	if (!Profile->GetRunIngredients().IsEmpty())
+	{
+		DrawLine(FString::Printf(TEXT("%s%s"), bEscaped ? TEXT("Zutaten: ") : TEXT("Diese Zutaten sind verloren: "), *FString::Join(Profile->GetRunIngredients(), TEXT(", "))), TextX, Y, bEscaped ? RewardColor : LostColor);
+		Y += PanelLine;
+	}
 	if (!Loot.IsEmpty())
 	{
 		DrawLine(bEscaped ? TEXT("Gefunden:") : TEXT("Diese Funde sind verloren:"), TextX, Y, TextColor);
@@ -343,7 +359,7 @@ void AEIHud::DrawContracts(const AEIHeroCharacter* Hero, const AEIGameState* Sta
 	}
 	if (GuardsLeft > 0)
 	{
-		DrawLine(FString::Printf(TEXT("W\u00E4chter: %d"), GuardsLeft), CenterX - 70.0f, 190.0f, WarningTextColor, 1.5f);
+		DrawLine(FString::Printf(TEXT("W\u00E4chter: %d"), GuardsLeft), CenterX - 70.0f, 200.0f, WarningTextColor, 1.5f);
 	}
 }
 
@@ -400,11 +416,73 @@ void AEIHud::DrawContractBoard(const AEIHeroCharacter* Hero, const AEIGameState*
 			DrawLine(FString::Printf(TEXT("S  Signalfeuer, %.0f m"), FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), ListX, ListY, FireMarkColor);
 		}
 	}
+	for (TActorIterator<AEIBoss> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsDead())
+		{
+			const FVector2D Mark = ToMap(It->GetActorLocation());
+			DrawRect(BossMarkColor, Mark.X - BoardMarkSize / 2.0f, Mark.Y - BoardMarkSize / 2.0f, BoardMarkSize, BoardMarkSize);
+			DrawLine(TEXT("B"), Mark.X + BoardMarkSize / 2.0f + 2.0f, Mark.Y - BoardMarkSize, TextColor);
+			if (const FEIBossValues* Values = It->GetBossValues())
+			{
+				DrawLine(FString::Printf(TEXT("B  %s, %.0f m"), *Values->Name, FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), ListX, ListY + BoardLine, BossMarkColor);
+			}
+		}
+	}
 	const FVector2D HeroMark = ToMap(Hero->GetActorLocation());
 	const FVector Ahead = Hero->GetViewRotation().Vector().GetSafeNormal2D();
 	const FVector2D AheadMark = HeroMark + FVector2D(Ahead.Y, -Ahead.X) * BoardHeroAheadDistance;
 	DrawRect(FLinearColor::White, HeroMark.X - BoardHeroSize / 2.0f, HeroMark.Y - BoardHeroSize / 2.0f, BoardHeroSize, BoardHeroSize);
 	DrawRect(FLinearColor::White, AheadMark.X - BoardHeroAheadSize / 2.0f, AheadMark.Y - BoardHeroAheadSize / 2.0f, BoardHeroAheadSize, BoardHeroAheadSize);
+}
+
+void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, float LineY, float PromptY)
+{
+	const float CenterX = Canvas->SizeX / 2.0f;
+	const AEIBoss* Boss = nullptr;
+	for (TActorIterator<AEIBoss> It(GetWorld()); It; ++It)
+	{
+		Boss = *It;
+	}
+	const FEIBossValues* Values = Boss != nullptr ? Boss->GetBossValues() : nullptr;
+	const EEIBossStage Stage = State->GetBossStage();
+	if (Stage == EEIBossStage::Down)
+	{
+		DrawLine(TEXT("Der Boss ist gefallen. Lauf zum Signalfeuer, und erst in der Barke ist die Beute sicher!"), Margin, LineY, RewardColor);
+		return;
+	}
+	if (Values == nullptr || Stage == EEIBossStage::None)
+	{
+		return;
+	}
+	// Close by, the bar says all of it, and the mark would lie on top of it.
+	const double FromBoss = FVector::Dist(Hero->GetActorLocation(), Boss->GetActorLocation());
+	if (!Boss->IsDead() && (Stage != EEIBossStage::Awake || FromBoss > BossMarkFromCm))
+	{
+		const FVector Mark = Boss->GetActorLocation() + FVector(0.0f, 0.0f, BossMarkAboveCm);
+		DrawWorldMark(Mark, FString::Printf(TEXT("%s %.0f m"), *Values->Name, FVector::Dist(Hero->GetActorLocation(), Boss->GetActorLocation()) / CentimetersPerMeter), BossMarkColor);
+	}
+	if (Stage == EEIBossStage::Sealed)
+	{
+		DrawLine(FString::Printf(TEXT("%s: %d von %d. %s"), *Values->Bannbruch.Name, State->GetBannbruchDone(), State->GetBannbruchTotal(), *Values->Bannbruch.Hint), Margin, LineY, RewardColor);
+		for (TActorIterator<AEIAnchorStone> It(GetWorld()); It; ++It)
+		{
+			if (It->IsBroken())
+			{
+				continue;
+			}
+			DrawWorldMark(It->GetMarkLocation(), FString::Printf(TEXT("%s %.0f m"), *Values->Bannbruch.PartName, FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), AnchorMarkColor);
+			if (It->IsHeld() && It->IsInZone(Hero))
+			{
+				DrawLine(FString::Printf(TEXT("%s: noch %.0f s halten"), *Values->Bannbruch.PartName, It->GetHoldLeft()), CenterX - 150.0f, PromptY - 80.0f, AnchorMarkColor, 1.5f);
+			}
+		}
+		return;
+	}
+	DrawLine(FString::Printf(TEXT("Besiege: %s"), *Values->Name), Margin, LineY, RewardColor);
+	const UEIHealthComponent* Life = Boss->GetHealth();
+	DrawLine(Values->Name, CenterX - BossBarWidth / 2.0f, BossBarY - 24.0f, TextColor);
+	DrawBar(CenterX - BossBarWidth / 2.0f, BossBarY, BossBarWidth, BossBarHeight, Life->GetHealth() / FMath::Max(Life->GetMaxHealth(), 1.0f), BossLifeColor);
 }
 
 void AEIHud::DrawDock(const AEIHeroCharacter* Hero, const AEIGameState* State, float LineY, float PromptY)
@@ -491,6 +569,11 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 		DrawLine(Profile->GetRewardText(), CenterX - 260.0f, RewardNoteY, RewardColor, 1.5f);
 	}
 
+	if (Phase == EEIRunPhase::Exploring || Phase == EEIRunPhase::SignalLit || Phase == EEIRunPhase::BargeWaiting)
+	{
+		DrawBoss(Hero, State, LineY + 24.0f, PromptY);
+	}
+
 	// What this run has earned so far, which is only safe in the barge.
 	FString Purse = FString::Printf(TEXT("Beute: %d Gold"), Profile->GetRunGold());
 	for (const FEIFaction& Faction : Table.Factions)
@@ -509,8 +592,11 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 		break;
 
 	case EEIRunPhase::Exploring:
-		DrawLine(FString::Printf(TEXT("%s   Nebenauftr\u00E4ge: %d von %d   %s"), *Clock, State->CountContractsDone(), State->GetContracts().Num(), *Purse), Margin, LineY, TextColor);
-		DrawLine(TEXT("Entz\u00FCnde das Signalfeuer, dann holt dich die Barke ab. M zeigt die Karte."), Margin, LineY + 24.0f, RewardColor);
+		DrawLine(FString::Printf(TEXT("%s   Nebenauftr\u00E4ge: %d von %d   %s   M zeigt die Karte"), *Clock, State->CountContractsDone(), State->GetContracts().Num(), *Purse), Margin, LineY, TextColor);
+		if (State->GetBossStage() == EEIBossStage::None)
+		{
+			DrawLine(TEXT("Entz\u00FCnde das Signalfeuer, dann holt dich die Barke ab."), Margin, LineY + 24.0f, RewardColor);
+		}
 		for (TActorIterator<AEISignalFire> It(GetWorld()); It; ++It)
 		{
 			if (It->IsInUse())
@@ -518,7 +604,8 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 				DrawWorldMark(It->GetFireLocation(), DistanceLabel(TEXT("Signalfeuer"), It->GetActorLocation()), FireMarkColor);
 				if (It->IsInReach(Hero))
 				{
-					DrawLine(TEXT("F: Signalfeuer entz\u00FCnden"), CenterX - 125.0f, PromptY, TextColor, 1.5f);
+					const bool bReady = State->CanLightSignal();
+					DrawLine(bReady ? TEXT("F: Signalfeuer entz\u00FCnden") : TEXT("Das Signalfeuer brennt erst nach dem Boss"), CenterX - (bReady ? 125.0f : 200.0f), PromptY, bReady ? TextColor : WarningTextColor, 1.5f);
 				}
 			}
 		}

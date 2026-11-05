@@ -33,10 +33,12 @@ PLACE_WALL_THICKNESS_M = 1
 PLACE_WALL_HEIGHT_M = 3
 PLACE_SIZE_M = 7
 COVER_CLEAR_M = 22
+# A boss needs room to fight in.
+BOSS_CLEAR_M = 30
 COVER_MIN_SIZE_M = 2
 COVER_MAX_SIZE_M = 5
 COVER_MAX_HEIGHT_M = 3
-# A chest needs room for the fight around it, away from the altars and beacons, where the fights already are.
+# A chest needs room for the fight around it, away from the altars and fires, where the fights already are.
 CHEST_CLEAR_EDGE_M = 16
 CHEST_CLEAR_PLACE_M = 32
 CHEST_CLEAR_PAD_M = 18
@@ -114,10 +116,13 @@ def add_cover(actors, layout):
     half = layout["boden_m"] / 2 - COVER_CLEAR_M
     taken = [(p["x_m"], p["y_m"]) for p in layout["orte"] + layout["signalfeuer"] + layout["ankunft"] + layout["sprungfelder"]]
     taken.append((0, 0))
+    bosses = [(p["x_m"], p["y_m"]) for p in layout["bossplaetze"]]
     placed = 0
     while placed < layout["deckung_anzahl"]:
         x, y = rng.uniform(-half, half), rng.uniform(-half, half)
         if any(math.hypot(x - other_x, y - other_y) < COVER_CLEAR_M for other_x, other_y in taken):
+            continue
+        if any(math.hypot(x - other_x, y - other_y) < BOSS_CLEAR_M for other_x, other_y in bosses):
             continue
         size_x, size_y = rng.uniform(COVER_MIN_SIZE_M, COVER_MAX_SIZE_M), rng.uniform(COVER_MIN_SIZE_M, COVER_MAX_SIZE_M)
         height = rng.uniform(1, COVER_MAX_HEIGHT_M)
@@ -144,6 +149,7 @@ def add_chests(actors, layout, cover):
     keep_clear = [(point, CHEST_CLEAR_COVER_M) for point in cover]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PLACE_M) for p in layout["orte"] + layout["signalfeuer"] + layout["ankunft"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PAD_M) for p in layout["sprungfelder"]]
+    keep_clear += [((p["x_m"], p["y_m"]), BOSS_CLEAR_M) for p in layout["bossplaetze"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_CAMP_M) for p in layout["lager"]]
     keep_clear.append(((0, 0), CHEST_CLEAR_PLACE_M))
     placed = 0

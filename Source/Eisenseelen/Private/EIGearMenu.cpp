@@ -123,6 +123,15 @@ void FEIGearMenu::Build(UEIProfileComponent& Profile, const AEIHeroCharacter& He
 			Purse += FString::Printf(TEXT("   %s %d"), *Faction.Name, Profile.GetSave().FactionPoints.FindRef(Faction.Name));
 		}
 		AddText(ChoicesX, Top, Purse, TitleColor);
+		FString Ingredients;
+		for (const TPair<FString, int32>& Pair : Profile.GetSave().Ingredients)
+		{
+			Ingredients += FString::Printf(TEXT("%s%s %d"), Ingredients.IsEmpty() ? TEXT("Zutaten: ") : TEXT(", "), *Pair.Key, Pair.Value);
+		}
+		if (!Ingredients.IsEmpty())
+		{
+			AddText(ChoicesX, Top + LineHeight * 1.5f, Ingredients, NormalColor);
+		}
 	}
 	BuildSlots(Profile, Left, ColumnsTop, SlotsWidth, MouseX, MouseY);
 	const int32 Hovered = BuildChoices(Profile, ChoicesX, ColumnsTop, ChoicesWidth, MouseX, MouseY);

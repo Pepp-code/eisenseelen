@@ -53,6 +53,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewBeginRun();
 
+	/** For preview pictures: the boss is free at once. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewSkipBannbruch();
+
+	/** For preview pictures: the boss falls. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewDefeatBoss();
+
 	/** For preview pictures: so many open contracts count as done. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewSkipContracts(int32 Count);
