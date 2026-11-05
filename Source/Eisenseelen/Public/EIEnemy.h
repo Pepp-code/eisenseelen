@@ -8,6 +8,7 @@
 
 class FJsonObject;
 class UEIHealthComponent;
+class UEILookComponent;
 class UMaterialInstanceDynamic;
 class UProjectileMovementComponent;
 class USphereComponent;
@@ -160,6 +161,7 @@ public:
 	bool HasHome() const { return bHasHome; }
 
 	UEIHealthComponent* GetHealth() const { return Health; }
+	UEILookComponent* GetLook() const { return Look; }
 	const FEIEnemyValues& GetValues() const { return Values; }
 	void ApplyValues(const FEIEnemyValues& NewValues);
 
@@ -214,6 +216,9 @@ protected:
 	virtual bool LoadEnemyValues(FEIEnemyValues& OutValues, FString& OutError);
 	virtual FLinearColor PickBaseColor() const;
 
+	/** Where Data/aussehen.json keeps its model: gegner.<kind>. */
+	virtual TArray<FString> GetLookKeys() const;
+
 	/** As long as this is true nothing can hurt it, slow it or wake it. */
 	virtual bool IsUntouchable() const { return false; }
 	virtual bool CanBeFrozen() const { return true; }
@@ -230,8 +235,13 @@ protected:
 	void GoHomeNow();
 	void ArriveHome();
 
+	/** The blow lands. LookEvent is what the model plays, such as "schlag" or "wurf". */
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastStrike();
+	void MulticastStrike(FName LookEvent);
+
+	/** A moment that only the model shows, such as "ausholen". */
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastLookEvent(FName Event);
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastStompSound();
@@ -309,6 +319,10 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIHealthComponent> Health;
 
+	/** The model from Data/aussehen.json over the shapes, if there is one. It stands where the capsule touches the floor. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> BodyMaterial;
 
@@ -380,6 +394,7 @@ private:
 	float HurtFlashRemaining = 0.0f;
 	float TelegraphBlend = 0.0f;
 	float StaggerBlend = 0.0f;
+	bool bWasStaggering = false;
 	float WalkBlend = 0.0f;
 	float WalkPhase = 0.0f;
 	float IdlePhase = 0.0f;

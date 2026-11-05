@@ -5,6 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "EISignalFire.generated.h"
 
+class UEILookComponent;
 class UMaterialInstanceDynamic;
 class UPointLightComponent;
 class UStaticMeshComponent;
@@ -53,6 +54,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> ZoneDisc;
+
+	/** The model from Data/aussehen.json over the blocks, if there is one. Collision stays with the blocks. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UPointLightComponent> Light;

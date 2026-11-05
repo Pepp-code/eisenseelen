@@ -10,6 +10,7 @@ class UCameraComponent;
 class UEICasterComponent;
 class UEIGearComponent;
 class UEIHealthComponent;
+class UEIHeroBodyComponent;
 class UEIHeroMovementComponent;
 class UEIRuneComponent;
 class AEISkyBarge;
@@ -34,7 +35,7 @@ struct EISENSEELEN_API FEIClassValues
 	static bool LoadFromProjectFile(EEIHeroClass HeroClass, FEIClassValues& OutValues, FString& OutError);
 };
 
-/** The first-person hero. There is no model yet: a capsule and a camera. */
+/** The first-person hero: a capsule and a camera, the own hand in front of it, and a body the others see. */
 UCLASS()
 class EISENSEELEN_API AEIHeroCharacter : public ACharacter
 {
@@ -65,6 +66,10 @@ public:
 	UEICasterComponent* GetCaster() const { return Caster; }
 	UEIRuneComponent* GetRunes() const { return Runes; }
 	UEIGearComponent* GetGear() const { return Gear; }
+	UEIHeroBodyComponent* GetBody() const { return Body; }
+
+	/** Server only: everyone sees the hero do this, such as "hieb" or "treffer". The names are those of Data/aussehen.json. */
+	void ShowLookEvent(FName Event);
 
 	/** Passes the sum of all bonuses on to whoever needs it. */
 	void OnGearChanged();
@@ -132,6 +137,9 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastDied();
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastLookEvent(FName Event);
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastBoardBarge(AEISkyBarge* Barge);
 
@@ -149,6 +157,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIViewModelComponent> ViewModel;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEIHeroBodyComponent> Body;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UEIHealthComponent> Health;

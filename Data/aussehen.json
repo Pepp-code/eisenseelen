@@ -1,0 +1,238 @@
+{
+	"aussehen": {
+		"_anleitung": "Hier steht, welches 3D-Modell über den grauen Klötzen liegt. Ein leeres modell heißt: Die Klötze bleiben. Alle Regeln stehen in docs/Kunst-Leitfaden.md.",
+		"_beispiel": {
+			"modell": "/Game/Kunst/Gegner/Knochenlaeufer/SK_Knochenlaeufer",
+			"skalierung": 1.0,
+			"versatz_cm": [0, 0, 0],
+			"drehung_grad": [0, 0, -90],
+			"anim_blueprint": "",
+			"animationen": {
+				"stehen": "/Game/Kunst/Gegner/Knochenlaeufer/A_Stehen",
+				"laufen": "/Game/Kunst/Gegner/Knochenlaeufer/A_Laufen",
+				"schlag": "/Game/Kunst/Gegner/Knochenlaeufer/A_Schlag",
+				"tod": "/Game/Kunst/Gegner/Knochenlaeufer/A_Tod"
+			},
+			"sockel": "waffe_r",
+			"leuchtteile_behalten": true
+		},
+		"_helden": "held. ist der Körper, den die anderen Spieler sehen. hand. ist die Hand, die du selbst vor der Kamera siehst.",
+		"held.klingenwacht": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"held.arkanist": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"hand.klingenwacht": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"hand.arkanist": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"_gegner": "Gegner und Bosse. Getroffen wird weiter die unsichtbare Form darunter, das Modell ändert nur, was man sieht.",
+		"gegner.knochenlaeufer": {
+			"modell": ""
+		},
+		"gegner.knochenwerfer": {
+			"modell": ""
+		},
+		"gegner.schildtraeger": {
+			"modell": ""
+		},
+		"gegner.kettenkoloss": {
+			"modell": ""
+		},
+		"gegner.glutschaedel": {
+			"modell": ""
+		},
+		"boss.Der Gefesselte": {
+			"modell": ""
+		},
+		"boss.Der Seelenrufer": {
+			"modell": ""
+		},
+		"_waffen": "Eine Waffe mit eigenem item.-Eintrag nutzt diesen, sonst gilt das Modell ihrer Grundform (form.).",
+		"form.langschwert": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"form.zweihaender": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"form.kurzschwert": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"form.stab": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"form.zepter": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Flammenschwert": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Frostklinge": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Sturmklinge": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Aschenbrecher": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Gletscherbrecher": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Donnerbrecher": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Glutsäbel": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Reifsäbel": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Funkensäbel": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Feuerstab": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Froststab": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Funkenstab": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Aschenzepter": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Gletscherzepter": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Donnerzepter": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"_ruestung": "Rüstung liegt als Stück über dem Heldenmodell und bewegt sich mit ihm. Dafür braucht sie dasselbe Skelett wie held.klingenwacht oder held.arkanist.",
+		"item.Helm der Eisenwacht": {
+			"modell": ""
+		},
+		"item.Brustpanzer der Eisenwacht": {
+			"modell": ""
+		},
+		"item.Handschuhe der Eisenwacht": {
+			"modell": ""
+		},
+		"item.Schuhe der Eisenwacht": {
+			"modell": ""
+		},
+		"item.Helm der Henkersgarde": {
+			"modell": ""
+		},
+		"item.Brustpanzer der Henkersgarde": {
+			"modell": ""
+		},
+		"item.Handschuhe der Henkersgarde": {
+			"modell": ""
+		},
+		"item.Schuhe der Henkersgarde": {
+			"modell": ""
+		},
+		"item.Helm der Glutschmiede": {
+			"modell": ""
+		},
+		"item.Brustpanzer der Glutschmiede": {
+			"modell": ""
+		},
+		"item.Handschuhe der Glutschmiede": {
+			"modell": ""
+		},
+		"item.Schuhe der Glutschmiede": {
+			"modell": ""
+		},
+		"item.Helm der Frostwacht": {
+			"modell": ""
+		},
+		"item.Brustpanzer der Frostwacht": {
+			"modell": ""
+		},
+		"item.Handschuhe der Frostwacht": {
+			"modell": ""
+		},
+		"item.Schuhe der Frostwacht": {
+			"modell": ""
+		},
+		"item.Helm des Quellwächters": {
+			"modell": ""
+		},
+		"item.Brustpanzer des Quellwächters": {
+			"modell": ""
+		},
+		"item.Handschuhe des Quellwächters": {
+			"modell": ""
+		},
+		"item.Schuhe des Quellwächters": {
+			"modell": ""
+		},
+		"_orte": "Orte auf der Karte. Leuchtende Teile wie Kristalle, Glut oder Siegel bleiben sichtbar, solange leuchtteile_behalten nicht false ist.",
+		"ort.schmiede": {
+			"modell": ""
+		},
+		"ort.jagdbrett": {
+			"modell": ""
+		},
+		"ort.altar": {
+			"modell": ""
+		},
+		"ort.ankerstein": {
+			"modell": ""
+		},
+		"ort.truhe": {
+			"modell": ""
+		},
+		"ort.signalfeuer": {
+			"modell": ""
+		},
+		"ort.seelenkessel": {
+			"modell": ""
+		},
+		"ort.grab": {
+			"modell": ""
+		},
+		"ort.trainingspuppe": {
+			"modell": ""
+		},
+		"ort.barke": {
+			"modell": ""
+		},
+		"ort.sprungfeld": {
+			"modell": ""
+		},
+		"ort.lager": {
+			"modell": ""
+		}
+	}
+}

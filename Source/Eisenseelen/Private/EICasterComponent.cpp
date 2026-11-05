@@ -347,6 +347,7 @@ void UEICasterComponent::ServerFire_Implementation(EEICast Kind, FVector_NetQuan
 void UEICasterComponent::SpawnProjectile(EEICast Kind, const FVector& Target)
 {
 	AEIHeroCharacter* Hero = GetHero();
+	Hero->ShowLookEvent(Kind == EEICast::Bolt ? TEXT("schuss") : TEXT("zauber"));
 	const UEIGearComponent* Gear = Hero->GetGear();
 	const EEIElement Element = Gear->GetWeaponElement();
 	// A charge of the staff is a shot, and only the spell key is a spell.

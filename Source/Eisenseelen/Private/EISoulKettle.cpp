@@ -1,6 +1,7 @@
 #include "EISoulKettle.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
@@ -64,6 +65,13 @@ AEISoulKettle::AEISoulKettle()
 	GraveSlab->SetUsingAbsoluteRotation(true);
 	Headstone->SetUsingAbsoluteLocation(true);
 	Headstone->SetUsingAbsoluteRotation(true);
+
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Root);
+	GraveLook = CreateDefaultSubobject<UEILookComponent>(TEXT("GraveLook"));
+	GraveLook->SetupAttachment(Root);
+	GraveLook->SetUsingAbsoluteLocation(true);
+	GraveLook->SetUsingAbsoluteRotation(true);
 }
 
 UStaticMeshComponent* AEISoulKettle::AddPart(const TCHAR* Name, UStaticMesh* Mesh, const FVector& Location, const FVector& SizeCm)
@@ -109,6 +117,10 @@ void AEISoulKettle::BeginPlay()
 	const FRotator GraveFacing = Away.IsNearlyZero() ? FRotator::ZeroRotator : Away.Rotation();
 	GraveSlab->SetWorldLocationAndRotation(GraveLocation + FVector(0.0f, 0.0f, GraveSlabSizeCm.Z / 2.0f), GraveFacing);
 	Headstone->SetWorldLocationAndRotation(GraveLocation + GraveFacing.RotateVector(FVector(HeadstoneBehindCm, 0.0f, HeadstoneSizeCm.Z / 2.0f)), GraveFacing);
+	GraveLook->SetWorldLocationAndRotation(GraveLocation, GraveFacing);
+	// Fluid and wisp stay: they show how full the kettle is.
+	Look->Setup({TEXT("ort.seelenkessel")}, {Pot}, {Fluid, Wisp});
+	GraveLook->Setup({TEXT("ort.grab")}, {GraveSlab, Headstone});
 	OnRep_Souls();
 }
 
@@ -124,6 +136,8 @@ void AEISoulKettle::OnRep_Souls()
 		// The grave breaks open: the slab slides aside and the circle is no longer needed.
 		bShownOpen = true;
 		ZoneDisc->SetVisibility(false);
+		Look->ShowActive(true);
+		GraveLook->ShowActive(true);
 		const FRotator Facing = GraveSlab->GetComponentRotation();
 		GraveSlab->SetWorldLocationAndRotation(GraveLocation + Facing.RotateVector(OpenSlabOffsetCm), Facing + FRotator(0.0f, 0.0f, OpenSlabRollDegrees));
 		EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), GraveLocation);

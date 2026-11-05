@@ -2,6 +2,7 @@
 
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
@@ -36,6 +37,9 @@ AEIForge::AEIForge()
 
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
+
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Root);
 
 	AddPart(TEXT("AnvilFoot"), Cube.Object, FVector(0.0f, AnvilYCm, AnvilFootSizeCm.Z / 2.0f), AnvilFootSizeCm);
 	AddPart(TEXT("AnvilTop"), Cube.Object, FVector(0.0f, AnvilYCm, AnvilFootSizeCm.Z + AnvilTopSizeCm.Z / 2.0f), AnvilTopSizeCm);
@@ -74,17 +78,20 @@ void AEIForge::BeginPlay()
 {
 	Super::BeginPlay();
 
+	TArray<USceneComponent*> Blocks;
 	for (UActorComponent* Component : GetComponents())
 	{
 		UStaticMeshComponent* Part = Cast<UStaticMeshComponent>(Component);
-		if (Part == nullptr || Part == Embers)
+		if (Part == nullptr || Part == Embers || Part->CreationMethod != EComponentCreationMethod::Native)
 		{
 			continue;
 		}
 		const bool bIron = Part->GetName().StartsWith(TEXT("Anvil"));
 		EIVisuals::SetColor(Part, bIron ? IronColor : StoneColor);
+		Blocks.Add(Part);
 	}
 	EIVisuals::SetColor(Embers, EmberColor, EmberGlow);
+	Look->Setup({TEXT("ort.schmiede")}, Blocks, {Embers});
 }
 
 bool AEIForge::IsInReach(const AActor* Actor) const

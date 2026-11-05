@@ -10,6 +10,7 @@
 #include "EIGameMode.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
+#include "EILookComponent.h"
 #include "EIProjectile.h"
 #include "EIRunDirector.h"
 #include "EIVisuals.h"
@@ -67,6 +68,12 @@ namespace
 	constexpr float TelegraphBlendPerSecond = 8.0f;
 	constexpr float TelegraphStretch = 0.22f;
 	constexpr float StaggerBlendPerSecond = 10.0f;
+	// A model shimmers in the color of its state: a little while it reels or is slowed, more while it warns or burns.
+	constexpr float StaggerShimmer = 0.4f;
+	constexpr float SlowedShimmer = 0.3f;
+	// A model runs once it is a bit faster than its usual pace, for example while it charges.
+	constexpr float RunFromSpeedShare = 1.2f;
+	constexpr float CorpseSeconds = 4.0f;
 	constexpr float StaggerTiltDegrees = 28.0f;
 	constexpr float BodyHeight = -20.0f;
 	constexpr float HeadAboveBody = 86.0f;
@@ -278,6 +285,9 @@ AEIEnemy::AEIEnemy()
 	Held->SetVisibility(false);
 
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
+
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(GetCapsuleComponent());
 }
 
 void AEIEnemy::BeginPlay()
@@ -295,6 +305,8 @@ void AEIEnemy::BeginPlay()
 	BodyMaterial = EIVisuals::SetColor(Body, BaseColor);
 	HeadMaterial = EIVisuals::SetColor(Head, BaseColor);
 	ShowHeldPart();
+	Look->SetRelativeLocation(FVector(0.0f, 0.0f, -GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()));
+	Look->Setup(GetLookKeys(), {Body, Head, Held});
 	if (Values.bExplodes)
 	{
 		Head->SetRelativeScale3D(FVector(EmberHeadSize));
@@ -574,6 +586,7 @@ void AEIEnemy::StartChargeWindup(const AActor* Target)
 	SetActorRotation(ChargeDirection.Rotation());
 	State = EState::ChargeWindup;
 	StateTime = 0.0f;
+	MulticastLookEvent(TEXT("ausholen"));
 
 	// The body covers the start and the end of the way too.
 	const float BodyRadius = GetCapsuleComponent()->GetScaledCapsuleRadius();
@@ -892,7 +905,7 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		{
 			bTelegraphing = false;
 			OnRep_Telegraphing();
-			MulticastStrike();
+			MulticastStrike(TEXT("ansturm"));
 			State = EState::Charging;
 			StateTime = 0.0f;
 			ChargeTravelledCm = 0.0f;
@@ -1121,6 +1134,7 @@ void AEIEnemy::StartStrikeWindup(const AActor* Target)
 	}
 	bTelegraphing = true;
 	OnRep_Telegraphing();
+	MulticastLookEvent(TEXT("ausholen"));
 }
 
 void AEIEnemy::Strike()
@@ -1130,7 +1144,7 @@ void AEIEnemy::Strike()
 		Explode(true);
 		return;
 	}
-	MulticastStrike();
+	MulticastStrike(Values.ThrowSpeedMetersPerSecond > 0.0f ? TEXT("wurf") : TEXT("schlag"));
 	if (Values.ThrowSpeedMetersPerSecond > 0.0f)
 	{
 		NameAttack(TEXT("Wurf"));
@@ -1268,6 +1282,7 @@ void AEIEnemy::OnRep_Telegraphing()
 void AEIEnemy::MulticastNoticed_Implementation(bool bCallOut)
 {
 	NoticeBlend = 1.0f;
+	Look->PlayEvent(TEXT("bemerkt"));
 	if (bCallOut)
 	{
 		EIVisuals::PlaySoundAt(this, TEXT("GegnerAusholen"), GetActorLocation());
@@ -1283,12 +1298,24 @@ void AEIEnemy::MulticastHurt_Implementation()
 {
 	HurtFlashRemaining = HurtFlashSeconds;
 	RecoilBlend = 1.0f;
+	Look->PlayEvent(TEXT("treffer"));
 }
 
-void AEIEnemy::MulticastStrike_Implementation()
+void AEIEnemy::MulticastStrike_Implementation(FName LookEvent)
 {
 	TelegraphBlend = 0.0f;
 	StrikeBlend = 1.0f;
+	Look->PlayEvent(LookEvent);
+}
+
+void AEIEnemy::MulticastLookEvent_Implementation(FName Event)
+{
+	Look->PlayEvent(Event);
+}
+
+TArray<FString> AEIEnemy::GetLookKeys() const
+{
+	return {FString(TEXT("gegner.")) + EIEnemyKindKey(Kind)};
 }
 
 void AEIEnemy::MulticastDie_Implementation()
@@ -1298,6 +1325,13 @@ void AEIEnemy::MulticastDie_Implementation()
 	Head->SetVisibility(false);
 	Held->SetVisibility(false);
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Look->SetStatus(FLinearColor::Black, 0.0f);
+	// A model with a death of its own falls over and lies there a while. Whatever blows up leaves nothing.
+	if (!Values.bExplodes && Look->LeaveCorpse(CorpseSeconds))
+	{
+		return;
+	}
+	Look->SetVisibility(false, true);
 	const FTransform Spawn(GetActorLocation());
 	if (AEIBoneDebris* Debris = GetWorld()->SpawnActorDeferred<AEIBoneDebris>(AEIBoneDebris::StaticClass(), Spawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 	{
@@ -1345,6 +1379,19 @@ void AEIEnemy::UpdateLook(float DeltaSeconds)
 	HeadMaterial->SetVectorParameterValue(TEXT("Farbe"), HeadColor);
 	HeadMaterial->SetScalarParameterValue(TEXT("Leuchten"), HeadGlow);
 	UpdatePose(DeltaSeconds);
+
+	if (Look->HasModel() && !IsDead())
+	{
+		// bStaggering has no notification of its own, so the model learns of a new stagger here.
+		if (bStaggering && !bWasStaggering)
+		{
+			Look->PlayEvent(TEXT("taumeln"));
+		}
+		bWasStaggering = bStaggering;
+		Look->SetPaused(bFrozen);
+		Look->SetMotion(static_cast<float>(GetVelocity().Size2D()), Values.SpeedMetersPerSecond * CentimetersPerMeter * RunFromSpeedShare, GetCharacterMovement()->IsFalling());
+		Look->SetStatus(Color, FMath::Max3(Glow, StaggerBlend * StaggerShimmer, bSlowed ? SlowedShimmer : 0.0f));
+	}
 }
 
 void AEIEnemy::UpdatePose(float DeltaSeconds)

@@ -62,6 +62,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual bool LoadEnemyValues(FEIEnemyValues& OutValues, FString& OutError) override;
 	virtual FLinearColor PickBaseColor() const override;
+	virtual TArray<FString> GetLookKeys() const override;
 	virtual bool IsUntouchable() const override { return bBound || bShielded; }
 	virtual bool CanBeFrozen() const override { return false; }
 	virtual void TickServer(float DeltaSeconds) override;

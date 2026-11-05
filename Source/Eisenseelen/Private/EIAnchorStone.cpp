@@ -1,6 +1,7 @@
 #include "EIAnchorStone.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
@@ -33,6 +34,9 @@ AEIAnchorStone::AEIAnchorStone()
 
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
+
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Root);
 
 	Stone = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Stone"));
 	Stone->SetupAttachment(Root);
@@ -73,6 +77,8 @@ void AEIAnchorStone::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// The chain stays a block: it runs to wherever the boss stands.
+	Look->Setup({TEXT("ort.ankerstein")}, {Stone}, {Crystal});
 	EIVisuals::SetColor(Stone, StoneColor);
 	EIVisuals::SetColor(Chain, ChainColor);
 	EIVisuals::SetColor(Crystal, BoundColor, CrystalGlow);
@@ -120,6 +126,7 @@ void AEIAnchorStone::OnRep_Broken()
 	Chain->SetVisibility(!bBroken);
 	ZoneDisc->SetVisibility(!bBroken);
 	Crystal->SetVisibility(!bBroken);
+	Look->ShowActive(bBroken);
 	if (bBroken)
 	{
 		// It falls to rubble, which blocks nobody, so that the fight around the boss does not get stuck on it.

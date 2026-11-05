@@ -107,6 +107,12 @@ FLinearColor AEIBoss::PickBaseColor() const
 	return Boss != nullptr ? Boss->Color : Super::PickBaseColor();
 }
 
+TArray<FString> AEIBoss::GetLookKeys() const
+{
+	const FEIBossValues* Boss = GetBossValues();
+	return Boss != nullptr ? TArray<FString>{FString(TEXT("boss.")) + Boss->Name} : Super::GetLookKeys();
+}
+
 void AEIBoss::ApplyGraveLook()
 {
 	// Whoever sleeps in a grave is not there yet: nobody sees it, hits it or bumps into it.
@@ -182,6 +188,7 @@ void AEIBoss::StartStomp()
 	MoveLeft = Boss->Stomp.WindupSeconds;
 	ShowGroundCircle(Boss->Stomp.RadiusMeters * CentimetersPerMeter, Boss->Stomp.WindupSeconds);
 	SetTelegraphing(true);
+	MulticastLookEvent(TEXT("ausholen"));
 }
 
 void AEIBoss::Stomp()
@@ -190,7 +197,7 @@ void AEIBoss::Stomp()
 	const FEIGroundMarkData Ring = GetGroundMark();
 	HideGroundMark();
 	SetTelegraphing(false);
-	MulticastStrike();
+	MulticastStrike(TEXT("stampfen"));
 	MulticastStompSound();
 	NextStompAt = GetWorld()->GetTimeSeconds() + (Boss != nullptr ? Boss->Stomp.PauseSeconds : 0.0f);
 	if (Boss == nullptr)
@@ -222,6 +229,7 @@ void AEIBoss::StartSummon()
 	// The ring shows where the group will stand.
 	ShowGroundCircle(Boss->Summon.DistanceMeters * CentimetersPerMeter, Boss->Summon.WindupSeconds);
 	SetTelegraphing(true);
+	MulticastLookEvent(TEXT("beschwoeren"));
 	NameAttack(TEXT("Beschwören"));
 }
 
@@ -322,6 +330,7 @@ bool AEIBoss::StartVanish()
 	// The ring lies where it will come up, so that nobody gets surprised from behind.
 	ShowGroundCircleAt(VanishTarget, GetCapsuleComponent()->GetScaledCapsuleRadius() * 2.0f, Boss->Vanish.WindupSeconds);
 	SetTelegraphing(true);
+	MulticastLookEvent(TEXT("verschwinden"));
 	NameAttack(TEXT("Verschwinden"));
 	return true;
 }

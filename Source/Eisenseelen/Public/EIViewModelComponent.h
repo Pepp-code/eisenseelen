@@ -4,6 +4,7 @@
 #include "Components/SceneComponent.h"
 #include "EIViewModelComponent.generated.h"
 
+class UEILookComponent;
 class UProceduralMeshComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -27,6 +28,15 @@ public:
 
 	/** How long the blade is, compared to the long sword, and what its edge and the head of the staff glow in. */
 	void SetWeaponLook(float LengthFactor, const FLinearColor& Color);
+
+	/** Puts the models from Data/aussehen.json over the gauntlet and the weapon: HandKey, then the weapon's keys in order. */
+	void SetModels(const FString& HandKey, const TArray<FString>& WeaponKeys, bool bStaff);
+
+	/** A moment such as "hieb" for the hand's own model. The hand still moves along Data/posen.json. */
+	void PlayLookEvent(FName Event);
+
+	UEILookComponent* GetHandLook() const { return HandLook; }
+	UEILookComponent* GetWeaponLook() const { return WeaponLook; }
 	void PlayPose(FName Curve, float Seconds, float TrailFrom = 2.0f, float TrailTo = 2.0f);
 
 	/** For a gesture nothing depends on: it does not interrupt a swing or a block. */
@@ -77,6 +87,21 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> StaffHead;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> Gauntlet;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> Guard;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> Shaft;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UEILookComponent> HandLook;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UEILookComponent> WeaponLook;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UProceduralMeshComponent> Trail;

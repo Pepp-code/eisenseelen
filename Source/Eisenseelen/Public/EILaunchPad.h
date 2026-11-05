@@ -5,6 +5,7 @@
 #include "EILaunchPad.generated.h"
 
 class UBoxComponent;
+class UEILookComponent;
 class UStaticMeshComponent;
 
 /** Throws a hero straight up as high as Data/welt.json says. Horizontal speed stays, so a running hero flies on. */
@@ -30,6 +31,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Plate;
+
+	/** The model from Data/aussehen.json over the blocks, if there is one. Collision stays with the blocks. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
 
 	float LaunchHeightMeters = 6.0f;
 };

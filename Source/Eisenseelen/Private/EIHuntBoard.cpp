@@ -2,6 +2,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "EIGameState.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
@@ -37,6 +38,9 @@ AEIHuntBoard::AEIHuntBoard()
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
 
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Root);
+
 	const float PostY = PanelSizeCm.Y / 2.0f - PostSizeCm.Y;
 	AddPart(TEXT("PostLeft"), Cube.Object, FVector(0.0f, -PostY, PostSizeCm.Z / 2.0f), PostSizeCm);
 	AddPart(TEXT("PostRight"), Cube.Object, FVector(0.0f, PostY, PostSizeCm.Z / 2.0f), PostSizeCm);
@@ -71,14 +75,18 @@ void AEIHuntBoard::BeginPlay()
 {
 	Super::BeginPlay();
 
+	TArray<USceneComponent*> Blocks;
 	for (UActorComponent* Component : GetComponents())
 	{
 		UStaticMeshComponent* Part = Cast<UStaticMeshComponent>(Component);
-		if (Part != nullptr && !Sheets.Contains(Part))
+		if (Part != nullptr && !Sheets.Contains(Part) && Part->CreationMethod == EComponentCreationMethod::Native)
 		{
 			EIVisuals::SetColor(Part, WoodColor);
+			Blocks.Add(Part);
 		}
 	}
+	// The letters stay as they are: they show which hunts are on offer.
+	Look->Setup({TEXT("ort.jagdbrett")}, Blocks);
 }
 
 void AEIHuntBoard::Tick(float DeltaSeconds)

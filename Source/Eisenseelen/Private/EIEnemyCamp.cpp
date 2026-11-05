@@ -2,6 +2,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "EIEnemy.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -25,11 +26,17 @@ AEIEnemyCamp::AEIEnemyCamp()
 	Ashes->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Ashes->SetCanEverAffectNavigation(false);
 	Ashes->SetCastShadow(false);
+
+	// The ashes are squashed flat, and the model keeps its own size.
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Ashes);
+	Look->SetUsingAbsoluteScale(true);
 }
 
 void AEIEnemyCamp::BeginPlay()
 {
 	Super::BeginPlay();
+	Look->Setup({TEXT("ort.lager")}, {Ashes});
 	EIVisuals::SetColor(Ashes, AshesColor);
 }
 

@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "EIForge.generated.h"
 
+class UEILookComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 
@@ -35,6 +36,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Embers;
+
+	/** The model from Data/aussehen.json over the blocks, if there is one. Collision stays with the blocks. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
 
 	UPROPERTY(Replicated)
 	float ReachMeters = 4.0f;

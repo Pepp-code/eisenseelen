@@ -1,6 +1,7 @@
 #include "EISkyBarge.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
@@ -56,6 +57,11 @@ AEISkyBarge::AEISkyBarge()
 	{
 		Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
+
+	// The model stands on the deck, where the heroes stand.
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Root);
+	Look->SetRelativeLocation(FVector(0.0f, 0.0f, DeckThicknessCm / 2.0f));
 }
 
 void AEISkyBarge::BeginPlay()
@@ -67,6 +73,7 @@ void AEISkyBarge::BeginPlay()
 	EIVisuals::SetColor(Prow, HullColor);
 	EIVisuals::SetColor(Mast, MastColor);
 	EIVisuals::SetColor(Sail, SailColor);
+	Look->Setup({TEXT("ort.barke")}, {Deck, Hull, Prow, Mast, Sail});
 }
 
 void AEISkyBarge::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -78,6 +85,7 @@ void AEISkyBarge::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 void AEISkyBarge::OnRep_Flying()
 {
 	Deck->SetCollisionResponseToChannel(ECC_Pawn, bFlying ? ECR_Ignore : ECR_Block);
+	Look->ShowActive(bFlying);
 }
 
 void AEISkyBarge::ReturnToStart()

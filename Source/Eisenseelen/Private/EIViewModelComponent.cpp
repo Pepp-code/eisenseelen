@@ -3,6 +3,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EILookComponent.h"
 #include "EIPoses.h"
 #include "EIVisuals.h"
 #include "Engine/StaticMesh.h"
@@ -73,21 +74,31 @@ void UEIViewModelComponent::Build()
 
 	UStaticMesh* Cube = EIVisuals::GetCube();
 	// The hero is an empty suit of armour, so the gauntlet floats without an arm. It stays for every weapon.
-	AddPart(Hand, Cube, FVector(-3.0f, 0.0f, 0.0f), FVector(7.0f, 6.0f, 6.0f), GauntletColor);
+	Gauntlet = AddPart(Hand, Cube, FVector(-3.0f, 0.0f, 0.0f), FVector(7.0f, 6.0f, 6.0f), GauntletColor);
 
 	SwordParts = NewObject<USceneComponent>(GetOwner());
 	SwordParts->SetupAttachment(Hand);
 	SwordParts->RegisterComponent();
 	Blade = AddPart(SwordParts, Cube, FVector(BladeStart + BladeLength / 2.0f, 0.0f, 0.0f), BladeSizeCm, BladeColor);
 	BladeEdge = AddPart(SwordParts, Cube, FVector(BladeStart + BladeLength / 2.0f, 0.0f, 0.0f), BladeEdgeSizeCm, BladeColor);
-	AddPart(SwordParts, Cube, FVector(BladeStart - 1.0f, 0.0f, 0.0f), FVector(2.5f, 4.0f, 16.0f), GuardColor);
+	Guard = AddPart(SwordParts, Cube, FVector(BladeStart - 1.0f, 0.0f, 0.0f), FVector(2.5f, 4.0f, 16.0f), GuardColor);
 
 	StaffParts = NewObject<USceneComponent>(GetOwner());
 	StaffParts->SetupAttachment(Hand);
 	StaffParts->RegisterComponent();
-	AddPart(StaffParts, Cube, FVector(StaffLength / 2.0f - StaffBack, 0.0f, 0.0f), FVector(StaffLength, 3.5f, 3.5f), ShaftColor);
+	Shaft = AddPart(StaffParts, Cube, FVector(StaffLength / 2.0f - StaffBack, 0.0f, 0.0f), FVector(StaffLength, 3.5f, 3.5f), ShaftColor);
 	StaffHead = AddPart(StaffParts, EIVisuals::GetSphere(), FVector(StaffLength - StaffBack + StaffHeadSize / 2.0f, 0.0f, 0.0f), FVector(StaffHeadSize), BladeColor);
 	StaffParts->SetVisibility(false, true);
+
+	// The models from Data/aussehen.json hang on the same hand, so they follow the same poses.
+	HandLook = NewObject<UEILookComponent>(GetOwner());
+	HandLook->SetupAttachment(Hand);
+	HandLook->SetViewOptions(true, false, false);
+	HandLook->RegisterComponent();
+	WeaponLook = NewObject<UEILookComponent>(GetOwner());
+	WeaponLook->SetupAttachment(Hand);
+	WeaponLook->SetViewOptions(true, false, false);
+	WeaponLook->RegisterComponent();
 
 	Trail = NewObject<UProceduralMeshComponent>(GetOwner());
 	Trail->SetupAttachment(this);
@@ -126,6 +137,34 @@ void UEIViewModelComponent::SetWeaponLook(float LengthFactor, const FLinearColor
 	EIVisuals::SetColor(BladeEdge, Color, BladeEdgeGlow);
 	EIVisuals::SetColor(StaffHead, Color, StaffHeadGlow);
 	EIVisuals::SetGlow(Trail, Color, TrailStrength);
+}
+
+void UEIViewModelComponent::SetModels(const FString& HandKey, const TArray<FString>& WeaponKeys, bool bStaff)
+{
+	if (Hand == nullptr)
+	{
+		return;
+	}
+	// The weapon goes back into the hand first, so a hand model that changes does not take it along.
+	WeaponLook->AttachToComponent(Hand, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	HandLook->Setup({HandKey}, {Gauntlet});
+	if (bStaff)
+	{
+		WeaponLook->Setup(WeaponKeys, {Shaft}, {StaffHead});
+	}
+	else
+	{
+		WeaponLook->Setup(WeaponKeys, {Blade, Guard}, {BladeEdge});
+	}
+	HandLook->AttachToModelSocket(WeaponLook, WeaponLook->GetSocket());
+}
+
+void UEIViewModelComponent::PlayLookEvent(FName Event)
+{
+	if (HandLook != nullptr)
+	{
+		HandLook->PlayEvent(Event);
+	}
 }
 
 void UEIViewModelComponent::PlayPose(FName Curve, float Seconds, float TrailFrom, float TrailTo)

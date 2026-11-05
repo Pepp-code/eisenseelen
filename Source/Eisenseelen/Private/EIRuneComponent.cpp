@@ -238,6 +238,7 @@ void UEIRuneComponent::ServerCast_Implementation(FVector_NetQuantize Location, f
 void UEIRuneComponent::SpawnField(const FEIRune& Rune, const FVector& Location, float Yaw)
 {
 	AEIHeroCharacter* Hero = GetHero();
+	Hero->ShowLookEvent(TEXT("rune"));
 	const FTransform Spawn(FRotator(0.0f, Yaw, 0.0f), Location);
 	AEIRuneField* Field = GetWorld()->SpawnActorDeferred<AEIRuneField>(AEIRuneField::StaticClass(), Spawn, Hero, Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (Field != nullptr)

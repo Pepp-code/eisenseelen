@@ -3,6 +3,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "EIDataFile.h"
 #include "EIEnemy.h"
+#include "EILookComponent.h"
 #include "EIProjectile.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
@@ -46,6 +47,9 @@ AEIChest::AEIChest()
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
 
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Root);
+
 	Body = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Body"));
 	Body->SetupAttachment(Root);
 	Body->SetStaticMesh(Cube.Object);
@@ -88,6 +92,7 @@ void AEIChest::BeginPlay()
 	Super::BeginPlay();
 
 	LoadValues();
+	Look->Setup({TEXT("ort.truhe")}, {Body, Lid}, {Gem, Seal});
 	EIVisuals::SetColor(Body, BodyColor);
 	EIVisuals::SetColor(Lid, LidColor);
 	EIVisuals::SetColor(Seal, SealColor, SealGlow);
@@ -181,6 +186,7 @@ void AEIChest::OnRep_Look()
 {
 	SetActorHiddenInGame(!bInUse);
 	SetActorEnableCollision(bInUse);
+	Look->ShowActive(bInUse && bOpened);
 
 	LidTargetDegrees = bOpened ? OpenLidDegrees : 0.0f;
 	if (!bOpened)

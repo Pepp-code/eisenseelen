@@ -5,6 +5,7 @@
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
 #include "EIHeroCharacter.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -33,6 +34,11 @@ AEILaunchPad::AEILaunchPad()
 	Plate->SetRelativeLocation(FVector(0.0f, 0.0f, -TriggerHeightCm));
 	Plate->SetRelativeScale3D(FVector(PadSizeCm / 100.0f, PadSizeCm / 100.0f, PlateThicknessCm / 100.0f));
 	Plate->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// The model stands on the floor, below the trigger.
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(TriggerBox);
+	Look->SetRelativeLocation(FVector(0.0f, 0.0f, -TriggerHeightCm));
 }
 
 void AEILaunchPad::BeginPlay()
@@ -46,6 +52,7 @@ void AEILaunchPad::BeginPlay()
 		FEIDataFile::ReportError(TEXT("welt.json"), Error);
 	}
 	EIVisuals::SetColor(Plate, PadColor, PadGlow);
+	Look->Setup({TEXT("ort.sprungfeld")}, {Plate});
 	TriggerBox->OnComponentBeginOverlap.AddDynamic(this, &AEILaunchPad::HandleOverlap);
 }
 

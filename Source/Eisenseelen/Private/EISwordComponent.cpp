@@ -3,6 +3,7 @@
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
 #include "EIEnemy.h"
+#include "EIHeroBodyComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIGearComponent.h"
@@ -255,6 +256,7 @@ void UEISwordComponent::MulticastBlockFeedback_Implementation(bool bParry)
 {
 	const TCHAR* Sound = bParry ? TEXT("Parade") : TEXT("Blocken");
 	AEIHeroCharacter* Hero = GetHero();
+	Hero->GetBody()->PlayEvent(TEXT("blocken"));
 	if (!Hero->IsLocallyControlled())
 	{
 		EIVisuals::PlaySoundAt(this, Sound, Hero->GetActorLocation());
@@ -349,6 +351,7 @@ void UEISwordComponent::BeginSwing(EEISwingKind Kind)
 	HitThisSwing.Reset();
 
 	AEIHeroCharacter* Hero = GetHero();
+	Hero->ShowLookEvent(Kind == EEISwingKind::Heavy ? TEXT("schwerer_hieb") : TEXT("hieb"));
 	if (Hero->IsLocallyControlled())
 	{
 		EIVisuals::PlaySound2D(this, Kind == EEISwingKind::Heavy ? TEXT("HiebSchwer") : TEXT("Hieb"));

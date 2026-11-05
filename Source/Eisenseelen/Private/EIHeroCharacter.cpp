@@ -1,4 +1,3 @@
-#include "EIEnemy.h"
 #include "EIHeroCharacter.h"
 
 #include "Camera/CameraComponent.h"
@@ -6,8 +5,10 @@
 #include "Dom/JsonObject.h"
 #include "EICasterComponent.h"
 #include "EIDataFile.h"
+#include "EIEnemy.h"
 #include "EIGearComponent.h"
 #include "EIHealthComponent.h"
+#include "EIHeroBodyComponent.h"
 #include "EIHeroMovementComponent.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
@@ -33,6 +34,8 @@ namespace
 	constexpr float HardLandingKickDegrees = 4.0f;
 	constexpr float FieldOfViewBlendSpeed = 5.0f;
 	constexpr float SprintFromRunShare = 1.15f;
+	constexpr float CapsuleRadiusCm = 34.0f;
+	constexpr float CapsuleHalfHeightCm = 88.0f;
 }
 
 bool FEIClassValues::LoadFromProjectFile(EEIHeroClass HeroClass, FEIClassValues& OutValues, FString& OutError)
@@ -67,7 +70,7 @@ AEIHeroCharacter::AEIHeroCharacter(const FObjectInitializer& ObjectInitializer)
 	PrimaryActorTick.bCanEverTick = true;
 	bUseControllerRotationYaw = true;
 	BaseEyeHeight = EyeHeightCm;
-	GetCapsuleComponent()->InitCapsuleSize(34.0f, 88.0f);
+	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadiusCm, CapsuleHalfHeightCm);
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(GetCapsuleComponent());
@@ -76,6 +79,11 @@ AEIHeroCharacter::AEIHeroCharacter(const FObjectInitializer& ObjectInitializer)
 
 	ViewModel = CreateDefaultSubobject<UEIViewModelComponent>(TEXT("ViewModel"));
 	ViewModel->SetupAttachment(Camera);
+
+	// The body stands on the ground, so it starts at the bottom of the capsule.
+	Body = CreateDefaultSubobject<UEIHeroBodyComponent>(TEXT("Body"));
+	Body->SetupAttachment(GetCapsuleComponent());
+	Body->SetRelativeLocation(FVector(0.0f, 0.0f, -CapsuleHalfHeightCm));
 
 	Health = CreateDefaultSubobject<UEIHealthComponent>(TEXT("Health"));
 	Sword = CreateDefaultSubobject<UEISwordComponent>(TEXT("Sword"));
@@ -110,6 +118,7 @@ void AEIHeroCharacter::BeginPlay()
 	LoadClassValues();
 	Gear->Recalculate();
 	Caster->RefillMana();
+	Body->Refresh();
 	if (HasAuthority())
 	{
 		Health->Reset(ClassValues.Life + Gear->GetStat(EEIStat::Life));
@@ -189,10 +198,30 @@ void AEIHeroCharacter::ApplyClassToView()
 
 void AEIHeroCharacter::ApplyWeaponToView()
 {
+	const bool bStaff = HeroClass == EEIHeroClass::Arcanist;
 	if (GetViewModel() != nullptr)
 	{
 		const FEIWeaponForm* Form = Gear->GetWeaponForm();
 		GetViewModel()->SetWeaponLook(Form != nullptr ? Form->LengthFactor : 1.0f, EIElementColor(Gear->GetWeaponElement()));
+		GetViewModel()->SetModels(TEXT("hand.") + EIHeroClassLookName(HeroClass), EIWeaponLookKeys(Gear, bStaff), bStaff);
+	}
+	Body->Refresh();
+}
+
+void AEIHeroCharacter::ShowLookEvent(FName Event)
+{
+	if (HasAuthority())
+	{
+		MulticastLookEvent(Event);
+	}
+}
+
+void AEIHeroCharacter::MulticastLookEvent_Implementation(FName Event)
+{
+	Body->PlayEvent(Event);
+	if (GetViewModel() != nullptr)
+	{
+		GetViewModel()->PlayLookEvent(Event);
 	}
 }
 
@@ -260,9 +289,10 @@ void AEIHeroCharacter::MulticastDied_Implementation()
 	Caster->Deactivate();
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
-	// No model yet, so the view simply drops to the floor and the hand is gone.
+	// The view simply drops to the floor and the hand is gone, while the others see the body fall.
 	Camera->SetRelativeLocation(FVector(0.0f, 0.0f, EyeHeightCm - DeadEyeDropCm));
 	ViewModel->SetVisibility(false, true);
+	Body->ShowDeath();
 }
 
 void AEIHeroCharacter::ClientHurt_Implementation(FVector_NetQuantize From, const FString& What, float Amount)
@@ -359,6 +389,10 @@ float AEIHeroCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Damag
 		// A thrown bone tells of whoever threw it, so the screen points there.
 		const AActor* Source = DamageCauser != nullptr && DamageCauser->GetInstigator() != nullptr ? DamageCauser->GetInstigator() : DamageCauser;
 		ClientHurt(Source != nullptr ? Source->GetActorLocation() : GetActorLocation(), AEIEnemy::DescribeAttackOf(DamageCauser), Applied);
+		if (!IsDead())
+		{
+			ShowLookEvent(TEXT("treffer"));
+		}
 	}
 	return Applied;
 }

@@ -1,6 +1,7 @@
 #include "EIAltar.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
@@ -33,6 +34,9 @@ AEIAltar::AEIAltar()
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
 
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Root);
+
 	Stone = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Stone"));
 	Stone->SetupAttachment(Root);
 	Stone->SetStaticMesh(Cube.Object);
@@ -59,6 +63,7 @@ void AEIAltar::BeginPlay()
 {
 	Super::BeginPlay();
 
+	Look->Setup({TEXT("ort.altar")}, {Stone}, {Crystal});
 	EIVisuals::SetColor(Stone, StoneColor);
 	CrystalMaterial = EIVisuals::SetColor(Crystal, DormantColor);
 	OnRep_State();
@@ -89,6 +94,7 @@ void AEIAltar::OnRep_State()
 {
 	const bool bActive = State == EEIAltarState::Active;
 	ZoneDisc->SetVisibility(bActive);
+	Look->ShowActive(bActive);
 	if (bActive)
 	{
 		EIVisuals::SetGlow(ZoneDisc, JobColor, ZoneStrength);

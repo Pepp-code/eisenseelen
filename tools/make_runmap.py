@@ -48,6 +48,8 @@ CHEST_CLEAR_CHEST_M = 35
 # A new volume's brush is a cube of this size. Paths are only needed near the floor.
 VOLUME_BRUSH_M = 2
 NAVIGATION_HEIGHT_M = 12
+# Everything the script builds carries this tag. A rebuild removes only these, so art placed by hand stays.
+GENERATED_TAG = "EI_Generiert"
 
 
 def spawn(actors, actor_class, location=(0, 0, 0), rotation=(0, 0, 0), label=""):
@@ -55,7 +57,16 @@ def spawn(actors, actor_class, location=(0, 0, 0), rotation=(0, 0, 0), label="")
     if actor is None:
         raise RuntimeError(f"could not spawn {actor_class}")
     actor.set_actor_label(label or actor_class.__name__)
+    actor.set_editor_property("tags", [unreal.Name(GENERATED_TAG)])
     return actor
+
+
+def clear_generated(actors):
+    """Removes what this script built last time. Things placed by hand stay, unless the map is from before the tag."""
+    level_actors = actors.get_all_level_actors()
+    tagged = [actor for actor in level_actors if actor.actor_has_tag(GENERATED_TAG)]
+    for actor in tagged or level_actors:
+        actors.destroy_actor(actor)
 
 
 def add_box(actors, label, center_m, size_m, rotation=(0, 0, 0)):
@@ -181,8 +192,7 @@ def main():
     if os.path.exists(map_file):
         if not levels.load_level(MAP_PATH):
             raise RuntimeError(f"could not load {MAP_PATH}")
-        for actor in actors.get_all_level_actors():
-            actors.destroy_actor(actor)
+        clear_generated(actors)
     elif not levels.new_level(MAP_PATH):
         raise RuntimeError(f"could not create {MAP_PATH}")
 

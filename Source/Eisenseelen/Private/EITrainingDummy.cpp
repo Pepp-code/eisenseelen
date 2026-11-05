@@ -3,6 +3,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "Engine/CollisionProfile.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -48,6 +49,10 @@ AEITrainingDummy::AEITrainingDummy()
 	Head->SetRelativeLocation(FVector(0.0f, 0.0f, 68.0f));
 	Head->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Capsule);
+	Look->SetRelativeLocation(FVector(0.0f, 0.0f, -HalfHeightCm));
+
 	DamageText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("DamageText"));
 	DamageText->SetupAttachment(Capsule);
 	DamageText->SetRelativeLocation(FVector(0.0f, 0.0f, 120.0f));
@@ -63,6 +68,7 @@ void AEITrainingDummy::BeginPlay()
 	Super::BeginPlay();
 	BodyMaterial = EIVisuals::SetColor(Body, DummyColor);
 	EIVisuals::SetColor(Head, DummyColor);
+	Look->Setup({TEXT("ort.trainingspuppe")}, {Body, Head});
 }
 
 void AEITrainingDummy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -96,6 +102,7 @@ void AEITrainingDummy::ShowHit()
 {
 	DamageText->SetText(FText::AsNumber(FMath::RoundToInt(LastDamage)));
 	FlashRemaining = FlashSeconds;
+	Look->PlayEvent(TEXT("treffer"));
 }
 
 void AEITrainingDummy::Tick(float DeltaSeconds)
@@ -111,4 +118,10 @@ void AEITrainingDummy::Tick(float DeltaSeconds)
 	}
 	Body->SetRelativeRotation(FRotator(Flash * WobbleDegrees, 0.0f, 0.0f));
 	Head->SetRelativeRotation(FRotator(Flash * WobbleDegrees, 0.0f, 0.0f));
+	if (Look->HasModel())
+	{
+		// A model without its own hit animation wobbles from its feet like the blocks.
+		Look->SetRelativeRotation(FRotator(Look->HasAnimation(TEXT("treffer")) ? 0.0f : Flash * WobbleDegrees, 0.0f, 0.0f));
+		Look->SetStatus(FlashColor, Flash);
+	}
 }

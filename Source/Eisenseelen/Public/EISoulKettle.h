@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "EISoulKettle.generated.h"
 
+class UEILookComponent;
 class UStaticMeshComponent;
 
 /**
@@ -72,6 +73,14 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Headstone;
+
+	/** The model from Data/aussehen.json over the blocks, if there is one. Collision stays with the blocks. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
+
+	/** The model of the grave (ort.grab) over slab and headstone. It lies where the boss sleeps. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> GraveLook;
 
 	UPROPERTY(Replicated)
 	FVector GraveLocation = FVector::ZeroVector;

@@ -3,6 +3,7 @@
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EIDataFile.h"
+#include "EILookComponent.h"
 #include "EIVisuals.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
@@ -35,6 +36,9 @@ AEISignalFire::AEISignalFire()
 
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
+
+	Look = CreateDefaultSubobject<UEILookComponent>(TEXT("Look"));
+	Look->SetupAttachment(Root);
 
 	Pillar = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Pillar"));
 	Pillar->SetupAttachment(Root);
@@ -78,6 +82,7 @@ void AEISignalFire::BeginPlay()
 	{
 		FEIDataFile::ReportError(TEXT("lauf.json"), Error);
 	}
+	Look->Setup({TEXT("ort.signalfeuer")}, {Pillar}, {Fire});
 	EIVisuals::SetColor(Pillar, PillarColor);
 	FireMaterial = EIVisuals::SetColor(Fire, ColdFireColor);
 	EIVisuals::SetGlow(ZoneDisc, ZoneColor, ZoneStrength);
@@ -112,6 +117,7 @@ void AEISignalFire::OnRep_Look()
 	SetActorEnableCollision(bInUse);
 	ZoneDisc->SetVisibility(bInUse && bLit);
 	Light->SetVisibility(bInUse && bLit);
+	Look->ShowActive(bInUse && bLit);
 	if (FireMaterial != nullptr)
 	{
 		FireMaterial->SetVectorParameterValue(TEXT("Farbe"), bLit ? BurningFireColor : ColdFireColor);

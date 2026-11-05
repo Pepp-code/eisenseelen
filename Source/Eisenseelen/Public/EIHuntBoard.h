@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "EIHuntBoard.generated.h"
 
+class UEILookComponent;
 class UStaticMeshComponent;
 
 /**
@@ -38,6 +39,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TArray<TObjectPtr<UStaticMeshComponent>> Sheets;
+
+	/** The model from Data/aussehen.json over the blocks, if there is one. Collision stays with the blocks. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
 
 	UPROPERTY(Replicated)
 	float ReachMeters = 4.0f;

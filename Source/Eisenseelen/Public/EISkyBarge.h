@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "EISkyBarge.generated.h"
 
+class UEILookComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 
@@ -62,6 +63,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Sail;
+
+	/** The model from Data/aussehen.json over the blocks, if there is one. Collision stays with the blocks. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
 
 	/** While it flies nobody collides with it, so it cannot land on anyone. */
 	UPROPERTY(ReplicatedUsing = OnRep_Flying)

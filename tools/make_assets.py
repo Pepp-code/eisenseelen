@@ -16,6 +16,8 @@ CHECKER_SHIFT_CELLS = 0.13
 CHECKER_LIGHT = 0.2
 CHECKER_DARK = 0.13
 CHECKER_ROUGHNESS = 0.85
+# The shimmer over a model is this strong in its middle and grows towards its edges, so the shape stays readable.
+OVERLAY_MIDDLE = 0.35
 
 library = unreal.MaterialEditingLibrary
 
@@ -120,6 +122,22 @@ def make_glow():
     graph.finish()
 
 
+def make_overlay():
+    """A colored shimmer laid over a whole 3D model, such as the red before a strike. Code sets Farbe and Staerke."""
+    graph = Graph("M_Ueberzug")
+    graph.material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    graph.material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    color = graph.color_parameter("Farbe", unreal.LinearColor(1.0, 0.1, 0.05, 1))
+    strength = graph.number_parameter("Staerke", 0.0)
+    edges = graph.node(
+        unreal.MaterialExpressionAdd,
+        ("A", graph.node(unreal.MaterialExpressionFresnel)),
+        ("B", graph.number(OVERLAY_MIDDLE)),
+    )
+    graph.output(graph.multiply(graph.multiply(color, strength), edges), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    graph.finish()
+
+
 def import_sounds():
     source_folder = os.path.join(unreal.Paths.project_dir(), "SourceAssets", "Audio")
     tasks = []
@@ -142,6 +160,7 @@ def main():
     make_checker()
     make_color()
     make_glow()
+    make_overlay()
     import_sounds()
     unreal.log("make_assets: done")
 

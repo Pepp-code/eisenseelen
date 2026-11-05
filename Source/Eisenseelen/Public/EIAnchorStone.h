@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "EIAnchorStone.generated.h"
 
+class UEILookComponent;
 class UStaticMeshComponent;
 
 /**
@@ -52,6 +53,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> ZoneDisc;
+
+	/** The model from Data/aussehen.json over the blocks, if there is one. Collision stays with the blocks. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
 
 	UPROPERTY(Replicated)
 	FVector ChainEnd = FVector::ZeroVector;

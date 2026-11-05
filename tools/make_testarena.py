@@ -23,6 +23,8 @@ LABEL_SIZE_CM = 90
 MARKER_HEIGHT_CM = 92
 TOWER_SIZE_M = 4
 TOWER_DISTANCE_M = 3.5
+# Everything the script builds carries this tag. A rebuild removes only these, so art placed by hand stays.
+GENERATED_TAG = "EI_Generiert"
 
 
 def spawn(actors, actor_class, location=(0, 0, 0), rotation=(0, 0, 0), label=""):
@@ -30,7 +32,16 @@ def spawn(actors, actor_class, location=(0, 0, 0), rotation=(0, 0, 0), label="")
     if actor is None:
         raise RuntimeError(f"could not spawn {actor_class}")
     actor.set_actor_label(label or actor_class.__name__)
+    actor.set_editor_property("tags", [unreal.Name(GENERATED_TAG)])
     return actor
+
+
+def clear_generated(actors):
+    """Removes what this script built last time. Things placed by hand stay, unless the map is from before the tag."""
+    level_actors = actors.get_all_level_actors()
+    tagged = [actor for actor in level_actors if actor.actor_has_tag(GENERATED_TAG)]
+    for actor in tagged or level_actors:
+        actors.destroy_actor(actor)
 
 
 def add_box(actors, label, center_m, size_m, rotation=(0, 0, 0)):
@@ -57,7 +68,7 @@ def add_course_marker(actors, kind, x_m, y_m, height_m, extra_tags=()):
     """Tells the test where a course starts and what to expect. Tag numbers are centimetres or degrees."""
     location = ((x_m - RUN_UP_M) * CM_PER_M, y_m * CM_PER_M, MARKER_HEIGHT_CM)
     marker = spawn(actors, unreal.TargetPoint, location=location, label=f"Parcours {kind} {height_m}")
-    tags = ["Parcours", kind, f"Hoehe={round(height_m * CM_PER_M)}", f"Anlauf={RUN_UP_M * CM_PER_M}", *extra_tags]
+    tags = [GENERATED_TAG, "Parcours", kind, f"Hoehe={round(height_m * CM_PER_M)}", f"Anlauf={RUN_UP_M * CM_PER_M}", *extra_tags]
     marker.set_editor_property("tags", [unreal.Name(tag) for tag in tags])
 
 
@@ -131,8 +142,7 @@ def main():
     if os.path.exists(map_file):
         if not levels.load_level(MAP_PATH):
             raise RuntimeError(f"could not load {MAP_PATH}")
-        for actor in actors.get_all_level_actors():
-            actors.destroy_actor(actor)
+        clear_generated(actors)
     elif not levels.new_level(MAP_PATH):
         raise RuntimeError(f"could not create {MAP_PATH}")
 

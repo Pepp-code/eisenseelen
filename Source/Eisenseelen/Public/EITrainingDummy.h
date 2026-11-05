@@ -5,6 +5,7 @@
 #include "EITrainingDummy.generated.h"
 
 class UCapsuleComponent;
+class UEILookComponent;
 class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 class UTextRenderComponent;
@@ -43,6 +44,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Head;
+
+	/** The model from Data/aussehen.json over the blocks, if there is one. Collision stays with the blocks. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UEILookComponent> Look;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UTextRenderComponent> DamageText;
