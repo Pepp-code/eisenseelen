@@ -282,7 +282,7 @@ void UEIRuneComponent::HurtAround(const FVector& Location, float RadiusCm, float
 			continue;
 		}
 		Done.Add(Target);
-		UGameplayStatics::ApplyDamage(Target, Damage, Hero->GetController(), Hero, nullptr);
+		UGameplayStatics::ApplyDamage(Target, Damage, Hero->GetController(), Hero, UEISpellDamage::StaticClass());
 	}
 }
 
@@ -323,7 +323,7 @@ void UEIRuneComponent::SparksFly(AEIEnemy* Enemy)
 		AEIEnemy* Target = Nearby[Index];
 		MulticastBurst(Target->GetActorLocation(), SparkBurstRadiusCm, SparkColor);
 		Target->ApplyBurn(Table.SparkBurnPerSecond, Table.SparkBurnSeconds * Hero->GetGear()->GetStatusFactor());
-		UGameplayStatics::ApplyDamage(Target, Table.SparkDamage * Hero->GetGear()->GetReactionFactor(), Hero->GetController(), Hero, nullptr);
+		UGameplayStatics::ApplyDamage(Target, Table.SparkDamage * Hero->GetGear()->GetReactionFactor(), Hero->GetController(), Hero, UEISpellDamage::StaticClass());
 	}
 }
 

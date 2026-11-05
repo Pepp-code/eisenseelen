@@ -50,6 +50,21 @@ namespace
 		Enemy->FinishSpawning(Spawn);
 		return Enemy;
 	}
+
+	/** It stands there and does nothing, so that only what is tested hurts it. */
+	AEIEnemy* SpawnStill(const FEIPlayContext& Context, EEIEnemyKind Kind, const FVector& Location, float Life)
+	{
+		const FTransform Spawn((Context.Hero->GetActorLocation() - Location).GetSafeNormal2D().Rotation(), Location);
+		AEIEnemy* Enemy = Context.World->SpawnActorDeferred<AEIEnemy>(AEIEnemy::StaticClass(), Spawn);
+		Enemy->SetKind(Kind);
+		Enemy->FinishSpawning(Spawn);
+		FEIEnemyValues Still = Enemy->GetValues();
+		Still.SpeedMetersPerSecond = 0.0f;
+		Still.AttackFromMeters = 0.1f;
+		Enemy->ApplyValues(Still);
+		Enemy->GetHealth()->Reset(Life);
+		return Enemy;
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -171,6 +186,150 @@ bool FEIEnemyKindsTest::RunTest(const FString& Parameters)
 	}));
 	Steps.Add(WaitUntil(TEXT("the charge ends"), 4.0, [State](const FEIPlayContext& Context) { return !State->Enemy->IsStripMarked(); }));
 	Steps.Add(Do([State](const FEIPlayContext& Context) { State->Enemy->Destroy(); }));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIEnemyRolesTest,
+	"Eisenseelen.Play.Enemy.Roles",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIEnemyRolesTest::RunTest(const FString& Parameters)
+{
+	struct FState
+	{
+		TWeakObjectPtr<AEIEnemy> Enemy;
+		TWeakObjectPtr<AEIEnemy> Neighbour;
+		float Life = 0.0f;
+		float Damage = 0.0f;
+		float EnemyDamage = 0.0f;
+		double Distance = 0.0;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+	constexpr float Hit = 100.0f;
+	constexpr float NeighbourLife = 1000.0f;
+	const auto IsTelegraphing = [State](const FEIPlayContext& Context) { return State->Enemy.IsValid() && State->Enemy->IsTelegraphing(); };
+	const auto IsNotTelegraphing = [State](const FEIPlayContext& Context) { return State->Enemy.IsValid() && !State->Enemy->IsTelegraphing(); };
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, 0.0f); }));
+	Steps.Add(Wait(0.2));
+
+	// The ember skull marks a circle around itself and bursts. Whoever is still inside gets hurt, its own kind too.
+	Steps.Add(Do([State, NeighbourLife](const FEIPlayContext& Context)
+	{
+		const FVector Ahead = Context.Hero->GetActorLocation() + Context.Hero->GetActorForwardVector() * 180.0f;
+		AEIEnemy* Skull = SpawnKindAhead(Context, EEIEnemyKind::EmberSkull, 180.0f);
+		State->Enemy = Skull;
+		State->Damage = Skull->GetValues().Damage;
+		State->EnemyDamage = Skull->GetValues().ExplosionEnemyDamage;
+		State->Neighbour = SpawnStill(Context, EEIEnemyKind::Runner, Ahead + Context.Hero->GetActorRightVector() * 150.0f, NeighbourLife);
+		State->Life = Context.Hero->GetHealth()->GetHealth();
+	}));
+	Steps.Add(WaitUntil(TEXT("the ember skull lights its fuse"), 2.0, IsTelegraphing));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const AEIEnemy* Skull = State->Enemy.Get();
+		const FEIGroundMarkData& Mark = Skull->GetGroundMark();
+		Context.Test->TestTrue(TEXT("It marks a circle"), Mark.bVisible && Mark.Shape == EEIMarkShape::Circle);
+		Context.Test->TestEqual(TEXT("As big as its blast"), Mark.LengthCm, Skull->GetValues().HitZoneMeters * CentimetersPerMeter * 2.0f);
+		Context.Test->TestEqual(TEXT("While the fuse burns, nothing has happened yet"), Context.Hero->GetHealth()->GetHealth(), State->Life);
+	}));
+	Steps.Add(WaitUntil(TEXT("the ember skull bursts"), 3.0, [State](const FEIPlayContext& Context) { return !State->Enemy.IsValid() || State->Enemy->IsDead(); }));
+	Steps.Add(Do([State, NeighbourLife](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("The blast hurts the hero"), State->Life - Context.Hero->GetHealth()->GetHealth(), State->Damage);
+		Context.Test->TestTrue(TEXT("The screen says what it was"), Context.Hero->GetLastHitNote().Contains(TEXT("Glutsch\u00E4del: Explosion")));
+		Context.Test->TestEqual(TEXT("The blast hurts its own kind"), NeighbourLife - State->Neighbour->GetHealth()->GetHealth(), State->EnemyDamage);
+		State->Neighbour->Destroy();
+	}));
+	Steps.Add(Wait(0.3));
+
+	// Shot down before its fuse is out, it bursts too, but only its own kind gets hurt. Another skull in reach bursts along.
+	Steps.Add(Do([State, NeighbourLife](const FEIPlayContext& Context)
+	{
+		const FVector Ahead = Context.Hero->GetActorLocation() + Context.Hero->GetActorForwardVector() * 150.0f;
+		const FVector Right = Context.Hero->GetActorRightVector();
+		State->Life = Context.Hero->GetHealth()->GetHealth();
+		AEIEnemy* Skull = SpawnKindAhead(Context, EEIEnemyKind::EmberSkull, 150.0f);
+		AEIEnemy* Other = SpawnStill(Context, EEIEnemyKind::EmberSkull, Ahead - Right * 200.0f, 1.0f);
+		AEIEnemy* Neighbour = SpawnStill(Context, EEIEnemyKind::Runner, Ahead + Right * 150.0f, NeighbourLife);
+		Skull->TakeDamage(10000.0f, FDamageEvent(), Context.Hero->GetController(), Context.Hero);
+		Context.Test->TestTrue(TEXT("Shot down, it falls"), Skull->IsDead());
+		Context.Test->TestEqual(TEXT("Shot down, it still tears its own kind apart"), NeighbourLife - Neighbour->GetHealth()->GetHealth(), State->EnemyDamage);
+		Context.Test->TestTrue(TEXT("Another skull in reach bursts along"), Other->IsDead());
+		Context.Test->TestEqual(TEXT("Shot down, it spares the hero"), Context.Hero->GetHealth()->GetHealth(), State->Life);
+		Neighbour->Destroy();
+		Context.Hero->SetCanBeDamaged(false);
+	}));
+	Steps.Add(Wait(0.3));
+
+	// A spell goes around the shield. Right after its own blow the shield hangs low, and then everything goes through.
+	Steps.Add(Do([State, Hit](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Guard = SpawnKindAhead(Context, EEIEnemyKind::ShieldBearer, 170.0f);
+		State->Enemy = Guard;
+		FEIEnemyValues Rooted = Guard->GetValues();
+		Rooted.SpeedMetersPerSecond = 0.0f;
+		Guard->ApplyValues(Rooted);
+		Guard->GetHealth()->Reset(5000.0f);
+		float Before = Guard->GetHealth()->GetHealth();
+		Guard->TakeDamage(Hit, FDamageEvent(UEISpellDamage::StaticClass()), Context.Hero->GetController(), Context.Hero);
+		Context.Test->TestNearlyEqual(TEXT("A spell goes around the shield"), Before - Guard->GetHealth()->GetHealth(), Hit, 0.01f);
+		Before = Guard->GetHealth()->GetHealth();
+		Guard->TakeDamage(Hit, FDamageEvent(), Context.Hero->GetController(), Context.Hero);
+		Context.Test->TestNearlyEqual(TEXT("Before its blow the shield holds"), Before - Guard->GetHealth()->GetHealth(), Hit * Rooted.ShieldDamageFactor, 0.01f);
+		Context.Test->TestFalse(TEXT("Before its blow the shield is up"), Guard->IsShieldDown());
+	}));
+	Steps.Add(WaitUntil(TEXT("the shield bearer winds up"), 3.0, IsTelegraphing));
+	Steps.Add(WaitUntil(TEXT("the shield bearer strikes"), 3.0, IsNotTelegraphing));
+	Steps.Add(Do([State, Hit](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Guard = State->Enemy.Get();
+		const float Before = Guard->GetHealth()->GetHealth();
+		Guard->TakeDamage(Hit, FDamageEvent(), Context.Hero->GetController(), Context.Hero);
+		Context.Test->TestNearlyEqual(TEXT("Right after its blow the shield hangs low"), Before - Guard->GetHealth()->GetHealth(), Hit, 0.01f);
+	}));
+	Steps.Add(WaitUntil(TEXT("everyone sees the shield sink"), 1.0, [State](const FEIPlayContext& Context) { return State->Enemy->IsShieldDown(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->Enemy->Destroy(); }));
+	Steps.Add(Wait(0.1));
+
+	// After a throw the thrower steps back from a hero who came too close.
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->Enemy = SpawnKindAhead(Context, EEIEnemyKind::Thrower, 400.0f); }));
+	Steps.Add(WaitUntil(TEXT("the thrower winds up"), 3.0, IsTelegraphing));
+	Steps.Add(WaitUntil(TEXT("the thrower throws"), 3.0, IsNotTelegraphing));
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->Distance = FVector::Dist2D(State->Enemy->GetActorLocation(), Context.Hero->GetActorLocation()); }));
+	Steps.Add(Wait(0.8));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const double Now = FVector::Dist2D(State->Enemy->GetActorLocation(), Context.Hero->GetActorLocation());
+		Context.Test->AddInfo(FString::Printf(TEXT("The thrower stepped back from %.0f cm to %.0f cm"), State->Distance, Now));
+		Context.Test->TestTrue(TEXT("After the throw it steps back"), Now > State->Distance + 100.0);
+		State->Enemy->Destroy();
+	}));
+	Steps.Add(Wait(0.1));
+
+	// Once the colossus runs, neither a parry nor frost stops it.
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->Enemy = SpawnKindAhead(Context, EEIEnemyKind::Colossus, 1000.0f); }));
+	Steps.Add(WaitUntil(TEXT("the colossus marks its way"), 1.0, [State](const FEIPlayContext& Context) { return State->Enemy->IsStripMarked(); }));
+	Steps.Add(WaitUntil(TEXT("the charge begins"), 3.0, IsNotTelegraphing));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		AEIEnemy* Colossus = State->Enemy.Get();
+		Colossus->Stagger(2.0f);
+		Colossus->Freeze(2.0f);
+		Context.Test->TestFalse(TEXT("A parry does not stop the charge"), Colossus->IsStaggering());
+		Context.Test->TestFalse(TEXT("Frost does not stop the charge"), Colossus->IsFrozen());
+		Context.Test->TestTrue(TEXT("It keeps running"), Colossus->IsStripMarked());
+	}));
+	Steps.Add(WaitUntil(TEXT("the charge ends"), 4.0, [State](const FEIPlayContext& Context) { return !State->Enemy->IsStripMarked(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		State->Enemy->Freeze(2.0f);
+		Context.Test->TestTrue(TEXT("After the charge frost holds it again"), State->Enemy->IsFrozen());
+		State->Enemy->Destroy();
+		Context.Hero->SetCanBeDamaged(true);
+	}));
 	return RunInArena(this, MoveTemp(Steps));
 }
 

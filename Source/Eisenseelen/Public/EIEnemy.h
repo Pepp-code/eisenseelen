@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "EIGroundMark.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/DamageType.h"
 #include "EIEnemy.generated.h"
 
 class FJsonObject;
@@ -19,10 +20,11 @@ enum class EEIEnemyKind : uint8
 	Runner,
 	Thrower,
 	ShieldBearer,
-	Colossus
+	Colossus,
+	EmberSkull
 };
 
-constexpr int32 EIEnemyKindCount = 4;
+constexpr int32 EIEnemyKindCount = 5;
 
 /** What a spell is made of. Two elements on one target can react. */
 UENUM()
@@ -86,11 +88,21 @@ struct EISENSEELEN_API FEIEnemyValues
 	float ChargeDamage = 0.0f;
 	float ChargeRecoverSeconds = 0.0f;
 	float ChargePauseSeconds = 0.0f;
+	bool bExplodes = false;
+	float ExplosionEnemyDamage = 0.0f;
+	float RetreatBelowMeters = 0.0f;
 
 	static bool LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutValues, FString& OutError);
 
 	/** From a section with the keys of Data/gegner.json. OutValues only changes when all of it is valid. */
 	static bool ReadFrom(const FJsonObject& Section, FEIEnemyValues& OutValues, FString& OutError);
+};
+
+/** Damage from a spell or a blast. It comes from everywhere at once, so a shield does not hold it. */
+UCLASS()
+class EISENSEELEN_API UEISpellDamage : public UDamageType
+{
+	GENERATED_BODY()
 };
 
 /**
@@ -115,6 +127,9 @@ public:
 
 	bool IsTelegraphing() const { return bTelegraphing; }
 	bool IsStaggering() const { return bStaggering; }
+
+	/** A shield bearer lowers its shield for a moment after its blow. */
+	bool IsShieldDown() const { return bShieldDown; }
 
 	/** Server only. Callable for preview pictures. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
@@ -256,12 +271,17 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastDie();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastExplode(FVector_NetQuantize Location, float RadiusCm);
+
 	void Steer(AActor* Target, float DeltaSeconds);
 	void SteerStraight(const AActor* Target, float DeltaSeconds);
 	bool NoticesHero(float DeltaSeconds);
 	bool CanAttack(const AActor* Target) const;
 	void ThrowBone();
-	float ReduceByShield(float Amount, const AActor* DamageCauser);
+	float ReduceByShield(float Amount, const AActor* DamageCauser, bool bGoesAround);
+	void Explode(bool bByItself);
+	void BackAway(const AActor* Target);
 	void ShowHeldPart();
 	void UpdateStatus(float DeltaSeconds);
 	bool CanStartCharge(const AActor* Target) const;
@@ -313,6 +333,9 @@ private:
 	UPROPERTY(Replicated)
 	bool bFrozen = false;
 
+	UPROPERTY(Replicated)
+	bool bShieldDown = false;
+
 	UPROPERTY(ReplicatedUsing = OnRep_GroundMark)
 	FEIGroundMarkData GroundMark;
 
@@ -328,6 +351,7 @@ private:
 	const TCHAR* AttackName = TEXT("");
 	FLinearColor BaseColor = FLinearColor::Gray;
 	bool bNextHitBreaksShield = false;
+	bool bExploded = false;
 	float SlowRemaining = 0.0f;
 	float BurnRemaining = 0.0f;
 	float BurnPerSecond = 0.0f;
@@ -362,6 +386,8 @@ private:
 	float StrikeBlend = 0.0f;
 	float RecoilBlend = 0.0f;
 	float NoticeBlend = 0.0f;
+	float ShieldDownBlend = 0.0f;
+	float EmberPhase = 0.0f;
 };
 
 /** Bones flying apart when a runner dies. Purely for the eye, every machine spawns its own. */

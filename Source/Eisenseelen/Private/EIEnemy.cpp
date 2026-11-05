@@ -5,10 +5,12 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
+#include "Engine/DamageEvents.h"
 #include "EIDataFile.h"
 #include "EIGameMode.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
+#include "EIProjectile.h"
 #include "EIRunDirector.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
@@ -29,6 +31,12 @@ namespace
 	const FLinearColor ThrowerColor(0.2f, 0.22f, 0.34f);
 	const FLinearColor ShieldBearerColor(0.33f, 0.22f, 0.14f);
 	const FLinearColor ColossusColor(0.22f, 0.07f, 0.07f);
+	const FLinearColor EmberColor(0.95f, 0.32f, 0.04f);
+	const FLinearColor CharredColor(0.06f, 0.045f, 0.04f);
+	constexpr float EmberGlow = 1.4f;
+	constexpr float EmberPulseSpeed = 5.0f;
+	constexpr float EmberFusePulseSpeed = 26.0f;
+	constexpr float EmberHeadSize = 0.6f;
 	const FLinearColor ShieldColor(0.5f, 0.45f, 0.35f);
 	const FVector ShieldPlace(48.0f, 0.0f, 0.0f);
 	const FVector ShieldSize(0.12f, 0.95f, 1.5f);
@@ -102,6 +110,9 @@ namespace
 	const FVector ThrowFlingOffset(45.0f, -10.0f, 0.0f);
 	const FVector ShieldBashOffset(32.0f, 0.0f, 4.0f);
 	const FVector ShieldWindupOffset(-10.0f, 0.0f, 6.0f);
+	const FVector ShieldDownOffset(-4.0f, 0.0f, -42.0f);
+	constexpr float ShieldDownTiltDegrees = 55.0f;
+	constexpr float ShieldDownBlendPerSecond = 10.0f;
 }
 
 const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind)
@@ -114,6 +125,8 @@ const TCHAR* EIEnemyKindKey(EEIEnemyKind Kind)
 		return TEXT("schildtraeger");
 	case EEIEnemyKind::Colossus:
 		return TEXT("kettenkoloss");
+	case EEIEnemyKind::EmberSkull:
+		return TEXT("glutschaedel");
 	default:
 		return TEXT("knochenlaeufer");
 	}
@@ -210,6 +223,18 @@ bool FEIEnemyValues::ReadFrom(const FJsonObject& Section, FEIEnemyValues& OutVal
 	{
 		return false;
 	}
+	// Only a kind that blows itself up has this number.
+	Section.TryGetBoolField(TEXT("explodiert"), Loaded.bExplodes);
+	if (Loaded.bExplodes && !FEIDataFile::ReadNumber(Section, TEXT("explosion_schaden_gegner"), 0.0, 100000.0, Loaded.ExplosionEnemyDamage, OutError))
+	{
+		return false;
+	}
+	// Only a kind that keeps its distance has this number.
+	if (Section.HasField(TEXT("zurueckweichen_unter_m"))
+		&& !FEIDataFile::ReadNumber(Section, TEXT("zurueckweichen_unter_m"), 0.0, 100.0, Loaded.RetreatBelowMeters, OutError))
+	{
+		return false;
+	}
 	OutValues = Loaded;
 	return true;
 }
@@ -271,6 +296,10 @@ void AEIEnemy::BeginPlay()
 	BodyMaterial = EIVisuals::SetColor(Body, BaseColor);
 	HeadMaterial = EIVisuals::SetColor(Head, BaseColor);
 	ShowHeldPart();
+	if (Values.bExplodes)
+	{
+		Head->SetRelativeScale3D(FVector(EmberHeadSize));
+	}
 	SetActorScale3D(FVector(Values.Scale));
 	if (IsLeader())
 	{
@@ -386,6 +415,8 @@ FLinearColor AEIEnemy::PickBaseColor() const
 		return ShieldBearerColor;
 	case EEIEnemyKind::Colossus:
 		return ColossusColor;
+	case EEIEnemyKind::EmberSkull:
+		return CharredColor;
 	default:
 		return BoneColor;
 	}
@@ -491,13 +522,10 @@ EEIReaction AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds)
 
 void AEIEnemy::Freeze(float Seconds)
 {
-	if (IsDead() || IsUntouchable() || !CanBeFrozen())
+	// Once a charge runs, nothing stops it.
+	if (IsDead() || IsUntouchable() || !CanBeFrozen() || State == EState::Charging)
 	{
 		return;
-	}
-	if (State == EState::Charging)
-	{
-		EndCharge();
 	}
 	StopWalking();
 	State = EState::Frozen;
@@ -735,6 +763,7 @@ void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(AEIEnemy, bSlowed);
 	DOREPLIFETIME(AEIEnemy, bBurning);
 	DOREPLIFETIME(AEIEnemy, bFrozen);
+	DOREPLIFETIME(AEIEnemy, bShieldDown);
 	DOREPLIFETIME(AEIEnemy, GroundMark);
 	DOREPLIFETIME(AEIEnemy, LeaderScale);
 }
@@ -778,6 +807,7 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		return;
 	}
 	StateTime += DeltaSeconds;
+	bShieldDown = Values.ShieldDamageFactor < 1.0f && State == EState::Recover;
 	AActor* Target = FindNearestHero();
 	switch (State)
 	{
@@ -826,6 +856,10 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 		return;
 
 	case EState::Recover:
+		if (Target != nullptr)
+		{
+			BackAway(Target);
+		}
 		if (StateTime >= RecoverFor)
 		{
 			State = EState::Chase;
@@ -895,13 +929,9 @@ void AEIEnemy::TickServer(float DeltaSeconds)
 
 void AEIEnemy::Stagger(float Seconds)
 {
-	if (!HasAuthority() || IsDead() || bFrozen || IsUntouchable())
+	if (!HasAuthority() || IsDead() || bFrozen || IsUntouchable() || State == EState::Charging)
 	{
 		return;
-	}
-	if (State == EState::Charging)
-	{
-		EndCharge();
 	}
 	HideGroundMark();
 	StopWalking();
@@ -919,6 +949,15 @@ void AEIEnemy::StaggerFromHeavyHit(float Seconds)
 	if (Arriving > 0.0f)
 	{
 		Stagger(Arriving);
+	}
+}
+
+void AEIEnemy::BackAway(const AActor* Target)
+{
+	// Whoever throws from afar does not want a hero at its throat, so after a throw it steps back.
+	if (Values.RetreatBelowMeters > 0.0f && FVector::Dist2D(Target->GetActorLocation(), GetActorLocation()) < Values.RetreatBelowMeters * CentimetersPerMeter)
+	{
+		AddMovementInput((GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D());
 	}
 }
 
@@ -1023,11 +1062,13 @@ void AEIEnemy::ThrowBone()
 	}
 }
 
-float AEIEnemy::ReduceByShield(float Amount, const AActor* DamageCauser)
+float AEIEnemy::ReduceByShield(float Amount, const AActor* DamageCauser, bool bGoesAround)
 {
 	const bool bBroken = bNextHitBreaksShield;
 	bNextHitBreaksShield = false;
-	if (Values.ShieldDamageFactor >= 1.0f || bBroken || bStaggering || bFrozen || DamageCauser == nullptr || Amount <= 0.0f)
+	// Right after its own blow the shield hangs low for a moment.
+	const bool bLowered = State == EState::Recover;
+	if (Values.ShieldDamageFactor >= 1.0f || bBroken || bGoesAround || bLowered || bStaggering || bFrozen || DamageCauser == nullptr || Amount <= 0.0f)
 	{
 		return Amount;
 	}
@@ -1061,7 +1102,13 @@ void AEIEnemy::StartStrikeWindup(const AActor* Target)
 	StopWalking();
 	State = EState::Windup;
 	StateTime = 0.0f;
-	if (Values.bMarksStrike)
+	if (Values.bExplodes)
+	{
+		// The fuse burns, and the circle shows how far the blast will reach.
+		NameAttack(TEXT("Explosion"));
+		ShowGroundCircle(Values.HitZoneMeters * CentimetersPerMeter, Values.WindupSeconds);
+	}
+	else if (Values.bMarksStrike)
 	{
 		// What is marked stays as it is marked, so it looks at its target right away and does not turn any more.
 		SetActorRotation((Target->GetActorLocation() - GetActorLocation()).GetSafeNormal2D().Rotation());
@@ -1074,6 +1121,11 @@ void AEIEnemy::StartStrikeWindup(const AActor* Target)
 
 void AEIEnemy::Strike()
 {
+	if (Values.bExplodes)
+	{
+		Explode(true);
+		return;
+	}
 	MulticastStrike();
 	if (Values.ThrowSpeedMetersPerSecond > 0.0f)
 	{
@@ -1093,6 +1145,73 @@ void AEIEnemy::Strike()
 	}
 }
 
+void AEIEnemy::Explode(bool bByItself)
+{
+	if (bExploded)
+	{
+		return;
+	}
+	bExploded = true;
+	// What the floor showed is what the blast reaches. Shot down before that, it bursts where it stands.
+	FEIGroundMarkData Zone = GroundMark;
+	if (!Zone.bVisible || Zone.Shape != EEIMarkShape::Circle)
+	{
+		Zone.Shape = EEIMarkShape::Circle;
+		Zone.Location = GetFloorSpot();
+		Zone.LengthCm = Values.HitZoneMeters * CentimetersPerMeter * 2.0f;
+	}
+	HideGroundMark();
+	const FVector Center = GetActorLocation();
+	const auto Reaches = [this, &Zone, &Center](const AActor* Other)
+	{
+		if (!Zone.Contains(Other->GetActorLocation()) || !ReachesHeightOf(Other))
+		{
+			return false;
+		}
+		FCollisionQueryParams WallQuery(SCENE_QUERY_STAT(EIEnemyBlast), false, this);
+		WallQuery.AddIgnoredActor(Other);
+		return !GetWorld()->LineTraceTestByObjectType(Center, Other->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), WallQuery);
+	};
+
+	// First who is in reach, then the damage, because whatever falls from it may burst as well.
+	TArray<AEIHeroCharacter*> Heroes;
+	if (bByItself)
+	{
+		for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+		{
+			if (!It->IsDead() && Reaches(*It))
+			{
+				Heroes.Add(*It);
+			}
+		}
+	}
+	TArray<TWeakObjectPtr<AEIEnemy>> Enemies;
+	for (TActorIterator<AEIEnemy> It(GetWorld()); It; ++It)
+	{
+		if (*It != this && !It->IsDead() && Reaches(*It))
+		{
+			Enemies.Add(*It);
+		}
+	}
+	MulticastExplode(Center, Zone.LengthCm / 2.0f);
+	NameAttack(TEXT("Explosion"));
+	for (AEIHeroCharacter* Hero : Heroes)
+	{
+		UGameplayStatics::ApplyDamage(Hero, Values.Damage, GetController(), this, nullptr);
+	}
+	for (const TWeakObjectPtr<AEIEnemy>& Enemy : Enemies)
+	{
+		if (Enemy.IsValid())
+		{
+			UGameplayStatics::ApplyDamage(Enemy.Get(), Values.ExplosionEnemyDamage, GetController(), this, UEISpellDamage::StaticClass());
+		}
+	}
+	if (bByItself && !IsDead())
+	{
+		Health->ApplyDamage(Health->GetHealth());
+	}
+}
+
 float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	if (IsUntouchable())
@@ -1100,7 +1219,8 @@ float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, 
 		return 0.0f;
 	}
 	const float Incoming = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
-	const float Applied = Health->ApplyDamage(ReduceByShield(Incoming, DamageCauser));
+	const bool bSpell = DamageEvent.DamageTypeClass != nullptr && DamageEvent.DamageTypeClass->IsChildOf(UEISpellDamage::StaticClass());
+	const float Applied = Health->ApplyDamage(ReduceByShield(Incoming, DamageCauser, bSpell));
 	if (AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(DamageCauser); Hero != nullptr && Applied > 0.0f)
 	{
 		Hero->NoteCombat();
@@ -1118,6 +1238,11 @@ float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, 
 
 void AEIEnemy::HandleDied()
 {
+	// Shot down before its fuse is out, it still bursts, but then only its own kind gets hurt.
+	if (Values.bExplodes)
+	{
+		Explode(false);
+	}
 	HideGroundMark();
 	if (const AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
@@ -1177,6 +1302,17 @@ void AEIEnemy::MulticastDie_Implementation()
 	}
 }
 
+void AEIEnemy::MulticastExplode_Implementation(FVector_NetQuantize Location, float RadiusCm)
+{
+	EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), Location);
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
+	{
+		FX->Setup(RadiusCm, EmberColor);
+	}
+}
+
 void AEIEnemy::UpdateLook(float DeltaSeconds)
 {
 	if (BodyMaterial == nullptr || HeadMaterial == nullptr)
@@ -1191,11 +1327,19 @@ void AEIEnemy::UpdateLook(float DeltaSeconds)
 	const FLinearColor Calm = FMath::Lerp(FMath::Lerp(StatusColor, WarningColor, TelegraphBlend), StaggerColor, StaggerBlend);
 	const FLinearColor Color = FMath::Lerp(Calm, HurtColor, Hurt);
 	const float Glow = FMath::Max3(TelegraphBlend * WarningGlow, Hurt * HurtGlow, bFrozen ? FrozenGlow : (bBurning ? BurningGlow : 0.0f));
-	for (UMaterialInstanceDynamic* Material : { BodyMaterial.Get(), HeadMaterial.Get() })
+	FLinearColor HeadColor = Color;
+	float HeadGlow = Glow;
+	if (Values.bExplodes && !bFrozen)
 	{
-		Material->SetVectorParameterValue(TEXT("Farbe"), Color);
-		Material->SetScalarParameterValue(TEXT("Leuchten"), Glow);
+		// Its body is charred, only its head glows from within, and it flickers fast while the fuse burns.
+		EmberPhase = FMath::Fmod(EmberPhase + DeltaSeconds * (bTelegraphing ? EmberFusePulseSpeed : EmberPulseSpeed), UE_TWO_PI);
+		HeadColor = FMath::Lerp(EmberColor, HurtColor, Hurt);
+		HeadGlow = FMath::Max(Glow, EmberGlow) * (0.7f + 0.3f * FMath::Sin(EmberPhase));
 	}
+	BodyMaterial->SetVectorParameterValue(TEXT("Farbe"), Color);
+	BodyMaterial->SetScalarParameterValue(TEXT("Leuchten"), Glow);
+	HeadMaterial->SetVectorParameterValue(TEXT("Farbe"), HeadColor);
+	HeadMaterial->SetScalarParameterValue(TEXT("Leuchten"), HeadGlow);
 	UpdatePose(DeltaSeconds);
 }
 
@@ -1230,7 +1374,10 @@ void AEIEnemy::UpdatePose(float DeltaSeconds)
 
 	if (Values.ShieldDamageFactor < 1.0f)
 	{
-		Held->SetRelativeLocation(ShieldPlace + ShieldWindupOffset * TelegraphBlend + ShieldBashOffset * StrikeBlend + FVector(0.0f, 0.0f, Bob));
+		// After its blow it lets the shield sink, and that is the moment to strike.
+		ShieldDownBlend = FMath::FInterpConstantTo(ShieldDownBlend, bShieldDown ? 1.0f : 0.0f, DeltaSeconds, ShieldDownBlendPerSecond);
+		Held->SetRelativeLocation(ShieldPlace + ShieldWindupOffset * TelegraphBlend + ShieldBashOffset * StrikeBlend + ShieldDownOffset * ShieldDownBlend + FVector(0.0f, 0.0f, Bob));
+		Held->SetRelativeRotation(FRotator(-ShieldDownTiltDegrees * ShieldDownBlend, 0.0f, 0.0f));
 	}
 	else if (Values.ThrowSpeedMetersPerSecond > 0.0f)
 	{

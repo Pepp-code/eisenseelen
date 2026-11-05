@@ -152,7 +152,8 @@ void AEIProjectile::HitTarget(AActor* Target)
 	{
 		Hero->GetRunes()->HitWithElement(Enemy, Element);
 	}
-	UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Caster, nullptr);
+	// A big spell goes around a shield, a small bolt does not.
+	UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Caster, bBig ? UEISpellDamage::StaticClass() : nullptr);
 	if (Enemy != nullptr && SlowSeconds > 0.0f)
 	{
 		if (Enemy->IsSlowed() && FreezeSeconds > 0.0f)

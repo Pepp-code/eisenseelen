@@ -429,7 +429,7 @@ void UEICasterComponent::CastChain(const FVector& Target, float Damage)
 		{
 			Hero->GetRunes()->HitWithElement(Enemy, EEIElement::Lightning);
 		}
-		UGameplayStatics::ApplyDamage(Current, Damage * FMath::Max(0.0f, 1.0f - Spell.JumpFalloff * Jump), Hero->GetController(), Hero, nullptr);
+		UGameplayStatics::ApplyDamage(Current, Damage * FMath::Max(0.0f, 1.0f - Spell.JumpFalloff * Jump), Hero->GetController(), Hero, UEISpellDamage::StaticClass());
 		Current = Jump < FMath::RoundToInt(Spell.Jumps) ? FindNextChainTarget(Current->GetActorLocation(), Struck) : nullptr;
 	}
 	MulticastChain(Points);

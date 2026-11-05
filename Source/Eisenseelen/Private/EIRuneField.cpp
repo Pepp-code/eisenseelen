@@ -147,7 +147,7 @@ void AEIRuneField::Pulse()
 		{
 			Hero->GetRunes()->HitWithElement(Enemy, Element);
 		}
-		UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Hero, nullptr);
+		UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Hero, UEISpellDamage::StaticClass());
 		if (Enemy != nullptr)
 		{
 			if (FreezeSeconds > 0.0f)

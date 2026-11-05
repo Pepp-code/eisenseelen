@@ -14,17 +14,20 @@
 		{ "name": "Spähtrupp", "groesse": "klein", "knochenlaeufer": 2, "knochenwerfer": 1 },
 		{ "name": "Wurfpaar", "groesse": "klein", "knochenwerfer": 2 },
 		{ "name": "Einzelwache", "groesse": "klein", "schildtraeger": 1 },
+		{ "name": "Glutläufer", "groesse": "klein", "knochenlaeufer": 2, "glutschaedel": 1 },
 
 		{ "name": "Knochenrudel", "groesse": "mittel", "knochenlaeufer": 6 },
 		{ "name": "Wurftrupp", "groesse": "mittel", "knochenlaeufer": 2, "knochenwerfer": 2 },
 		{ "name": "Schildwache", "groesse": "mittel", "knochenlaeufer": 3, "schildtraeger": 1 },
 		{ "name": "Schützenreihe", "groesse": "mittel", "knochenlaeufer": 1, "knochenwerfer": 3 },
+		{ "name": "Feuerrotte", "groesse": "mittel", "knochenlaeufer": 3, "glutschaedel": 2 },
 
 		{ "name": "Knochenmeute", "groesse": "gross", "knochenlaeufer": 10 },
 		{ "name": "Sturmtrupp", "groesse": "gross", "knochenlaeufer": 3, "knochenwerfer": 2, "schildtraeger": 1 },
 		{ "name": "Schildwall", "groesse": "gross", "knochenwerfer": 2, "schildtraeger": 2 },
+		{ "name": "Brandhaufen", "groesse": "gross", "knochenlaeufer": 4, "knochenwerfer": 2, "glutschaedel": 3 },
 
 		{ "name": "Koloss mit Gefolge", "groesse": "elite", "knochenlaeufer": 4, "kettenkoloss": 1 },
-		{ "name": "Kriegshaufen", "groesse": "elite", "knochenlaeufer": 2, "knochenwerfer": 2, "schildtraeger": 1, "kettenkoloss": 1 }
+		{ "name": "Kriegshaufen", "groesse": "elite", "knochenlaeufer": 2, "knochenwerfer": 2, "schildtraeger": 1, "kettenkoloss": 1, "glutschaedel": 1 }
 	]
 }
