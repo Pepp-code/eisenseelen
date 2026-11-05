@@ -570,13 +570,32 @@ Zum Start eines Laufs stehen 14 kleine und 4 mittlere Gruppen in den Lagern.
 
 Es gibt eine Karte, die **Aschesteppe**: orange, verbrannte Dörfer, gefallene Riesen. Sie ist 300 × 300 m groß, das Gelände ist fest, der Inhalt zufällig.
 
-- **Gelände:** Höhendaten per Skript aus einer Entwurfsdatei, du beurteilst die Vorschau und sagst, was sich ändern soll.
+- **Gelände:** Höhendaten per Skript aus einer Entwurfsdatei, du beurteilst die Vorschau und sagst, was sich ändern soll. Gebaut am 5. November 2026, siehe unten.
 - **Orte:** 8 Plätze für größere Orte (Ruine, Lager, Friedhof). Jeder Lauf aktiviert 4–5 davon.
 - **Bossplätze, Ankunft und Signalfeuer:** je 3 bis 4 feste Orte, das Spiel wählt pro Lauf einen.
 - **Dichte:** Alle 20 Sekunden Laufweg etwas Lohnendes.
 - **Modifikatoren:** Nacht und Aschesturm. Sie kosten fast nichts, aber der Lauf fühlt sich anders an.
 
 Zwei weitere graue Gebiete sind eingeplant, siehe Reiter Items und Builds. Ein zweites fertig gestaltetes Biom ist erst etwas für die Zeit nach dem Ende des Plans.
+
+#### So entsteht die Welt
+
+**Entschieden am 5. November 2026:** Die Welt wächst in sechs Schritten. Jeder Schritt ist für sich spielbar, und jeder bereitet die echten Modelle vor, statt sie zu ersetzen.
+
+| Schritt | Was entsteht | Stand |
+|---|---|---|
+| W1 Gelände | Eine echte Landschaft statt des flachen Bodens: sanfte Wellen, Tafelberge mit Rampe, ein trockenes Flussbett und steile Hänge am Rand. Alle Spielorte bleiben eben auf Höhe 0. | gebaut |
+| W2 Orte mit Charakter | Jeder Ort bekommt eine Art: verbranntes Dorf, gefallener Riese, Friedhof, Turmruine, Knochenlager, Ritualplatz. Sie bestehen aus Bauteilen wie Hauswand, Zaun, Rippe oder Grabstein. Jedes Bauteil hat eine Zeile in `Data/aussehen.json`, ein Modell ersetzt dann jede Kopie. | als Nächstes |
+| W3 Orientierung | Wahrzeichen, die man von überall sieht, etwa ein Riesenschädel oder ein Turm, und Pfade zwischen den Orten. | geplant |
+| W4 Stimmung | Oranger Himmel, Dunst in der Ferne, dazu die Modifikatoren Nacht und Aschesturm. | geplant |
+| W5 Weitere Gebiete | Die zwei grauen Gebiete aus Schritt F, mit denselben Werkzeugen. | geplant |
+| W6 Kunst | Ein Landschaftsmaterial mit Schichten für Asche, Fels, Sand und Pfad, Pflanzen und Steine, die sich selbst verteilen, und Modelle für die Bauteile. | geplant |
+
+**Das Gelände (W1):** Die Form steht in `Data/gelaende.json`: wie hoch die Wellen sind, wo die Tafelberge stehen und wohin ihre Rampe zeigt, wo das Flussbett verläuft und wie weit es um jeden Spielort eben bleibt. `py -3.12 tools/gelaende.py` zeichnet eine Draufsicht nach `Saved/gelaende_draufsicht.png`, rot ist zu steil zum Gehen. Danach baut `pwsh tools/rebuild_content.ps1` die Karte neu. Der Boden hat bis W6 ein Ersatzmaterial: Steppenfarbe mit Metergitter, an steilen Hängen dunkler Fels.
+
+Tafelberge mit Rampe kann man zu Fuß erklimmen, die ohne Rampe sind Kulisse und Sichtschutz. Deckung und Truhen stehen nur auf ebenem Boden in Höhe der Ebene. Ein Test prüft bei jedem Lauf, dass jeder Spielort eben liegt und dass jede Truhe, jedes Lager und jeder Altar zu Fuß erreichbar ist.
+
+Wenn du die Landschaft später von Hand formst oder bemalst, sag es vorher: Der Neubau ersetzt sie sonst. Dann nimmt der Agent ihr die Markierung `EI_Generiert` ab, und das Skript lässt sie in Ruhe.
 
 ## 8. Technologiewahl von Grund auf
 

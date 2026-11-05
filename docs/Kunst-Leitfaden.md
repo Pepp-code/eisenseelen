@@ -83,6 +83,8 @@ Eine Figur mit Skelett kann auf zwei Arten Animationen bekommen.
 
 `tools/rebuild_content.ps1` baut die Karten aus `Data/testarena.json` und `Data/laufkarte.json` neu. Dabei ersetzt es nur, was es selbst gebaut hat. Diese Dinge tragen das Tag `EI_Generiert`. Was du selbst in eine Karte stellst, zum Beispiel Bäume, Felsen oder Licht, bleibt beim Neubau stehen. Kopiere also nie ein erzeugtes Ding, um es zu verschieben, denn die Kopie trägt das Tag mit und verschwindet beim nächsten Neubau.
 
+Der Boden der Laufkarte ist eine Landschaft namens „Gelaende“, ihre Form steht in `Data/gelaende.json`. Auch sie trägt das Tag und entsteht bei jedem Neubau neu. Ihr Material `M_Gelaende` ist ein Ersatz: Steppenfarbe mit Metergitter, an steilen Hängen Fels. Das echte Material mit Schichten für Asche, Fels, Sand und Pfad kommt in Schritt W6. Willst du die Landschaft von Hand formen oder bemalen, sag es vorher. Dann bekommt sie das Tag nicht mehr, und der Neubau lässt sie stehen.
+
 ## Die Reihenfolge
 
 1. **Modelle** über `Data/aussehen.json`. Das geht ab jetzt, Stück für Stück. Am meisten bringt zuerst ein Gegner, der Heldenkörper und eine Grundform jeder Waffe.

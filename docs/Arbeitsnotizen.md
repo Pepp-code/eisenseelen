@@ -72,6 +72,8 @@ Prüfe vor jedem Bauen und vor jeder Änderung in `Data/`, ob ein Editor läuft.
 - Ein gescheitertes `MoveToActor` hält die Figur auf der Stelle an. Prüfe zuerst, ob sie auf dem Wegenetz steht, und warte vor dem nächsten Versuch.
 - Bewegliche Dinge brauchen `SetCanEverAffectNavigation(false)`, sonst wird das Wegenetz ständig neu gebaut.
 - `RuntimeGeneration=Dynamic`: Die Wege entstehen beim Spielstart, auch unter `-nullrhi`, und das dauert einen Moment.
+- Ein gespeichertes `RecastNavMesh` in der Karte gewinnt beim Start: Es hatte nur die Wege um den Kartenmittelpunkt, weil der Volumen-Klotz beim Bau erst 2 m groß war. `make_runmap.py` löscht es deshalb vor dem Speichern, das Spiel baut die Wege dann selbst über die ganze Landschaft.
+- Altäre und Feuer sind fest. Ein Weg dorthin endet davor, also gilt „erreichbar“ ab 4 m Abstand.
 
 **Vorschaubilder**
 
@@ -87,6 +89,9 @@ Prüfe vor jedem Bauen und vor jeder Änderung in `Data/`, ob ein Editor läuft.
 - `save_current_level()` scheitert still, wenn die Datei schreibgeschützt ist. Prüfe den Rückgabewert.
 - `AndroidFileServer` ist abgeschaltet, weil es sonst bei jedem Lauf etwas in `DefaultEngine.ini` schreibt.
 - `tools/preview_run.py` und die Karten-Skripte laufen mit Python in Unreal, sie brauchen kein eigenes Python.
+- Die Landschaft baut `UEIWorldTools::BuildLandscape` in C++, denn Python kann keine Höhen importieren. In UE 5.8 sind Edit Layers immer an, die Meldung „Automatically enabling edit layers“ ist harmlos. Die Höhen rechnet `tools/gelaende.py` ohne Unreal, so zeigt die Draufsicht genau den Boden der Karte.
+- Ein Test, der etwas an eine feste Stelle setzt, muss die Bodenhöhe dort nehmen (`OnGround` in `EIRunTest.cpp`). Auf Höhe 0 steckt man sonst in einem Hügel, und das Spawnen scheitert still.
+- `unreal.log` aus einem Commandlet landet in `Saved/Logs/Eisenseelen.log`, nicht in der umgeleiteten Ausgabe.
 
 **Windows und die Kommandozeile**
 
@@ -106,3 +111,4 @@ Die Einzelheiten stehen im Plan. Hier steht der Weg dorthin, weil er erklärt, w
 
 - **5. November 2026, abends:** Das Level erhöht keine Werte mehr, die Attribute sind gestrichen, denn das passte nicht zum Prinzip. Jedes Level öffnet stattdessen neue Teile in der Schmiede, gekauft wird mit Gold. Qualitäten und Item-Funde von Gegnern sind mit der Schmiede weggefallen. Bewusst noch leer: Herzkristalle.
 - **5. November 2026, nachts:** Alles ist für echte 3D-Modelle vorbereitet. Die Klötze bleiben für Treffer und Wände zuständig, ein Modell aus `Data/aussehen.json` liegt nur darüber. Ein Modell ohne eigene Animationen zerfällt beim Tod wie bisher in Knochen. Runen haben keine Zeile, denn sie sieht man nur als Zauber. Effekte (Niagara) und Umgebung kommen danach.
+- **5. November 2026, spät:** Was man kauft, trägt man sofort. Die Welt wächst in den Schritten W1 bis W6 (Masterplan, „Die Karte“). W1 ist gebaut: echte Landschaft aus `Data/gelaende.json`, alle Spielorte eben auf Höhe 0, damit Aufgaben, Lager und Tests unverändert gelten.
