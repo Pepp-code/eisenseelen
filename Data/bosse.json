@@ -3,6 +3,12 @@
 	"erholung_anteil_pro_s": 0.05,
 	"leben_je_weiterem_spieler": 0.65,
 	"signalfeuer_mindestabstand_m": 100,
+	"jagdbriefe": 3,
+	"chance_worte": [
+		{ "ab": 0.3, "wort": "häufig" },
+		{ "ab": 0.1, "wort": "selten" },
+		{ "ab": 0, "wort": "sehr selten" }
+	],
 	"bosse": [
 		{
 			"name": "Der Gefesselte",
@@ -66,6 +72,67 @@
 					{ "name": "Glutkern", "chance": 0.4 },
 					{ "name": "Schwere Kette", "chance": 0.15 },
 					{ "name": "Herz des Gefesselten", "chance": 0.03 }
+				]
+			}
+		},
+		{
+			"name": "Der Seelenrufer",
+			"auftritt": "Der Seelenrufer steigt aus seinem Grab!",
+			"farbe": [0.35, 0.55, 0.6],
+			"bannbruch": {
+				"art": "kessel",
+				"name": "Seelenkessel",
+				"teil": "Kessel",
+				"anleitung": "Besiege Gegner im Kreis um den Kessel. Jede Seele füllt ihn.",
+				"anzahl": 25,
+				"zone_m": 12,
+				"abstand_m": 8
+			},
+			"werte": {
+				"leben": 3200,
+				"bedrohung": 0,
+				"tempo_m_pro_s": 3.5,
+				"schaden": 25,
+				"angriff_ab_abstand_m": 16,
+				"ausholen_s": 0.9,
+				"ausholen_folgen_s": 0.6,
+				"trefferzone_m": 1,
+				"trefferbreite_m": 1,
+				"erholung_s": 1.2,
+				"taumeln_faktor_schwerer_hieb_0_bis_1": 0,
+				"sicht_m": 40,
+				"alarm_umkreis_m": 0,
+				"aufgeben_m": 70,
+				"wach_mindestens_s": 12,
+				"groesse_faktor": 2.4,
+				"drehtempo_grad_pro_s": 360,
+				"schild_schaden_faktor_0_bis_1": 1,
+				"schild_winkel_grad": 120,
+				"wurf_tempo_m_pro_s": 24,
+				"zurueckweichen_unter_m": 7,
+				"erfahrung": 50,
+				"item_chance_0_bis_1": 0
+			},
+			"beschwoeren": {
+				"gruppe": "klein",
+				"alle_s": 18,
+				"ankuendigung_s": 1.5,
+				"schutz_hoechstens_s": 20,
+				"abstand_m": 6
+			},
+			"verschwinden": {
+				"alle_s": 14,
+				"ankuendigung_s": 1.2,
+				"weite_m": 20,
+				"mindestens_m": 10
+			},
+			"beute": {
+				"gold_von": 800,
+				"gold_bis": 1200,
+				"zutaten": [
+					{ "name": "Seelenasche", "chance": 0.4 },
+					{ "name": "Grabkerze", "chance": 0.15 },
+					{ "name": "Herz des Seelenrufers", "chance": 0.03 }
 				]
 			}
 		}

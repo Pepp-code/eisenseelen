@@ -10,11 +10,13 @@
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EIHuntBoard.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
+#include "EISoulKettle.h"
 #include "EISwordComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -85,6 +87,9 @@ namespace
 	constexpr float BoardHeroAheadDistance = 9.0f;
 	constexpr float BoardHeroAheadSize = 4.0f;
 	const FLinearColor BoardFloorColor(0.14f, 0.14f, 0.16f, 0.9f);
+	const FLinearColor WardBarColor(0.45f, 0.9f, 1.0f);
+	constexpr float HuntListWidth = 620.0f;
+	constexpr float HuntListLine = 26.0f;
 }
 
 void AEIHud::DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Color)
@@ -462,9 +467,9 @@ void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 	{
 		return;
 	}
-	// Close by, the bar says all of it, and the mark would lie on top of it.
+	// Close by, the bar says all of it, and the mark would lie on top of it. Whoever sleeps in a grave is found by its kettle.
 	const double FromBoss = FVector::Dist(Hero->GetActorLocation(), Boss->GetActorLocation());
-	if (!Boss->IsDead() && (Stage != EEIBossStage::Awake || FromBoss > BossMarkFromCm))
+	if (!Boss->IsDead() && !Boss->SleepsInGrave() && (Stage != EEIBossStage::Awake || FromBoss > BossMarkFromCm))
 	{
 		const FVector Mark = Boss->GetActorLocation() + FVector(0.0f, 0.0f, BossMarkAboveCm);
 		DrawWorldMark(Mark, FString::Printf(TEXT("%s %.0f m"), *Values->Name, FVector::Dist(Hero->GetActorLocation(), Boss->GetActorLocation()) / CentimetersPerMeter), BossMarkColor);
@@ -484,12 +489,24 @@ void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 				DrawLine(FString::Printf(TEXT("%s: noch %.0f s halten"), *Values->Bannbruch.PartName, It->GetHoldLeft()), CenterX - 150.0f, PromptY - 80.0f, AnchorMarkColor, 1.5f);
 			}
 		}
+		for (TActorIterator<AEISoulKettle> It(GetWorld()); It; ++It)
+		{
+			if (It->IsFull())
+			{
+				continue;
+			}
+			DrawWorldMark(It->GetMarkLocation(), FString::Printf(TEXT("%s %.0f m"), *Values->Bannbruch.PartName, FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), AnchorMarkColor);
+			if (It->IsInZone(Hero))
+			{
+				DrawLine(FString::Printf(TEXT("Seelen: %d von %d. Besiege Gegner im Kreis"), It->GetSouls(), It->GetCount()), CenterX - 230.0f, PromptY - 80.0f, AnchorMarkColor, 1.5f);
+			}
+		}
 		return;
 	}
 	DrawLine(FString::Printf(TEXT("Besiege: %s"), *Values->Name), Margin, LineY, RewardColor);
 	const UEIHealthComponent* Life = Boss->GetHealth();
-	DrawLine(Values->Name, CenterX - BossBarWidth / 2.0f, BossBarY - 24.0f, TextColor);
-	DrawBar(CenterX - BossBarWidth / 2.0f, BossBarY, BossBarWidth, BossBarHeight, Life->GetHealth() / FMath::Max(Life->GetMaxHealth(), 1.0f), BossLifeColor);
+	DrawLine(Boss->IsShielded() ? FString::Printf(TEXT("%s, gesch\u00FCtzt solange seine Diener leben"), *Values->Name) : Values->Name, CenterX - BossBarWidth / 2.0f, BossBarY - 24.0f, Boss->IsShielded() ? WardBarColor : TextColor);
+	DrawBar(CenterX - BossBarWidth / 2.0f, BossBarY, BossBarWidth, BossBarHeight, Life->GetHealth() / FMath::Max(Life->GetMaxHealth(), 1.0f), Boss->IsShielded() ? WardBarColor : BossLifeColor);
 }
 
 void AEIHud::DrawDock(const AEIHeroCharacter* Hero, const AEIGameState* State, float LineY, float PromptY)
@@ -514,19 +531,56 @@ void AEIHud::DrawDock(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 	{
 		DrawLine(FString::Printf(TEXT("An Bord: %d von %d"), Aboard, Heroes), Margin, LineY + 24.0f, RewardColor);
 	}
+	bool bPrompted = false;
 	for (TActorIterator<AEISkyBarge> It(GetWorld()); It; ++It)
 	{
 		if (Hero->IsAboard())
 		{
 			DrawLine(TEXT("F: Aussteigen"), CenterX - 70.0f, PromptY, TextColor, 1.5f);
+			bPrompted = true;
 		}
 		else if (It->IsInBoardingZone(Hero))
 		{
 			DrawLine(TEXT("F: Einsteigen"), CenterX - 70.0f, PromptY, TextColor, 1.5f);
+			bPrompted = true;
 		}
 		else
 		{
 			DrawWorldMark(It->GetActorLocation(), FString::Printf(TEXT("Barke %.0f m"), FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), BargeMarkColor);
+		}
+	}
+
+	// The hunt letter says where the run goes and who waits there, but never what it drops.
+	const TArray<FEIHuntLetter>& Letters = State->GetHuntLetters();
+	const FEIHuntLetter* Chosen = State->GetChosenHuntLetter();
+	if (Chosen == nullptr)
+	{
+		return;
+	}
+	DrawLine(FString::Printf(TEXT("Jagdbrief: %s \u2013 %s \u2013 Bannbruch: %s"), *Chosen->Area, *Chosen->Boss, *Chosen->Bannbruch), Margin, LineY + 48.0f, Chosen->Color);
+	for (TActorIterator<AEIHuntBoard> It(GetWorld()); It; ++It)
+	{
+		if (Hero->IsAboard() || !It->IsInReach(Hero))
+		{
+			if (!Hero->IsAboard())
+			{
+				DrawWorldMark(It->GetMarkLocation(), FString::Printf(TEXT("Jagdbrett %.0f m"), FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), RewardColor);
+			}
+			continue;
+		}
+		const float ListX = CenterX - HuntListWidth / 2.0f;
+		float ListY = PromptY - HuntListLine * (Letters.Num() + 2);
+		DrawRect(PanelColor, ListX - PanelPadding / 2.0f, ListY - PanelPadding / 2.0f, HuntListWidth + PanelPadding, HuntListLine * (Letters.Num() + 1) + PanelPadding / 2.0f);
+		DrawLine(TEXT("Jagdbriefe"), ListX, ListY, RewardColor);
+		for (int32 Index = 0; Index < Letters.Num(); ++Index)
+		{
+			ListY += HuntListLine;
+			const bool bChosen = Index == State->GetChosenLetter();
+			DrawLine(FString::Printf(TEXT("%s %s \u2013 %s \u2013 %s"), bChosen ? TEXT(">") : TEXT("  "), *Letters[Index].Area, *Letters[Index].Boss, *Letters[Index].Bannbruch), ListX, ListY, bChosen ? Letters[Index].Color : LostColor);
+		}
+		if (!bPrompted && !State->IsCastingOff() && Letters.Num() > 1)
+		{
+			DrawLine(TEXT("F: anderen Brief nehmen"), CenterX - 140.0f, PromptY, TextColor, 1.5f);
 		}
 	}
 }

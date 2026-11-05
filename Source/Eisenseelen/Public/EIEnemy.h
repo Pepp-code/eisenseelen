@@ -198,6 +198,7 @@ protected:
 
 	/** Server only. The floor shows where the next attack lands. */
 	void ShowGroundCircle(float RadiusCm, float FillSeconds);
+	void ShowGroundCircleAt(const FVector& Location, float RadiusCm, float FillSeconds);
 	void ShowGroundStrip(const FVector& Start, const FVector& Direction, float LengthCm, float WidthCm, float FillSeconds);
 	void HideGroundMark();
 

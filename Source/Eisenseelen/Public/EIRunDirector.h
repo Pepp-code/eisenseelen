@@ -13,8 +13,10 @@ class AEIChest;
 class AEIEnemy;
 class AEIEnemyCamp;
 class AEIHeroCharacter;
+class AEIHuntBoard;
 class AEISignalFire;
 class AEISkyBarge;
+class AEISoulKettle;
 enum class EEIRunPhase : uint8;
 
 /** The numbers of a run from Data/lauf.json. */
@@ -34,6 +36,7 @@ struct EISENSEELEN_API FEIRunValues
 	float SignalZoneMeters = 15.0f;
 	float BargeDistanceMeters = 12.0f;
 	float BargeDepartMetersPerSecond = 6.0f;
+	float HuntBoardReachMeters = 4.0f;
 	EEIEnemyKind LeaderKind = EEIEnemyKind::ShieldBearer;
 	float LeaderLifeFactor = 2.5f;
 	float LeaderDamageFactor = 1.5f;
@@ -76,11 +79,28 @@ public:
 	/** Which bosses there are. Tests may change it, and it counts from the next reset on. With an empty table a run has no boss. */
 	FEIBossTable& GetBossTable() { return BossTable; }
 	AEIBoss* GetBoss() const { return Boss; }
+
+	/** Which boss of the table waits in this run, or INDEX_NONE. */
+	int32 GetBossIndex() const { return BossIndex; }
 	const FVector& GetBossPlace() const { return BossPlace; }
 	const TArray<TObjectPtr<AEIAnchorStone>>& GetAnchors() const { return Anchors; }
+	AEISoulKettle* GetKettle() const { return Kettle; }
+	AEIHuntBoard* GetHuntBoard() const { return HuntBoard; }
 
-	/** Puts everything back to the dock, with new contracts. */
+	/** Puts everything back to the dock, with new contracts and new hunt letters. */
 	void ResetRun();
+
+	/** At the dock the team takes one of the hunt letters, and its boss waits in the run. False if it cannot be taken now. */
+	bool ChooseLetter(int32 Index);
+
+	/** At the dock: the next hunt letter, after the last one the first again. */
+	void ChooseNextLetter();
+
+	/** For tests and preview pictures: this boss comes, whatever letter hangs at the board. Between ResetRun and BeginRunNow. */
+	void ForceBoss(int32 NewBossIndex);
+
+	/** A boss calls a group to its side, beside all caps. Server only. */
+	TArray<AEIEnemy*> SummonGroup(const FString& Size, const FVector& Center, float RadiusCm);
 
 	/** A hero pressed the use key. */
 	void Interact(AEIHeroCharacter* Hero);
@@ -109,8 +129,14 @@ private:
 	void PrepareBoss();
 	void PrepareContracts();
 	void PrepareSignalFire();
+	void PrepareHuntBoard();
+	void SetBossIndex(int32 NewBossIndex);
 	void SpawnLeaders();
 	void SpawnBoss(int32 HeroCount);
+	void SpawnAnchors(const FVector& Ground, const FEIBannbruch& Bannbruch);
+	void SpawnKettle(const FVector& Ground, const FEIBannbruch& Bannbruch);
+	void FeedKettle(const AEIEnemy& Enemy);
+	int32 CountLivingHeroes() const;
 	void UpdateBannbruch(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
 	void BreakBossFree(int32 HeroCount);
 	void BossFell();
@@ -143,7 +169,18 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AEIAnchorStone>> Anchors;
 
+	UPROPERTY(Transient)
+	TObjectPtr<AEISoulKettle> Kettle;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AEIHuntBoard> HuntBoard;
+
 	FEIBossTable BossTable;
+	FString AreaName;
+	FVector DockCenter = FVector::ZeroVector;
+	FVector HuntBoardPlace = FVector::ZeroVector;
+	bool bHasDock = false;
+	bool bKettleHeld = false;
 	TArray<FVector> BossPlaces;
 	int32 BossIndex = INDEX_NONE;
 	FVector BossPlace = FVector::ZeroVector;

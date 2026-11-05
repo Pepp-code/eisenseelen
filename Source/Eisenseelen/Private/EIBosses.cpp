@@ -9,12 +9,20 @@ namespace
 	bool ReadBannbruch(const FJsonObject& Line, FEIBannbruch& Out, FString& OutError)
 	{
 		FString Kind;
-		if (!Line.TryGetStringField(TEXT("art"), Kind) || Kind != TEXT("ankersteine"))
+		Line.TryGetStringField(TEXT("art"), Kind);
+		if (Kind == TEXT("ankersteine"))
 		{
-			OutError = FString::Printf(TEXT("Den Bannbruch mit der Art %s gibt es nicht."), *Kind);
+			Out.Kind = EEIBannbruchKind::AnchorStones;
+		}
+		else if (Kind == TEXT("kessel"))
+		{
+			Out.Kind = EEIBannbruchKind::Kettle;
+		}
+		else
+		{
+			OutError = FString::Printf(TEXT("Den Bannbruch mit der Art %s gibt es nicht. Es gibt ankersteine und kessel."), *Kind);
 			return false;
 		}
-		Out.Kind = EEIBannbruchKind::AnchorStones;
 		if (!Line.TryGetStringField(TEXT("name"), Out.Name)
 			|| !Line.TryGetStringField(TEXT("teil"), Out.PartName)
 			|| !Line.TryGetStringField(TEXT("anleitung"), Out.Hint))
@@ -22,15 +30,58 @@ namespace
 			OutError = TEXT("Einem Bannbruch fehlt name, teil oder anleitung.");
 			return false;
 		}
+		const bool bKettle = Out.Kind == EEIBannbruchKind::Kettle;
 		float Count = 0.0f;
-		if (!FEIDataFile::ReadNumber(Line, TEXT("anzahl"), 1.0, 20.0, Count, OutError)
-			|| !FEIDataFile::ReadNumber(Line, TEXT("halten_s"), 0.1, 3600.0, Out.HoldSeconds, OutError)
+		if (!FEIDataFile::ReadNumber(Line, TEXT("anzahl"), 1.0, bKettle ? 500.0 : 20.0, Count, OutError)
+			|| (!bKettle && !FEIDataFile::ReadNumber(Line, TEXT("halten_s"), 0.1, 3600.0, Out.HoldSeconds, OutError))
 			|| !FEIDataFile::ReadNumber(Line, TEXT("zone_m"), 1.0, 100.0, Out.ZoneMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Line, TEXT("abstand_m"), 1.0, 200.0, Out.DistanceMeters, OutError))
 		{
 			return false;
 		}
 		Out.Count = FMath::RoundToInt32(Count);
+		return true;
+	}
+
+	bool ReadStomp(const FJsonObject& Line, FEIStomp& Out, FString& OutError)
+	{
+		Out.bHas = true;
+		return FEIDataFile::ReadNumber(Line, TEXT("radius_m"), 0.5, 100.0, Out.RadiusMeters, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("ab_abstand_m"), 0.0, 100.0, Out.FromMeters, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("ankuendigung_s"), 0.0, 20.0, Out.WindupSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("schaden"), 0.0, 100000.0, Out.Damage, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("pause_s"), 0.0, 600.0, Out.PauseSeconds, OutError);
+	}
+
+	bool ReadSummon(const FJsonObject& Line, FEISummon& Out, FString& OutError)
+	{
+		Out.bHas = true;
+		if (!Line.TryGetStringField(TEXT("gruppe"), Out.GroupSize) || Out.GroupSize.IsEmpty())
+		{
+			OutError = TEXT("Beim Beschwoeren fehlt die gruppe (klein, mittel, gross oder elite).");
+			return false;
+		}
+		return FEIDataFile::ReadNumber(Line, TEXT("alle_s"), 1.0, 600.0, Out.EverySeconds, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("ankuendigung_s"), 0.0, 20.0, Out.WindupSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("schutz_hoechstens_s"), 0.0, 600.0, Out.MaxShieldSeconds, OutError)
+			&& FEIDataFile::ReadNumber(Line, TEXT("abstand_m"), 1.0, 100.0, Out.DistanceMeters, OutError);
+	}
+
+	bool ReadVanish(const FJsonObject& Line, FEIVanish& Out, FString& OutError)
+	{
+		Out.bHas = true;
+		if (!FEIDataFile::ReadNumber(Line, TEXT("alle_s"), 1.0, 600.0, Out.EverySeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Line, TEXT("ankuendigung_s"), 0.0, 20.0, Out.WindupSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Line, TEXT("weite_m"), 1.0, 200.0, Out.RangeMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Line, TEXT("mindestens_m"), 0.0, 200.0, Out.MinMeters, OutError))
+		{
+			return false;
+		}
+		if (Out.MinMeters > Out.RangeMeters)
+		{
+			OutError = TEXT("Beim Verschwinden liegt mindestens_m ueber weite_m.");
+			return false;
+		}
 		return true;
 	}
 
@@ -45,14 +96,15 @@ namespace
 		const TSharedPtr<FJsonObject>* Bannbruch = nullptr;
 		const TSharedPtr<FJsonObject>* Fight = nullptr;
 		const TSharedPtr<FJsonObject>* Stomp = nullptr;
+		const TSharedPtr<FJsonObject>* Summon = nullptr;
+		const TSharedPtr<FJsonObject>* Vanish = nullptr;
 		const TSharedPtr<FJsonObject>* Loot = nullptr;
 		if (!Line.TryGetArrayField(TEXT("farbe"), Color) || Color->Num() != 3
 			|| !Line.TryGetObjectField(TEXT("bannbruch"), Bannbruch)
 			|| !Line.TryGetObjectField(TEXT("werte"), Fight)
-			|| !Line.TryGetObjectField(TEXT("stampfen"), Stomp)
 			|| !Line.TryGetObjectField(TEXT("beute"), Loot))
 		{
-			OutError = FString::Printf(TEXT("Dem Boss %s fehlt farbe, bannbruch, werte, stampfen oder beute."), *Out.Name);
+			OutError = FString::Printf(TEXT("Dem Boss %s fehlt farbe, bannbruch, werte oder beute."), *Out.Name);
 			return false;
 		}
 		double Parts[3] = {};
@@ -61,16 +113,20 @@ namespace
 			(*Color)[Index]->TryGetNumber(Parts[Index]);
 		}
 		Out.Color = FLinearColor(static_cast<float>(Parts[0]), static_cast<float>(Parts[1]), static_cast<float>(Parts[2]));
+		Out.Stomp.bHas = false;
+		// Stomping, calling and vanishing are each up to the boss.
 		if (!ReadBannbruch(**Bannbruch, Out.Bannbruch, OutError)
 			|| !FEIEnemyValues::ReadFrom(**Fight, Out.Fight, OutError)
-			|| !FEIDataFile::ReadNumber(**Stomp, TEXT("radius_m"), 0.5, 100.0, Out.Stomp.RadiusMeters, OutError)
-			|| !FEIDataFile::ReadNumber(**Stomp, TEXT("ab_abstand_m"), 0.0, 100.0, Out.Stomp.FromMeters, OutError)
-			|| !FEIDataFile::ReadNumber(**Stomp, TEXT("ankuendigung_s"), 0.0, 20.0, Out.Stomp.WindupSeconds, OutError)
-			|| !FEIDataFile::ReadNumber(**Stomp, TEXT("schaden"), 0.0, 100000.0, Out.Stomp.Damage, OutError)
-			|| !FEIDataFile::ReadNumber(**Stomp, TEXT("pause_s"), 0.0, 600.0, Out.Stomp.PauseSeconds, OutError)
+			|| (Line.TryGetObjectField(TEXT("stampfen"), Stomp) && !ReadStomp(**Stomp, Out.Stomp, OutError))
+			|| (Line.TryGetObjectField(TEXT("beschwoeren"), Summon) && !ReadSummon(**Summon, Out.Summon, OutError))
+			|| (Line.TryGetObjectField(TEXT("verschwinden"), Vanish) && !ReadVanish(**Vanish, Out.Vanish, OutError))
 			|| !FEIDataFile::ReadNumber(**Loot, TEXT("gold_von"), 0.0, 1000000.0, Out.GoldFrom, OutError)
 			|| !FEIDataFile::ReadNumber(**Loot, TEXT("gold_bis"), 0.0, 1000000.0, Out.GoldTo, OutError))
 		{
+			if (!OutError.StartsWith(TEXT("Beim Boss")) && !OutError.StartsWith(TEXT("Dem Boss")))
+			{
+				OutError = FString::Printf(TEXT("Beim Boss %s: %s"), *Out.Name, *OutError);
+			}
 			return false;
 		}
 		Out.Fight.Name = Out.Name;
@@ -113,6 +169,35 @@ namespace
 		{
 			return false;
 		}
+		float Letters = 0.0f;
+		if (!FEIDataFile::ReadNumber(Root, TEXT("jagdbriefe"), 1.0, 4.0, Letters, OutError))
+		{
+			return false;
+		}
+		Out.HuntLetters = FMath::RoundToInt32(Letters);
+		const TArray<TSharedPtr<FJsonValue>>* Words = nullptr;
+		if (!Root.TryGetArrayField(TEXT("chance_worte"), Words) || Words->IsEmpty())
+		{
+			OutError = TEXT("Die Liste chance_worte muss da sein und darf nicht leer sein.");
+			return false;
+		}
+		for (const TSharedPtr<FJsonValue>& WordLine : *Words)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			FEIChanceWord Word;
+			if (!WordLine->TryGetObject(Object)
+				|| !(*Object)->TryGetStringField(TEXT("wort"), Word.Word)
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("ab"), 0.0, 1.0, Word.From, OutError))
+			{
+				if (OutError.IsEmpty())
+				{
+					OutError = TEXT("Einem Eintrag in chance_worte fehlt das wort.");
+				}
+				return false;
+			}
+			Out.ChanceWords.Add(Word);
+		}
+		Out.ChanceWords.Sort([](const FEIChanceWord& A, const FEIChanceWord& B) { return A.From > B.From; });
 		const TArray<TSharedPtr<FJsonValue>>* Lines = nullptr;
 		if (!Root.TryGetArrayField(TEXT("bosse"), Lines) || Lines->IsEmpty())
 		{
@@ -149,6 +234,18 @@ TArray<FString> FEIBossValues::RollLoot() const
 		}
 	}
 	return Found;
+}
+
+FString FEIBossTable::DescribeChance(float Chance) const
+{
+	for (const FEIChanceWord& Word : ChanceWords)
+	{
+		if (Chance >= Word.From)
+		{
+			return Word.Word;
+		}
+	}
+	return ChanceWords.IsEmpty() ? FString() : ChanceWords.Last().Word;
 }
 
 bool FEIBossTable::LoadFromString(const FString& Json, FEIBossTable& OutTable, FString& OutError)

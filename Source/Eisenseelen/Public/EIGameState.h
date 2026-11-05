@@ -29,6 +29,29 @@ enum class EEIBossStage : uint8
 	Down
 };
 
+/** One hunt letter at the dock: where the run goes and which boss waits there. What it drops stays a secret. */
+USTRUCT()
+struct FEIHuntLetter
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FString Area;
+
+	UPROPERTY()
+	FString Boss;
+
+	UPROPERTY()
+	FString Bannbruch;
+
+	UPROPERTY()
+	FLinearColor Color = FLinearColor::Gray;
+
+	/** Which boss of Data/bosse.json, counted from 0. */
+	UPROPERTY()
+	int32 BossIndex = INDEX_NONE;
+};
+
 /** What every player needs to know about the session. */
 UCLASS()
 class EISENSEELEN_API AEIGameState : public AGameStateBase
@@ -62,6 +85,11 @@ public:
 	int32 GetBannbruchDone() const { return BannbruchDone; }
 	int32 GetBannbruchTotal() const { return BannbruchTotal; }
 
+	/** The letters at the dock and the one the team has taken. Empty for a run without a boss. */
+	const TArray<FEIHuntLetter>& GetHuntLetters() const { return HuntLetters; }
+	int32 GetChosenLetter() const { return ChosenLetter; }
+	const FEIHuntLetter* GetChosenHuntLetter() const { return HuntLetters.IsValidIndex(ChosenLetter) ? &HuntLetters[ChosenLetter] : nullptr; }
+
 	/** Whether the sky is red right now, because a task has called the enemies from all sides. */
 	bool IsBloodMoon() const { return bBloodMoon; }
 
@@ -77,6 +105,8 @@ public:
 	void SetCastingOff(bool bNewCastingOff) { bCastingOff = bNewCastingOff; }
 	void SetBossStage(EEIBossStage NewStage) { BossStage = NewStage; }
 	void SetBannbruchProgress(int32 Done, int32 Total);
+	void SetHuntLetters(const TArray<FEIHuntLetter>& NewLetters, int32 NewChosen);
+	void SetChosenLetter(int32 NewChosen);
 	void SetContracts(const TArray<FEIContract>& NewContracts);
 	TArray<FEIContract>& EditContracts() { return Contracts; }
 
@@ -89,6 +119,15 @@ public:
 private:
 	UFUNCTION()
 	void OnRep_BloodMoon();
+
+	UFUNCTION()
+	void OnRep_ChosenLetter();
+
+	UPROPERTY(Replicated)
+	TArray<FEIHuntLetter> HuntLetters;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ChosenLetter)
+	int32 ChosenLetter = INDEX_NONE;
 
 	UPROPERTY(Replicated)
 	bool bHordeActive = false;

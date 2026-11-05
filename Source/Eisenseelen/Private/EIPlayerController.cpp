@@ -7,6 +7,7 @@
 #include "EIHordeDirector.h"
 #include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
+#include "EISoulKettle.h"
 #include "Engine/DamageEvents.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -143,6 +144,41 @@ void AEIPlayerController::PreviewSkipBannbruch()
 	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
 		GameMode->GetRun()->SkipBannbruch();
+	}
+}
+
+void AEIPlayerController::PreviewChooseBoss(int32 BossIndex)
+{
+	AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>();
+	if (GameMode == nullptr)
+	{
+		return;
+	}
+	// The letter of that boss, if one hangs at the board, so that the screen says the same.
+	const TArray<FEIHuntLetter>& Letters = GetWorld()->GetGameState<AEIGameState>()->GetHuntLetters();
+	const int32 Letter = Letters.IndexOfByPredicate([BossIndex](const FEIHuntLetter& Each) { return Each.BossIndex == BossIndex; });
+	if (Letter == INDEX_NONE || !GameMode->GetRun()->ChooseLetter(Letter))
+	{
+		GameMode->GetRun()->ForceBoss(BossIndex);
+	}
+}
+
+void AEIPlayerController::PreviewKettleSouls(int32 Souls)
+{
+	AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>();
+	AEISoulKettle* Kettle = GameMode != nullptr ? GameMode->GetRun()->GetKettle() : nullptr;
+	if (Kettle != nullptr)
+	{
+		Kettle->SetSouls(FMath::Min(Souls, Kettle->GetCount() - 1));
+		GetWorld()->GetGameState<AEIGameState>()->SetBannbruchProgress(Kettle->GetSouls(), Kettle->GetCount());
+	}
+}
+
+void AEIPlayerController::PreviewHurryBoss()
+{
+	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>(); GameMode != nullptr && GameMode->GetRun()->GetBoss() != nullptr)
+	{
+		GameMode->GetRun()->GetBoss()->HurryMoves();
 	}
 }
 

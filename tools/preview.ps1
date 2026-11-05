@@ -2,12 +2,13 @@
 Startet das Spiel ohne sichtbares Fenster und nimmt Vorschaubilder auf.
 
     pwsh tools/preview.ps1              Waffen und Gegner in der Testarena
-    pwsh tools/preview.ps1 -Szene lauf  ein ganzer Lauf auf der Laufkarte
+    pwsh tools/preview.ps1 -Szene lauf  ein ganzer Lauf auf der Laufkarte, mit dem Gefesselten
+    pwsh tools/preview.ps1 -Szene seelenrufer  derselbe Lauf, mit dem Seelenrufer
 
 Die Bilder landen in Saved\Screenshots\WindowsEditor.
 #>
 param(
-	[ValidateSet('waffen', 'lauf')]
+	[ValidateSet('waffen', 'lauf', 'seelenrufer')]
 	[string]$Szene = 'waffen',
 	[int]$TimeoutSeconds = 420
 )
@@ -20,8 +21,10 @@ if (Test-Path $Shots) {
 	Remove-Item $Shots -Recurse -Force
 }
 
-$ScriptName = if ($Szene -eq 'lauf') { 'preview_run.py' } else { 'preview_shots.py' }
-$Map = if ($Szene -eq 'lauf') { '/Game/Maps/L_ErsterLauf' } else { '/Game/Maps/L_Testarena' }
+$OnRunMap = $Szene -ne 'waffen'
+$ScriptName = if ($OnRunMap) { 'preview_run.py' } else { 'preview_shots.py' }
+$Map = if ($OnRunMap) { '/Game/Maps/L_ErsterLauf' } else { '/Game/Maps/L_Testarena' }
+$env:EI_VORSCHAU_BOSS = if ($Szene -eq 'seelenrufer') { 'Der Seelenrufer' } else { 'Der Gefesselte' }
 $Script = (Join-Path $PSScriptRoot $ScriptName) -replace '\\', '/'
 $Arguments = @(
 	"`"$(Join-Path $Root 'Eisenseelen.uproject')`"", $Map, '-game', '-RenderOffscreen', '-ResX=1600', '-ResY=900',

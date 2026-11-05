@@ -64,7 +64,7 @@ namespace
 	void SwitchOffReinforcements(const FEIPlayContext& Context)
 	{
 		FEIEnemyGroups& Groups = GetGameMode(Context)->GetRun()->GetGroups();
-		for (FEIWaveRule* Wave : { &Groups.AltarWave, &Groups.StoneWave, &Groups.FightWave, &Groups.PursuitWave, &Groups.FireWave })
+		for (FEIWaveRule* Wave : { &Groups.AltarWave, &Groups.StoneWave, &Groups.KettleWave, &Groups.FightWave, &Groups.PursuitWave, &Groups.FireWave })
 		{
 			Wave->Size.Empty();
 		}

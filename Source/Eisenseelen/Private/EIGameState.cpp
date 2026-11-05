@@ -29,6 +29,8 @@ void AEIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIGameState, BannbruchTotal);
 	DOREPLIFETIME(AEIGameState, Contracts);
 	DOREPLIFETIME(AEIGameState, bBloodMoon);
+	DOREPLIFETIME(AEIGameState, HuntLetters);
+	DOREPLIFETIME(AEIGameState, ChosenLetter);
 }
 
 float AEIGameState::GetRunSeconds() const
@@ -92,6 +94,26 @@ void AEIGameState::SetBannbruchProgress(int32 Done, int32 Total)
 {
 	BannbruchDone = Done;
 	BannbruchTotal = Total;
+}
+
+void AEIGameState::SetHuntLetters(const TArray<FEIHuntLetter>& NewLetters, int32 NewChosen)
+{
+	HuntLetters = NewLetters;
+	ChosenLetter = NewChosen;
+}
+
+void AEIGameState::SetChosenLetter(int32 NewChosen)
+{
+	if (ChosenLetter != NewChosen)
+	{
+		ChosenLetter = NewChosen;
+		OnRep_ChosenLetter();
+	}
+}
+
+void AEIGameState::OnRep_ChosenLetter()
+{
+	EIVisuals::PlaySound2D(this, TEXT("Blocken"));
 }
 
 void AEIGameState::SetBloodMoon(bool bNewBloodMoon)

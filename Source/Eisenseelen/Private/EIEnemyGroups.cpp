@@ -57,6 +57,7 @@ namespace
 			|| !FEIDataFile::ReadNumber(Root, TEXT("blutmond_nachlauf_s"), 0.0, 600.0, Out.BloodMoonLingerSeconds, OutError)
 			|| !ReadWave(**Waves, TEXT("altar"), Out.AltarWave, OutError)
 			|| !ReadWave(**Waves, TEXT("ankerstein"), Out.StoneWave, OutError)
+			|| !ReadWave(**Waves, TEXT("kessel"), Out.KettleWave, OutError)
 			|| !ReadWave(**Waves, TEXT("bosskampf"), Out.FightWave, OutError)
 			|| !ReadWave(**Waves, TEXT("flucht"), Out.PursuitWave, OutError)
 			|| !ReadWave(**Waves, TEXT("signalfeuer"), Out.FireWave, OutError))

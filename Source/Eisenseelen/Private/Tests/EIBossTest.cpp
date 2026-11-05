@@ -9,10 +9,12 @@
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHordeDirector.h"
+#include "EIHuntBoard.h"
 #include "EIProfileComponent.h"
 #include "EIRunDirector.h"
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
+#include "EISoulKettle.h"
 #include "EITestScript.h"
 #include "Engine/DamageEvents.h"
 #include "EngineUtils.h"
@@ -47,8 +49,8 @@ namespace
 		Teleport(Context, FVector(Location.X + DistanceCm, Location.Y, HeroHeight), 180.0f);
 	}
 
-	/** A run with nothing but the boss, with short holds. It only works at the dock. */
-	void PrepareBossRun(const FEIPlayContext& Context)
+	/** A run with nothing but the boss, with short holds. It only works at the dock. Without a boss index the first of the file comes. */
+	void PrepareBossRun(const FEIPlayContext& Context, int32 BossIndex = 0)
 	{
 		UEIRunDirector* Run = GetRun(Context);
 		FEIRunValues Values = Run->GetValues();
@@ -65,6 +67,7 @@ namespace
 			Boss.Bannbruch.HoldSeconds = ShortHoldSeconds;
 		}
 		Run->ResetRun();
+		Run->ForceBoss(BossIndex);
 	}
 
 	FEIPlayStep WaitForPaths()
@@ -123,6 +126,7 @@ bool FEIBossDataTest::RunTest(const FString& Parameters)
 		TEXT("\"taumeln_faktor_schwerer_hieb_0_bis_1\": 0, \"sicht_m\": 1, \"alarm_umkreis_m\": 0, \"aufgeben_m\": 1, \"wach_mindestens_s\": 1, \"groesse_faktor\": 2, \"drehtempo_grad_pro_s\": 1, ")
 		TEXT("\"schild_schaden_faktor_0_bis_1\": 1, \"schild_winkel_grad\": 1, \"wurf_tempo_m_pro_s\": 0, \"erfahrung\": 7, \"item_chance_0_bis_1\": 0}");
 	const FString Valid = FString(TEXT("{\"platz_leine_m\": 32, \"erholung_anteil_pro_s\": 0.1, \"leben_je_weiterem_spieler\": 0.5, \"kampf_welle_alle_s\": 20, \"verfolgung_welle_alle_s\": 12, \"signalfeuer_mindestabstand_m\": 100, ")
+		TEXT("\"jagdbriefe\": 2, \"chance_worte\": [{\"ab\": 0, \"wort\": \"kaum\"}, {\"ab\": 0.3, \"wort\": \"oft\"}], ")
 		TEXT("\"bosse\": [{\"name\": \"Probe\", \"auftritt\": \"Los!\", \"farbe\": [1, 0, 0], ")
 		TEXT("\"bannbruch\": {\"art\": \"ankersteine\", \"name\": \"Steine\", \"teil\": \"Stein\", \"anleitung\": \"Halten\", \"anzahl\": 2, \"halten_s\": 5, \"zone_m\": 3, \"abstand_m\": 9}, \"werte\": ")) + Fight +
 		TEXT(", \"stampfen\": {\"radius_m\": 4, \"ab_abstand_m\": 3, \"ankuendigung_s\": 1, \"schaden\": 2, \"pause_s\": 6}, ")
@@ -139,7 +143,40 @@ bool FEIBossDataTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("It has its numbers for the fight"), Boss.Fight.Experience, 7.0f);
 	TestEqual(TEXT("It has its stones"), Boss.Bannbruch.Count, 2);
 	TestEqual(TEXT("It has its stomp"), Boss.Stomp.RadiusMeters, 4.0f);
+	TestTrue(TEXT("It stomps"), Boss.Stomp.bHas);
+	TestFalse(TEXT("It calls nobody"), Boss.Summon.bHas);
+	TestFalse(TEXT("It does not vanish"), Boss.Vanish.bHas);
 	TestEqual(TEXT("The leash counts"), Small.LeashMeters, 32.0f);
+	TestEqual(TEXT("So many letters hang at the board"), Small.HuntLetters, 2);
+	TestEqual(TEXT("A good chance has its word"), Small.DescribeChance(0.4f), FString(TEXT("oft")));
+	TestEqual(TEXT("The border counts to the upper word"), Small.DescribeChance(0.3f), FString(TEXT("oft")));
+	TestEqual(TEXT("A small chance has its word"), Small.DescribeChance(0.03f), FString(TEXT("kaum")));
+
+	// A boss in a grave: a kettle instead of stones, no stomp, but it calls its group and vanishes.
+	const FString Kettle = Valid
+		.Replace(TEXT("\"art\": \"ankersteine\""), TEXT("\"art\": \"kessel\""))
+		.Replace(TEXT("\"anzahl\": 2, \"halten_s\": 5,"), TEXT("\"anzahl\": 30,"))
+		.Replace(TEXT("\"stampfen\": {\"radius_m\": 4, \"ab_abstand_m\": 3, \"ankuendigung_s\": 1, \"schaden\": 2, \"pause_s\": 6}"),
+			TEXT("\"beschwoeren\": {\"gruppe\": \"klein\", \"alle_s\": 18, \"ankuendigung_s\": 1.5, \"schutz_hoechstens_s\": 20, \"abstand_m\": 6}, ")
+			TEXT("\"verschwinden\": {\"alle_s\": 14, \"ankuendigung_s\": 1.2, \"weite_m\": 20, \"mindestens_m\": 10}"));
+	FEIBossTable WithKettle;
+	TestTrue(TEXT("A boss with a kettle loads"), FEIBossTable::LoadFromString(Kettle, WithKettle, Error));
+	if (!WithKettle.Bosses.IsEmpty())
+	{
+		const FEIBossValues& Caller = WithKettle.Bosses[0];
+		TestEqual(TEXT("It sleeps by a kettle"), Caller.Bannbruch.Kind, EEIBannbruchKind::Kettle);
+		TestEqual(TEXT("The kettle wants its souls"), Caller.Bannbruch.Count, 30);
+		TestFalse(TEXT("Without stampfen it does not stomp"), Caller.Stomp.bHas);
+		TestTrue(TEXT("It calls a group"), Caller.Summon.bHas);
+		TestEqual(TEXT("Of that size"), Caller.Summon.GroupSize, FString(TEXT("klein")));
+		TestEqual(TEXT("The shield lasts at most so long"), Caller.Summon.MaxShieldSeconds, 20.0f);
+		TestTrue(TEXT("It vanishes"), Caller.Vanish.bHas);
+		TestEqual(TEXT("So far"), Caller.Vanish.RangeMeters, 20.0f);
+	}
+	else
+	{
+		AddError(Error);
+	}
 
 	// What it drops.
 	for (int32 Roll = 0; Roll < 50; ++Roll)
@@ -169,6 +206,9 @@ bool FEIBossDataTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Gold has to go upwards"), FEIBossTable::LoadFromString(Valid.Replace(TEXT("\"gold_bis\": 20"), TEXT("\"gold_bis\": 5")), Untouched, Error));
 	TestFalse(TEXT("A boss needs its loot"), FEIBossTable::LoadFromString(Valid.Replace(TEXT("\"beute\""), TEXT("\"schatz\"")), Untouched, Error));
 	TestFalse(TEXT("Broken text is refused"), FEIBossTable::LoadFromString(TEXT("{ bosse"), Untouched, Error));
+	TestFalse(TEXT("A table needs its letter count"), FEIBossTable::LoadFromString(Valid.Replace(TEXT("\"jagdbriefe\": 2"), TEXT("\"jagdbriefe\": 9")), Untouched, Error));
+	TestFalse(TEXT("A table needs its chance words"), FEIBossTable::LoadFromString(Valid.Replace(TEXT("\"chance_worte\""), TEXT("\"worte\"")), Untouched, Error));
+	TestFalse(TEXT("A summon needs its group"), FEIBossTable::LoadFromString(Kettle.Replace(TEXT("\"gruppe\": \"klein\", "), TEXT("")), Untouched, Error));
 	TestEqual(TEXT("A refused file changes nothing"), Untouched.Bosses.Num(), 0);
 	return true;
 }
@@ -495,6 +535,7 @@ bool FEIBossFightWavesTest::RunTest(const FString& Parameters)
 			Boss.Bannbruch.HoldSeconds = 100.0f;
 		}
 		Run->ResetRun();
+		Run->ForceBoss(0);
 		Run->BeginRunNow();
 		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
 	}));
@@ -525,6 +566,320 @@ bool FEIBossFightWavesTest::RunTest(const FString& Parameters)
 
 	// In the fight they come too.
 	Steps.Add(WaitUntil(TEXT("a wave comes to the fight"), 2.0, [Threat](const FEIPlayContext& Context) { return Threat(Context) > 0.0f; }));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIHuntLetterTest,
+	"Eisenseelen.Play.Run.HuntLetters",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIHuntLetterTest::RunTest(const FString& Parameters)
+{
+	struct FState
+	{
+		int32 ChosenBefore = INDEX_NONE;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		UEIRunDirector* Run = GetRun(Context);
+		Run->GetContractTable().ContractsPerRun = 0.0f;
+		Run->ResetRun();
+		const FEIBossTable& Table = Run->GetBossTable();
+		const TArray<FEIHuntLetter>& Letters = GetState(Context)->GetHuntLetters();
+		Context.Test->TestEqual(TEXT("As many letters hang as the file says, or as there are bosses"), Letters.Num(), FMath::Min(Table.HuntLetters, Table.Bosses.Num()));
+		TSet<int32> Named;
+		for (const FEIHuntLetter& Letter : Letters)
+		{
+			if (!Table.Bosses.IsValidIndex(Letter.BossIndex))
+			{
+				Context.Test->AddError(TEXT("A letter names a boss nobody knows"));
+				continue;
+			}
+			Named.Add(Letter.BossIndex);
+			Context.Test->TestEqual(TEXT("A letter names its boss"), Letter.Boss, Table.Bosses[Letter.BossIndex].Name);
+			Context.Test->TestEqual(TEXT("And how it is freed"), Letter.Bannbruch, Table.Bosses[Letter.BossIndex].Bannbruch.Name);
+			Context.Test->TestFalse(TEXT("And where it waits"), Letter.Area.IsEmpty());
+		}
+		Context.Test->TestEqual(TEXT("Every letter names another boss"), Named.Num(), Letters.Num());
+		Context.Test->TestEqual(TEXT("The first letter is taken"), GetState(Context)->GetChosenLetter(), 0);
+		if (Letters.Num() < 2)
+		{
+			Context.Test->AddError(TEXT("The test needs two letters"));
+			return;
+		}
+		Context.Test->TestEqual(TEXT("Its boss waits"), Run->GetBossIndex(), Letters[0].BossIndex);
+		Context.Test->TestTrue(TEXT("Another letter can be taken"), Run->ChooseLetter(1));
+		Context.Test->TestEqual(TEXT("Then its boss waits"), Run->GetBossIndex(), Letters[1].BossIndex);
+		Context.Test->TestEqual(TEXT("The screen knows how many parts it has"), GetState(Context)->GetBannbruchTotal(), Table.Bosses[Letters[1].BossIndex].Bannbruch.Count);
+		Context.Test->TestFalse(TEXT("A letter that does not hang cannot be taken"), Run->ChooseLetter(Letters.Num()));
+
+		// At the board the use key takes the next one.
+		const AEIHuntBoard* Board = Run->GetHuntBoard();
+		if (Board == nullptr)
+		{
+			Context.Test->AddError(TEXT("The board is missing"));
+			return;
+		}
+		const FVector Front = Board->GetActorLocation() + Board->GetActorForwardVector() * 200.0f;
+		Teleport(Context, Front + FVector(0.0f, 0.0f, HeroHeight + 10.0f), static_cast<float>(Board->GetActorRotation().Yaw) + 180.0f);
+		Context.Test->TestTrue(TEXT("In front of it the hero can reach it"), Board->IsInReach(Context.Hero));
+		Context.Test->TestFalse(TEXT("The board does not stand where the barge is boarded"), Run->GetBarge()->IsInBoardingZone(Context.Hero));
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([State](const FEIPlayContext& Context) { State->ChosenBefore = GetState(Context)->GetChosenLetter(); }));
+	AddTap(Steps, EKeys::F);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const int32 Count = GetState(Context)->GetHuntLetters().Num();
+		Context.Test->TestEqual(TEXT("The use key takes the next letter"), GetState(Context)->GetChosenLetter(), (State->ChosenBefore + 1) % FMath::Max(Count, 1));
+		Context.Test->TestFalse(TEXT("And nobody boards the barge for it"), Context.Hero->IsAboard());
+
+		// Whatever letter is taken, its boss is the one that waits in the run.
+		UEIRunDirector* Run = GetRun(Context);
+		const FEIHuntLetter* Chosen = GetState(Context)->GetChosenHuntLetter();
+		Run->BeginRunNow();
+		const AEIBoss* Boss = GetBoss(Context);
+		if (Chosen == nullptr || Boss == nullptr || Boss->GetBossValues() == nullptr)
+		{
+			Context.Test->AddError(TEXT("The letter or its boss is missing"));
+			return;
+		}
+		Context.Test->TestEqual(TEXT("The boss of the letter waits"), Boss->GetBossValues()->Name, Chosen->Boss);
+		const int32 BossIndex = Run->GetBossIndex();
+		Context.Test->TestFalse(TEXT("Out there no letter can be taken"), Run->ChooseLetter((GetState(Context)->GetChosenLetter() + 1) % Count));
+		Context.Test->TestEqual(TEXT("And the boss stays"), Run->GetBossIndex(), BossIndex);
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+namespace
+{
+	int32 FindKettleBoss(const FEIPlayContext& Context)
+	{
+		return GetRun(Context)->GetBossTable().Bosses.IndexOfByPredicate([](const FEIBossValues& Boss) { return Boss.Bannbruch.Kind == EEIBannbruchKind::Kettle; });
+	}
+
+	void KillAllButTheBoss(const FEIPlayContext& Context)
+	{
+		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
+		{
+			if (!It->IsBoss() && !It->IsDead())
+			{
+				It->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+			}
+		}
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEISoulCallerTest,
+	"Eisenseelen.Play.Run.SoulCaller",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEISoulCallerTest::RunTest(const FString& Parameters)
+{
+	struct FState
+	{
+		TArray<TWeakObjectPtr<AEIEnemy>> Called;
+		float LifeBefore = 0.0f;
+		FVector BeforeVanish = FVector::ZeroVector;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+	const auto Threat = [](const FEIPlayContext& Context) { return Context.World->GetAuthGameMode<AEIGameMode>()->GetHorde()->CountThreat(); };
+	const auto CallTo = [State](const FEIPlayContext& Context, const FVector& Center)
+	{
+		State->Called.Reset();
+		for (AEIEnemy* Enemy : GetRun(Context)->SummonGroup(TEXT("klein"), Center, 250.0f))
+		{
+			State->Called.Add(Enemy);
+		}
+		Context.Test->TestTrue(TEXT("A group comes"), !State->Called.IsEmpty());
+	};
+	const auto KillCalled = [State]()
+	{
+		for (const TWeakObjectPtr<AEIEnemy>& Enemy : State->Called)
+		{
+			if (Enemy.IsValid())
+			{
+				Enemy->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
+			}
+		}
+	};
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(WaitForPaths());
+
+	// The Seelenrufer waits, chosen at the dock.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		const int32 Caller = FindKettleBoss(Context);
+		if (Caller == INDEX_NONE)
+		{
+			Context.Test->AddError(TEXT("No boss sleeps by a kettle"));
+			return;
+		}
+		PrepareBossRun(Context, Caller);
+		UEIRunDirector* Run = GetRun(Context);
+		Context.Test->TestEqual(TEXT("It is the one that comes"), Run->GetBossIndex(), Caller);
+		Context.Test->TestEqual(TEXT("The kettle wants its souls"), GetState(Context)->GetBannbruchTotal(), Run->GetBossTable().Bosses[Caller].Bannbruch.Count);
+		Run->BeginRunNow();
+		StandBeside(Context, Run->GetActiveFire(), 300.0f);
+	}));
+	Steps.Add(Wait(0.2));
+
+	// It sleeps in its grave: nobody sees it or hurts it, and a kettle stands beside it, without stones.
+	Steps.Add(Do([CallTo](const FEIPlayContext& Context)
+	{
+		UEIRunDirector* Run = GetRun(Context);
+		AEIBoss* Boss = GetBoss(Context);
+		const AEISoulKettle* Kettle = Run->GetKettle();
+		if (Boss == nullptr || Kettle == nullptr)
+		{
+			Context.Test->AddError(TEXT("The boss or its kettle is missing"));
+			return;
+		}
+		Context.Test->TestTrue(TEXT("It sleeps in its grave"), Boss->SleepsInGrave());
+		Context.Test->TestTrue(TEXT("Nobody sees it"), Boss->IsHidden());
+		Context.Test->TestFalse(TEXT("Nobody bumps into it"), Boss->GetActorEnableCollision());
+		const float Life = Boss->GetHealth()->GetHealth();
+		Boss->TakeDamage(1000.0f, FDamageEvent(), nullptr, Context.Hero);
+		Context.Test->TestEqual(TEXT("Nobody hurts it"), Boss->GetHealth()->GetHealth(), Life);
+		Context.Test->TestEqual(TEXT("No stones hold it"), Run->GetAnchors().Num(), 0);
+		Context.Test->TestEqual(TEXT("The kettle is empty"), Kettle->GetSouls(), 0);
+		Context.Test->TestEqual(TEXT("It wants as many souls as the file says"), Kettle->GetCount(), Boss->GetBossValues()->Bannbruch.Count);
+		Context.Test->TestNearlyEqual(TEXT("The kettle stands beside the grave"), static_cast<float>(FVector::Dist2D(Kettle->GetActorLocation(), Run->GetBossPlace())), Boss->GetBossValues()->Bannbruch.DistanceMeters * CentimetersPerMeter, 1.0f);
+
+		// Who falls far from the kettle gives it nothing.
+		CallTo(Context, Run->GetActiveFire()->GetActorLocation() + FVector(600.0f, 0.0f, 0.0f));
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([CallTo, KillCalled, Threat](const FEIPlayContext& Context)
+	{
+		KillCalled();
+		const AEISoulKettle* Kettle = GetRun(Context)->GetKettle();
+		Context.Test->TestEqual(TEXT("Far away no soul comes"), Kettle->GetSouls(), 0);
+		Context.Test->TestEqual(TEXT("As long as nobody stands at the kettle no wave comes"), Threat(Context), 0.0f);
+
+		// Who falls in its circle gives it a soul.
+		CallTo(Context, Kettle->GetActorLocation());
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([State, KillCalled](const FEIPlayContext& Context)
+	{
+		int32 InZone = 0;
+		const AEISoulKettle* Kettle = GetRun(Context)->GetKettle();
+		for (const TWeakObjectPtr<AEIEnemy>& Enemy : State->Called)
+		{
+			InZone += Enemy.IsValid() && Kettle->IsInZone(Enemy.Get()) ? 1 : 0;
+		}
+		KillCalled();
+		Context.Test->TestTrue(TEXT("The group stood in the circle"), InZone > 0);
+		Context.Test->TestEqual(TEXT("Every fallen enemy in the circle gives a soul"), Kettle->GetSouls(), InZone);
+		Context.Test->TestEqual(TEXT("The screen counts them"), GetState(Context)->GetBannbruchDone(), InZone);
+		Context.Test->TestTrue(TEXT("The grave stays shut"), GetBoss(Context)->IsBound());
+		StandBeside(Context, Kettle, 300.0f);
+	}));
+
+	// Whoever stands at the kettle gets a wave.
+	Steps.Add(WaitUntil(TEXT("a wave comes to the kettle"), 3.0, [Threat](const FEIPlayContext& Context) { return Threat(Context) > 0.0f; }));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		// The hero stays at the kettle, so that the boss sees him at once when it rises.
+		KillAllButTheBoss(Context);
+		AEISoulKettle* Kettle = GetRun(Context)->GetKettle();
+		Kettle->SetSouls(Kettle->GetCount() - 1);
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([CallTo](const FEIPlayContext& Context) { CallTo(Context, GetRun(Context)->GetKettle()->GetActorLocation()); }));
+	Steps.Add(Wait(0.1));
+
+	// The last soul opens the grave, and it rises.
+	Steps.Add(Do([KillCalled](const FEIPlayContext& Context)
+	{
+		KillCalled();
+		AEIBoss* Boss = GetBoss(Context);
+		Context.Test->TestTrue(TEXT("The kettle is full"), GetRun(Context)->GetKettle()->IsFull());
+		Context.Test->TestFalse(TEXT("The boss is free"), Boss->IsBound());
+		Context.Test->TestFalse(TEXT("It has left its grave"), Boss->SleepsInGrave());
+		Context.Test->TestFalse(TEXT("Now it is seen"), Boss->IsHidden());
+		Context.Test->TestTrue(TEXT("Now it stands in the way"), Boss->GetActorEnableCollision());
+		Context.Test->TestEqual(TEXT("The fight is on"), GetState(Context)->GetBossStage(), EEIBossStage::Awake);
+		Context.Test->TestFalse(TEXT("It has noticed the hero"), Boss->IsWatching());
+		const float Life = Boss->GetHealth()->GetHealth();
+		Boss->TakeDamage(100.0f, FDamageEvent(), nullptr, Context.Hero);
+		Context.Test->TestEqual(TEXT("Now it can be hurt"), Boss->GetHealth()->GetHealth(), Life - 100.0f);
+		KillAllButTheBoss(Context);
+		Boss->HurryMoves();
+	}));
+
+	// Its group shields it, and it vanishes to come up somewhere else.
+	Steps.Add(WaitUntil(TEXT("the boss calls its group"), 15.0, [](const FEIPlayContext& Context)
+	{
+		StandBeside(Context, GetBoss(Context), 1200.0f);
+		return GetBoss(Context)->IsSummoning();
+	}));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const AEIBoss* Boss = GetBoss(Context);
+		Context.Test->TestTrue(TEXT("It shows what comes"), Boss->IsTelegraphing());
+		Context.Test->TestFalse(TEXT("Before the group is there it is open"), Boss->IsShielded());
+	}));
+	Steps.Add(WaitUntil(TEXT("the group shields it"), 5.0, [](const FEIPlayContext& Context) { return GetBoss(Context)->IsShielded(); }));
+	Steps.Add(Do([State, Threat](const FEIPlayContext& Context)
+	{
+		AEIBoss* Boss = GetBoss(Context);
+		Context.Test->TestTrue(TEXT("Its group is there"), Threat(Context) > 0.0f);
+		State->LifeBefore = Boss->GetHealth()->GetHealth();
+		Boss->TakeDamage(500.0f, FDamageEvent(), nullptr, Context.Hero);
+		Context.Test->TestEqual(TEXT("Shielded it takes no damage"), Boss->GetHealth()->GetHealth(), State->LifeBefore);
+	}));
+	Steps.Add(WaitUntil(TEXT("the boss vanishes"), 5.0, [State](const FEIPlayContext& Context)
+	{
+		State->BeforeVanish = GetBoss(Context)->GetActorLocation();
+		return GetBoss(Context)->IsVanishing();
+	}));
+	Steps.Add(WaitUntil(TEXT("the boss comes up again"), 5.0, [](const FEIPlayContext& Context) { return !GetBoss(Context)->IsVanishing(); }));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		const AEIBoss* Boss = GetBoss(Context);
+		const FEIBossValues* Values = Boss->GetBossValues();
+		const double Moved = FVector::Dist2D(Boss->GetActorLocation(), State->BeforeVanish);
+		Context.Test->AddInfo(FString::Printf(TEXT("It vanishes and comes up %.0f cm away"), Moved));
+		Context.Test->TestTrue(TEXT("It comes up far enough away"), Moved >= Values->Vanish.MinMeters * CentimetersPerMeter - 50.0);
+		Context.Test->TestTrue(TEXT("Not too far from its place"), FVector::Dist2D(Boss->GetActorLocation(), GetRun(Context)->GetBossPlace()) <= Values->Vanish.RangeMeters * CentimetersPerMeter + 100.0);
+		KillAllButTheBoss(Context);
+	}));
+	Steps.Add(WaitUntil(TEXT("the shield falls with its group"), 2.0, [](const FEIPlayContext& Context) { return !GetBoss(Context)->IsShielded(); }));
+
+	// Open again, and it falls: with gold and from its own set.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIRunDirector* Run = GetRun(Context);
+		TArray<FEILootItem>& Loot = Run->GetBossTable().Bosses[Run->GetBossIndex()].Loot;
+		for (FEILootItem& Item : Loot)
+		{
+			Item.Chance = 1.0f;
+		}
+		AEIBoss* Boss = GetBoss(Context);
+		const float Life = Boss->GetHealth()->GetHealth();
+		Boss->TakeDamage(100.0f, FDamageEvent(), nullptr, Context.Hero);
+		Context.Test->TestEqual(TEXT("Without its group it can be hurt again"), Boss->GetHealth()->GetHealth(), Life - 100.0f);
+		Boss->TakeDamage(100000000.0f, FDamageEvent(), nullptr, nullptr);
+		const UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Context.Test->TestEqual(TEXT("The boss is down"), GetState(Context)->GetBossStage(), EEIBossStage::Down);
+		Context.Test->TestEqual(TEXT("It drops its whole set"), Profile->GetRunIngredients().Num(), Loot.Num());
+		for (const FEILootItem& Item : Loot)
+		{
+			Context.Test->TestTrue(TEXT("From its own set"), Profile->GetRunIngredients().Contains(Item.Name));
+		}
+	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }
 

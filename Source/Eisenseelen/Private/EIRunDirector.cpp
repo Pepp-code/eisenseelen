@@ -12,10 +12,12 @@
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
 #include "EIHordeDirector.h"
+#include "EIHuntBoard.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
+#include "EISoulKettle.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 
@@ -94,6 +96,45 @@ namespace
 		return true;
 	}
 
+	/** The name of the area and where the dock and the hunt board stand. */
+	bool LoadDock(FString& OutArea, FVector& OutCenter, FVector& OutBoardPlace, FString& OutError)
+	{
+		const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("laufkarte.json"), OutError);
+		const TSharedPtr<FJsonObject>* Dock = nullptr;
+		if (!Root.IsValid())
+		{
+			return false;
+		}
+		FString Area;
+		if (!Root->TryGetStringField(TEXT("gebiet"), Area) || Area.IsEmpty())
+		{
+			OutError = TEXT("Der Name gebiet fehlt.");
+			return false;
+		}
+		if (!Root->TryGetObjectField(TEXT("anlegestelle"), Dock))
+		{
+			OutError = TEXT("Die anlegestelle fehlt.");
+			return false;
+		}
+		float X = 0.0f;
+		float Y = 0.0f;
+		float Height = 0.0f;
+		float BoardX = 0.0f;
+		float BoardY = 0.0f;
+		if (!FEIDataFile::ReadNumber(**Dock, TEXT("x_m"), -100000.0, 100000.0, X, OutError)
+			|| !FEIDataFile::ReadNumber(**Dock, TEXT("y_m"), -100000.0, 100000.0, Y, OutError)
+			|| !FEIDataFile::ReadNumber(**Dock, TEXT("hoehe_m"), -10000.0, 10000.0, Height, OutError)
+			|| !FEIDataFile::ReadNumber(**Dock, TEXT("jagdbrett_x_m"), -1000.0, 1000.0, BoardX, OutError)
+			|| !FEIDataFile::ReadNumber(**Dock, TEXT("jagdbrett_y_m"), -1000.0, 1000.0, BoardY, OutError))
+		{
+			return false;
+		}
+		OutArea = Area;
+		OutCenter = FVector(X, Y, Height) * CentimetersPerMeter;
+		OutBoardPlace = FVector(X + BoardX, Y + BoardY, Height) * CentimetersPerMeter;
+		return true;
+	}
+
 	/** The first place far enough from all others, or else simply the first one. It leaves the list. */
 	template <typename TPlace>
 	TPlace* TakePlace(TArray<TPlace*>& Places, const TArray<FVector>& Taken, double MinDistanceCm)
@@ -131,6 +172,7 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("signalfeuer_zone_m"), 1.0, 200.0, Loaded.SignalZoneMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abstand_m"), 1.0, 100.0, Loaded.BargeDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abflug_tempo_m_pro_s"), 0.1, 100.0, Loaded.BargeDepartMetersPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("jagdbrett_reichweite_m"), 0.5, 100.0, Loaded.HuntBoardReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_leben_faktor"), 0.1, 100.0, Loaded.LeaderLifeFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_schaden_faktor"), 0.1, 100.0, Loaded.LeaderDamageFactor, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("anfuehrer_groesse_faktor"), 0.1, 10.0, Loaded.LeaderScaleFactor, OutError))
@@ -181,6 +223,11 @@ void UEIRunDirector::LoadValues()
 	{
 		FEIDataFile::ReportError(TEXT("laufkarte.json"), Error);
 	}
+	bHasDock = LoadDock(AreaName, DockCenter, HuntBoardPlace, Error);
+	if (!bHasDock)
+	{
+		FEIDataFile::ReportError(TEXT("laufkarte.json"), Error);
+	}
 	if (!FEIBossTable::LoadFromProjectFile(BossTable, Error))
 	{
 		FEIDataFile::ReportError(TEXT("bosse.json"), Error);
@@ -210,8 +257,28 @@ void UEIRunDirector::ResetRun()
 		State->SetRunPhase(EEIRunPhase::None);
 		return;
 	}
+	PrepareHuntBoard();
 	Barge->ReturnToStart();
 	State->SetRunPhase(EEIRunPhase::AtDock);
+}
+
+void UEIRunDirector::PrepareHuntBoard()
+{
+	if (HuntBoard != nullptr || !bHasDock)
+	{
+		return;
+	}
+	FVector Ground = HuntBoardPlace;
+	FindGround(HuntBoardPlace, Ground);
+	// The letters face the middle of the dock, so that whoever walks to the barge sees them.
+	const FVector Facing = (DockCenter - HuntBoardPlace).GetSafeNormal2D();
+	const FTransform Spawn(Facing.IsNearlyZero() ? FRotator::ZeroRotator : Facing.Rotation(), Ground);
+	HuntBoard = GetWorld()->SpawnActorDeferred<AEIHuntBoard>(AEIHuntBoard::StaticClass(), Spawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (HuntBoard != nullptr)
+	{
+		HuntBoard->Setup(Values.HuntBoardReachMeters);
+		HuntBoard->FinishSpawning(Spawn);
+	}
 }
 
 void UEIRunDirector::PrepareBoss()
@@ -224,6 +291,12 @@ void UEIRunDirector::PrepareBoss()
 		}
 	}
 	Anchors.Reset();
+	if (Kettle != nullptr)
+	{
+		Kettle->Destroy();
+		Kettle = nullptr;
+	}
+	bKettleHeld = false;
 	if (Boss != nullptr)
 	{
 		Boss->Destroy();
@@ -231,10 +304,74 @@ void UEIRunDirector::PrepareBoss()
 	}
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	const bool bHasBoss = Barge != nullptr && !BossTable.Bosses.IsEmpty() && !BossPlaces.IsEmpty();
-	BossIndex = bHasBoss ? FMath::RandRange(0, BossTable.Bosses.Num() - 1) : INDEX_NONE;
 	BossPlace = bHasBoss ? BossPlaces[FMath::RandRange(0, BossPlaces.Num() - 1)] : FVector::ZeroVector;
 	State->SetBossStage(bHasBoss ? EEIBossStage::Sealed : EEIBossStage::None);
-	State->SetBannbruchProgress(0, bHasBoss ? BossTable.Bosses[BossIndex].Bannbruch.Count : 0);
+	if (!bHasBoss)
+	{
+		State->SetHuntLetters(TArray<FEIHuntLetter>(), INDEX_NONE);
+		SetBossIndex(INDEX_NONE);
+		return;
+	}
+
+	// Each letter names another boss, in a new order every time. What a boss drops stays a surprise.
+	TArray<int32> Order;
+	for (int32 Index = 0; Index < BossTable.Bosses.Num(); ++Index)
+	{
+		Order.Add(Index);
+	}
+	for (int32 Index = Order.Num() - 1; Index > 0; --Index)
+	{
+		Order.Swap(Index, FMath::RandRange(0, Index));
+	}
+	TArray<FEIHuntLetter> Letters;
+	for (int32 Index = 0; Index < FMath::Min(BossTable.HuntLetters, Order.Num()); ++Index)
+	{
+		const FEIBossValues& Named = BossTable.Bosses[Order[Index]];
+		FEIHuntLetter& Letter = Letters.AddDefaulted_GetRef();
+		Letter.Area = AreaName;
+		Letter.Boss = Named.Name;
+		Letter.Bannbruch = Named.Bannbruch.Name;
+		Letter.Color = Named.Color;
+		Letter.BossIndex = Order[Index];
+	}
+	State->SetHuntLetters(Letters, 0);
+	SetBossIndex(Letters[0].BossIndex);
+}
+
+void UEIRunDirector::SetBossIndex(int32 NewBossIndex)
+{
+	BossIndex = NewBossIndex;
+	GetWorld()->GetGameState<AEIGameState>()->SetBannbruchProgress(0, BossIndex != INDEX_NONE ? BossTable.Bosses[BossIndex].Bannbruch.Count : 0);
+}
+
+bool UEIRunDirector::ChooseLetter(int32 Index)
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (State->GetRunPhase() != EEIRunPhase::AtDock || State->IsCastingOff() || !State->GetHuntLetters().IsValidIndex(Index))
+	{
+		return false;
+	}
+	State->SetChosenLetter(Index);
+	SetBossIndex(State->GetHuntLetters()[Index].BossIndex);
+	return true;
+}
+
+void UEIRunDirector::ChooseNextLetter()
+{
+	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	const int32 Count = State->GetHuntLetters().Num();
+	if (Count > 0)
+	{
+		ChooseLetter((FMath::Max(State->GetChosenLetter(), 0) + 1) % Count);
+	}
+}
+
+void UEIRunDirector::ForceBoss(int32 NewBossIndex)
+{
+	if (BossTable.Bosses.IsValidIndex(NewBossIndex) && GetWorld()->GetGameState<AEIGameState>()->GetBossStage() == EEIBossStage::Sealed && Boss == nullptr)
+	{
+		SetBossIndex(NewBossIndex);
+	}
 }
 
 void UEIRunDirector::SpawnBoss(int32 HeroCount)
@@ -256,7 +393,18 @@ void UEIRunDirector::SpawnBoss(int32 HeroCount)
 	Boss->SetBossIndex(BossIndex);
 	Boss->FinishSpawning(Spawn);
 	Boss->StandWatch(Boss->GetActorLocation());
+	if (Bannbruch.Kind == EEIBannbruchKind::Kettle)
+	{
+		SpawnKettle(Ground, Bannbruch);
+	}
+	else
+	{
+		SpawnAnchors(Ground, Bannbruch);
+	}
+}
 
+void UEIRunDirector::SpawnAnchors(const FVector& Ground, const FEIBannbruch& Bannbruch)
+{
 	// The stones stand in a ring around the boss, each with a chain to it.
 	const FVector ChainEnd = Boss->GetActorLocation();
 	const float Turn = FMath::FRandRange(0.0f, 360.0f);
@@ -273,11 +421,70 @@ void UEIRunDirector::SpawnBoss(int32 HeroCount)
 	}
 }
 
+void UEIRunDirector::SpawnKettle(const FVector& Ground, const FEIBannbruch& Bannbruch)
+{
+	// The kettle stands a little away from the grave, on the ground there.
+	const FVector Direction = FVector::ForwardVector.RotateAngleAxis(FMath::FRandRange(0.0f, 360.0f), FVector::UpVector);
+	const FVector Wanted = Ground + Direction * Bannbruch.DistanceMeters * CentimetersPerMeter;
+	FVector KettleGround = Wanted;
+	FindGround(Wanted, KettleGround);
+	const FTransform KettleSpawn(KettleGround);
+	Kettle = GetWorld()->SpawnActorDeferred<AEISoulKettle>(AEISoulKettle::StaticClass(), KettleSpawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Kettle != nullptr)
+	{
+		Kettle->Setup(Ground, Bannbruch.ZoneMeters, Bannbruch.Count);
+		Kettle->FinishSpawning(KettleSpawn);
+	}
+}
+
+void UEIRunDirector::FeedKettle(const AEIEnemy& Enemy)
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (Kettle == nullptr || Boss == nullptr || &Enemy == Boss.Get() || State->GetBossStage() != EEIBossStage::Sealed || !Kettle->IsInZone(&Enemy))
+	{
+		return;
+	}
+	Kettle->AddSoul(Enemy.GetActorLocation());
+	State->SetBannbruchProgress(Kettle->GetSouls(), Kettle->GetCount());
+	if (Kettle->IsFull())
+	{
+		BreakBossFree(CountLivingHeroes());
+	}
+}
+
+int32 UEIRunDirector::CountLivingHeroes() const
+{
+	int32 Heroes = 0;
+	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+	{
+		Heroes += It->IsDead() ? 0 : 1;
+	}
+	return Heroes;
+}
+
+TArray<AEIEnemy*> UEIRunDirector::SummonGroup(const FString& Size, const FVector& Center, float RadiusCm)
+{
+	const FEIEnemyGroup* Group = Groups.Pick(Size);
+	if (Group == nullptr)
+	{
+		return TArray<AEIEnemy*>();
+	}
+	UEIHordeDirector* Horde = CastChecked<AEIGameMode>(GetOwner())->GetHorde();
+	return Horde->SpawnGroup(*Group, GetPlayerFactor(CountLivingHeroes()), Center, RadiusCm);
+}
+
 void UEIRunDirector::UpdateBannbruch(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
 {
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	if (State->GetBossStage() != EEIBossStage::Sealed || Boss == nullptr)
 	{
+		bKettleHeld = false;
+		return;
+	}
+	if (Kettle != nullptr)
+	{
+		// The kettle only fills from enemies that fall, the souls come in NoteEnemyDied. Whoever stands in the circle calls them.
+		bKettleHeld = LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return Kettle->IsInZone(Hero); });
 		return;
 	}
 	int32 Broken = 0;
@@ -315,15 +522,15 @@ void UEIRunDirector::SkipBannbruch()
 		Anchor->SetHoldLeft(0.0f);
 		Anchor->UpdateHold(false, 0.0f);
 	}
-	if (Boss != nullptr && GetWorld()->GetGameState<AEIGameState>()->GetBossStage() == EEIBossStage::Sealed)
+	if (Kettle != nullptr)
 	{
-		GetWorld()->GetGameState<AEIGameState>()->SetBannbruchProgress(Anchors.Num(), Anchors.Num());
-		int32 Heroes = 0;
-		for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
-		{
-			Heroes += It->IsDead() ? 0 : 1;
-		}
-		BreakBossFree(Heroes);
+		Kettle->SetSouls(Kettle->GetCount());
+	}
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (Boss != nullptr && State->GetBossStage() == EEIBossStage::Sealed)
+	{
+		State->SetBannbruchProgress(State->GetBannbruchTotal(), State->GetBannbruchTotal());
+		BreakBossFree(CountLivingHeroes());
 	}
 }
 
@@ -665,6 +872,7 @@ void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
 	{
 		BossFell();
 	}
+	FeedKettle(Enemy);
 	TArray<FEIContract>& Contracts = State->EditContracts();
 	for (int32 Index = 0; Index < Contracts.Num(); ++Index)
 	{
@@ -710,6 +918,10 @@ void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 		else if (Hero->IsAboard())
 		{
 			Hero->ArriveAt(Hero->GetLocationBeforeBoarding(), static_cast<float>(Hero->GetActorRotation().Yaw));
+		}
+		else if (HuntBoard != nullptr && HuntBoard->IsInReach(Hero))
+		{
+			ChooseNextLetter();
 		}
 		return;
 	}
@@ -793,6 +1005,10 @@ const FEIWaveRule* UEIRunDirector::FindCurrentWave(EEIRunPhase Phase) const
 	if (IsAnchorHeld())
 	{
 		return &Groups.StoneWave;
+	}
+	if (bKettleHeld)
+	{
+		return &Groups.KettleWave;
 	}
 	return State->IsContractHeld() ? &Groups.AltarWave : nullptr;
 }

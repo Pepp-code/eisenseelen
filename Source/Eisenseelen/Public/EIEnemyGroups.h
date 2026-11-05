@@ -30,6 +30,8 @@ struct EISENSEELEN_API FEIEnemyGroups
 	float BloodMoonLingerSeconds = 8.0f;
 	FEIWaveRule AltarWave;
 	FEIWaveRule StoneWave;
+	/** While somebody stands at the soul kettle of a boss. */
+	FEIWaveRule KettleWave;
 	FEIWaveRule FightWave;
 	FEIWaveRule PursuitWave;
 	FEIWaveRule FireWave;

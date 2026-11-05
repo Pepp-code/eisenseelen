@@ -757,6 +757,10 @@ public:
 				}
 			}
 			Run->ResetRun();
+			// The first boss, through its letter at the board, so that the guest sees which one is chosen.
+			const int32 Letter = ServerWorld->GetGameState<AEIGameState>()->GetHuntLetters().IndexOfByPredicate([](const FEIHuntLetter& Each) { return Each.BossIndex == 0; });
+			Test->TestTrue(TEXT("The first boss has its letter"), Letter != INDEX_NONE && Run->ChooseLetter(Letter));
+			Run->ForceBoss(0);
 			Run->BeginRunNow();
 			Session.ServerCopyOfClientHero->SetCanBeDamaged(false);
 			for (FConstPlayerControllerIterator It = ServerWorld->GetPlayerControllerIterator(); It; ++It)
@@ -786,6 +790,9 @@ public:
 			Test->TestTrue(TEXT("The guest sees it bound"), Boss->IsBound());
 			Test->TestEqual(TEXT("The guest sees it big"), static_cast<float>(Boss->GetActorScale3D().X), Boss->GetBossValues()->Fight.Scale);
 			Test->TestEqual(TEXT("The guest knows who it is"), Boss->GetBossValues()->Name, GameMode->GetRun()->GetBossTable().Bosses[0].Name);
+			const FEIHuntLetter* GuestLetter = GuestState->GetChosenHuntLetter();
+			Test->TestEqual(TEXT("The guest has the hunt letters"), GuestState->GetHuntLetters().Num(), ServerWorld->GetGameState<AEIGameState>()->GetHuntLetters().Num());
+			Test->TestTrue(TEXT("The guest knows the chosen letter"), GuestLetter != nullptr && GuestLetter->Boss == Boss->GetBossValues()->Name);
 			int32 Stones = 0;
 			for (TActorIterator<AEIAnchorStone> It(Session.ClientWorld); It; ++It)
 			{

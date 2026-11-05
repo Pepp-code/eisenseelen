@@ -57,6 +57,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewSkipBannbruch();
 
+	/** For preview pictures: this boss comes, by its place in Data/bosse.json. At the dock, before the run. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewChooseBoss(int32 BossIndex);
+
+	/** For preview pictures: so many souls are in the kettle. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewKettleSouls(int32 Souls);
+
+	/** For preview pictures: the boss summons or vanishes as soon as it can. */
+	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
+	void PreviewHurryBoss();
+
 	/** For preview pictures: the boss falls. */
 	UFUNCTION(BlueprintCallable, Category = "Eisenseelen")
 	void PreviewDefeatBoss();

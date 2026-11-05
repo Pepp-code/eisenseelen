@@ -53,14 +53,98 @@ def stand_looking_at(location, target, height=STAND_HEIGHT):
     player().set_control_rotation(unreal.Rotator(0, pitch, yaw))
 
 
+def wait_until(check, boss, distance, height, tries=40, step=0.25):
+    """Follows the boss from the side until the check holds, or it gives up."""
+    for _ in range(tries):
+        place = boss.get_actor_location()
+        stand_looking_at((place.x + distance, place.y), (place.x, place.y, height))
+        if check():
+            return
+        yield step
+
+
+def chained_one(boss, spot):
+    """Bound from afar, at a stone, free, and what it marks on the floor."""
+    stand_looking_at((spot.x + 3200, spot.y + 600), (spot.x, spot.y, 400))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    anchor = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAnchorStone)[0].get_actor_location()
+    stand_looking_at((anchor.x + (anchor.x - spot.x) * 0.25, anchor.y + (anchor.y - spot.y) * 0.25), (spot.x, spot.y, 300))
+    yield 2.0
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_skip_bannbruch()
+    stand_looking_at((spot.x + 1500, spot.y), (spot.x, spot.y, 300))
+    yield 1.5
+    shot()
+    yield AFTER_SHOT_SECONDS
+
+    # The blow from close by, then the way of its charge from afar. Either one comes first. Then the stomp.
+    for distance in (420, 1500):
+        yield from wait_until(boss.is_strip_marked, boss, distance, 100, step=0.2)
+        shot()
+        yield 5.0
+    yield from wait_until(boss.is_stomp_marked, boss, 700, 200, step=0.5)
+    shot()
+    yield 2.5
+
+
+def soul_caller(boss, spot):
+    """The kettle from afar and from inside its circle, the open grave, the summon, the shield and the vanishing."""
+    kettle = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EISoulKettle)[0]
+    place = kettle.get_actor_location()
+    stand_looking_at((place.x + 2400, place.y + 600), (place.x, place.y, 150))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_kettle_souls(kettle.get_count() * 2 // 3)
+    away_x, away_y = place.x - spot.x, place.y - spot.y
+    length = max(math.hypot(away_x, away_y), 1.0)
+    stand_looking_at((place.x + away_x / length * 600, place.y + away_y / length * 600), (spot.x, spot.y, 100))
+    yield SETTLE_SECONDS
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_skip_bannbruch()
+    yield 1.0
+    stand_looking_at((spot.x + 1400, spot.y), (spot.x, spot.y, 250))
+    yield 0.5
+    shot()
+    yield AFTER_SHOT_SECONDS
+    player().preview_hurry_boss()
+    yield from wait_until(boss.is_summoning, boss, 1300, 150)
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from wait_until(boss.is_vanishing, boss, 1300, 150)
+    shot()
+    yield AFTER_SHOT_SECONDS
+    yield from wait_until(lambda: not boss.is_vanishing(), boss, 1300, 150)
+    yield 0.3
+    shot()
+    yield AFTER_SHOT_SECONDS
+
+
 def scenario():
     with open(os.path.join(unreal.Paths.project_dir(), "Data", "lauf.json"), encoding="utf-8") as file:
         run_values = json.load(file)
     hold_seconds = run_values["signalfeuer_halten_s"]
+    with open(os.path.join(unreal.Paths.project_dir(), "Data", "bosse.json"), encoding="utf-8") as file:
+        boss_names = [each["name"] for each in json.load(file)["bosse"]]
+    boss_index = boss_names.index(os.environ.get("EI_VORSCHAU_BOSS", boss_names[0]))
 
     yield SHADER_WAIT_SECONDS
+    player().preview_choose_boss(boss_index)
+    yield 0.5
 
-    # The dock: from the middle of it, and then right at the barge, where the use key works.
+    # The dock: from the middle of it, at the board with the hunt letters, and then right at the barge, where the use key works.
+    shot()
+    yield AFTER_SHOT_SECONDS
+    board = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIHuntBoard)[0]
+    spot = board.get_actor_location()
+    front = board.get_actor_forward_vector()
+    pawn().set_actor_location(unreal.Vector(spot.x + 300 * front.x, spot.y + 300 * front.y, spot.z + STAND_HEIGHT), False, True)
+    player().set_control_rotation(unreal.Rotator(0, -8, math.degrees(math.atan2(-front.y, -front.x))))
+    yield SETTLE_SECONDS
     shot()
     yield AFTER_SHOT_SECONDS
     barge = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EISkyBarge)[0]
@@ -148,42 +232,13 @@ def scenario():
         shot()
         yield AFTER_SHOT_SECONDS
 
-    # The boss: bound from afar, at a stone, free and stomping, and fallen.
+    # The boss: bound from afar, at its Bannbruch, free, at its moves, and fallen.
     boss = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIBoss)[0]
     spot = boss.get_actor_location()
-    stand_looking_at((spot.x + 3200, spot.y + 600), (spot.x, spot.y, 400))
-    yield SETTLE_SECONDS
-    shot()
-    yield AFTER_SHOT_SECONDS
-    anchor = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIAnchorStone)[0].get_actor_location()
-    stand_looking_at((anchor.x + (anchor.x - spot.x) * 0.25, anchor.y + (anchor.y - spot.y) * 0.25), (spot.x, spot.y, 300))
-    yield 2.0
-    shot()
-    yield AFTER_SHOT_SECONDS
-    player().preview_skip_bannbruch()
-    stand_looking_at((spot.x + 1500, spot.y), (spot.x, spot.y, 300))
-    yield 1.5
-    shot()
-    yield AFTER_SHOT_SECONDS
-
-    # What it marks on the floor: the blow from close by, then the way of its charge from afar. Either one comes first.
-    for distance in (420, 1500):
-        for _ in range(40):
-            place = boss.get_actor_location()
-            stand_looking_at((place.x + distance, place.y), (place.x, place.y, 100))
-            if boss.is_strip_marked():
-                break
-            yield 0.2
-        shot()
-        yield 5.0
-    for _ in range(40):
-        place = boss.get_actor_location()
-        stand_looking_at((place.x + 700, place.y), (place.x, place.y, 200))
-        if boss.is_stomp_marked():
-            break
-        yield 0.5
-    shot()
-    yield 2.5
+    if boss.sleeps_in_grave():
+        yield from soul_caller(boss, spot)
+    else:
+        yield from chained_one(boss, spot)
     player().preview_defeat_boss()
     yield 1.0
     shot()

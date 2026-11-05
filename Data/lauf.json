@@ -11,6 +11,7 @@
 	"signalfeuer_halten_s": 60,
 	"signalfeuer_reichweite_m": 4,
 	"signalfeuer_zone_m": 15,
+	"jagdbrett_reichweite_m": 4,
 	"barke_abstand_m": 12,
 	"barke_abflug_tempo_m_pro_s": 6,
 	"anfuehrer_art": "schildtraeger",

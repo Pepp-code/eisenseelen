@@ -337,10 +337,15 @@ bool AEIEnemy::ReachesHeightOf(const AActor* Other) const
 
 void AEIEnemy::ShowGroundCircle(float RadiusCm, float FillSeconds)
 {
+	ShowGroundCircleAt(GetFloorSpot(), RadiusCm, FillSeconds);
+}
+
+void AEIEnemy::ShowGroundCircleAt(const FVector& Location, float RadiusCm, float FillSeconds)
+{
 	FEIGroundMarkData Mark;
 	Mark.bVisible = true;
 	Mark.Shape = EEIMarkShape::Circle;
-	Mark.Location = GetFloorSpot();
+	Mark.Location = Location;
 	Mark.LengthCm = RadiusCm * 2.0f;
 	Mark.WidthCm = RadiusCm * 2.0f;
 	Mark.FillSeconds = FillSeconds;
