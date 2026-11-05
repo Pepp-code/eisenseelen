@@ -56,7 +56,10 @@ namespace
 		Values.SignalHoldSeconds = ShortHoldSeconds;
 		Run->ApplyValues(Values);
 		Run->GetContractTable().ContractsPerRun = 0.0f;
+		// Nobody else comes until the boss is down, or a stray bone would count as its blow.
 		Run->GetGroups().AltarWave.Size.Empty();
+		Run->GetGroups().StoneWave.Size.Empty();
+		Run->GetGroups().FightWave.Size.Empty();
 		for (FEIBossValues& Boss : Run->GetBossTable().Bosses)
 		{
 			Boss.Bannbruch.HoldSeconds = ShortHoldSeconds;
