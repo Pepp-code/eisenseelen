@@ -88,7 +88,9 @@ Bei uns ist die Anlegestelle mit der Barke der Saloon: Jagdbrett (jetzt mit Gebi
 
 ## Stil und Assets
 
-Der heutige Stil ist der „graue Klotz": schwarze halbtransparente Flächen, weiße Schrift, farbige Balken. Der Plan: **erst Funktion, dann Optik.** Alles oben entsteht im Klotz-Stil mit Icon-Platzhaltern (farbige Vierecke mit Kurztext). Wenn die Elemente stehen, folgt die optische Schicht als eigene Aufgabe: Rahmen, Holz-/Leder-Look, Schriften, Einblend-Animationen — als 2D-Assets, die an die vorbereiteten Bild-Plätze gelegt werden. Nichts an der Logik ändert sich dabei.
+Der heutige Stil ist der „graue Klotz": schwarze halbtransparente Flächen, weiße Schrift, farbige Balken. Der Plan: **erst Funktion, dann Optik.** Alles oben entsteht im Klotz-Stil mit Icon-Platzhaltern (farbige Vierecke mit Kurztext). Wenn die Elemente stehen, folgt die optische Schicht als eigene Aufgabe — als 2D-Assets, die an die vorbereiteten Bild-Plätze gelegt werden. Nichts an der Logik ändert sich dabei.
+
+Das genaue Design („geschmiedetes Eisen" statt Western-Holz, Bildschirm-Anker, der komplette Animations-Katalog, Icon-Platz-System, Umsetzungs-Schritte ST1–ST8) steht ausgearbeitet in `docs/UI-Stil.md`.
 
 ## Umsetzung in Schritten
 
