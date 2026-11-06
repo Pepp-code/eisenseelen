@@ -74,6 +74,7 @@ public:
 
 	const TArray<FEIContract>& GetContracts() const { return Contracts; }
 	int32 CountContractsDone() const;
+	bool AreContractsDone() const;
 
 	/** Whether somebody stands in the zone of a contract right now. */
 	bool IsContractHeld() const;

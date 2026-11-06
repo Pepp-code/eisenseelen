@@ -512,8 +512,8 @@ In `Source/Eisenseelen/Private/Tests/EIRunTest.cpp` erweitern wir `Eisenseelen.P
 - **K0 Bestandsaufnahme:** erledigt
 - **K1 Detailplan & Planbild:** erledigt
 - **K2 Grundform (`600 × 600 m` Insel-Landschaft, Höhenplan, geschichtetes `M_Gelaende`, `Run.Terrain`):** erledigt (58/58 Tests grün)
-- **K3 Spielorte neu verteilen:** als Nächstes
-- **K4 Wasser und Wege:** offen
+- **K3 Spielorte neu verteilen:** erledigt (4 Küsten-Ankünfte, 4 Bossplätze, 4 Signalfeuer, 8 Altäre/Schreine, 18 Lager, 5 Sprungfelder, 14 Truhen; Bannbruch erst nach Abschluss aller 3 Nebenaufträge)
+- **K4 Wasser und Wege:** als Nächstes
 - **K5 Felsmassiv und Tunnel:** offen
 - **K6 Wald:** offen
 - **K7 Orte mit Charakter:** offen

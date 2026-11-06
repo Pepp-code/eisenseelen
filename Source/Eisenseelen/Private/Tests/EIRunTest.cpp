@@ -1205,9 +1205,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FEIPathfindingTest::RunTest(const FString& Parameters)
 {
-	// The northern wall of the first place on the run map: 10 m long, along X at y = 117 m.
-	const FVector HeroSpot(0.0f, 12300.0f, HeroHeight);
-	const FVector EnemySpot(0.0f, 11100.0f, HeroHeight);
+	// The first wall of the first place on the run map (at 95 m, 140 m): 10 m long, along X at y = 147 m.
+	const FVector HeroSpot(9500.0f, 15300.0f, HeroHeight);
+	const FVector EnemySpot(9500.0f, 14100.0f, HeroHeight);
 	const TSharedRef<double> StartedAt = MakeShared<double>(0.0);
 
 	const auto FindEnemy = [](const FEIPlayContext& Context) -> AEIEnemy*
@@ -1358,6 +1358,35 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 		}
 		Context.Test->AddInfo(FString::Printf(TEXT("%d goals checked for a way on foot"), Goals.Num()));
 		Context.Test->TestEqual(TEXT("Every goal can be reached on foot"), Unreachable, 0);
+
+		// Measure the island travel distances and times across Aschenwerder (North to South arrival) and along Arrival -> Side Job -> Boss -> Signal Fire.
+		constexpr double WalkSpeedMetersPerSec = 5.5;
+		constexpr double SprintSpeedMetersPerSec = 8.0;
+		if (Arrivals.Num() >= 3)
+		{
+			const UNavigationPath* CrossPath = Navigation->FindPathToLocationSynchronously(Context.World, Arrivals[0].Location, Arrivals[2].Location);
+			if (Context.Test->TestTrue(TEXT("A path crosses the island from north to south"), CrossPath != nullptr && CrossPath->IsValid()))
+			{
+				const double CrossMeters = CrossPath->GetPathLength() / CentimetersPerMeter;
+				const double WalkMinutes = (CrossMeters / WalkSpeedMetersPerSec) / 60.0;
+				const double SprintMinutes = (CrossMeters / SprintSpeedMetersPerSec) / 60.0;
+				Context.Test->AddInfo(FString::Printf(TEXT("Island crossing (North -> South): %.0f m path (%.1f min walking, %.1f min sprinting)"), CrossMeters, WalkMinutes, SprintMinutes));
+				Context.Test->TestTrue(TEXT("Crossing the island takes a substantial walk"), CrossMeters >= 380.0);
+			}
+		}
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		if (Arrivals.Num() >= 1 && Run->GetActiveFire() != nullptr)
+		{
+			const FVector BossSpot = Run->GetBossPlace();
+			const FVector FireSpot = Run->GetActiveFire()->GetActorLocation();
+			const UNavigationPath* ToBoss = Navigation->FindPathToLocationSynchronously(Context.World, Arrivals[0].Location, BossSpot);
+			const UNavigationPath* ToFire = Navigation->FindPathToLocationSynchronously(Context.World, BossSpot, FireSpot);
+			if (ToBoss != nullptr && ToBoss->IsValid() && ToFire != nullptr && ToFire->IsValid())
+			{
+				const double RouteMeters = (ToBoss->GetPathLength() + ToFire->GetPathLength()) / CentimetersPerMeter;
+				Context.Test->AddInfo(FString::Printf(TEXT("Direct route Arrival -> Boss -> Fire: %.0f m (%.1f min walking)"), RouteMeters, (RouteMeters / WalkSpeedMetersPerSec) / 60.0));
+			}
+		}
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

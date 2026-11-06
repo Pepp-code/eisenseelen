@@ -27,7 +27,7 @@
 		"sprungfelder_m": 9,
 		"mitte_m": 16,
 		"uebergang_m": 12,
-		"uebergang_berg_m": 45
+		"uebergang_berg_m": 16
 	},
 	"_umriss": "Stützpunkte der Küstenlinie im Uhrzeigersinn (x_m = Nord, y_m = Ost). Außerhalb fällt das Land über den Strand ins Flachwasser und dann auf den Meeresboden (-4 m) ab.",
 	"kueste_punkte": [
@@ -190,10 +190,10 @@
 		}
 	],
 	"erhebungen": [
-		{ "name": "Eisenjoch-West", "x_m": 5, "y_m": 30, "radius_x_m": 52, "radius_y_m": 46, "hoehe_m": 26, "steilheit": 0.45, "rampe_grad": 200 },
-		{ "name": "Eisenjoch-Mitte", "x_m": 18, "y_m": 75, "radius_x_m": 45, "radius_y_m": 52, "hoehe_m": 24, "steilheit": 0.45 },
-		{ "name": "Eisenjoch-Ost", "x_m": 28, "y_m": 122, "radius_x_m": 38, "radius_y_m": 44, "hoehe_m": 21, "steilheit": 0.45, "rampe_grad": 20 },
-		{ "name": "Wächterkuppe", "x_m": -25, "y_m": -105, "radius_x_m": 42, "radius_y_m": 42, "hoehe_m": 18, "steilheit": 0.42, "rampe_grad": 135 },
+		{ "name": "Eisenjoch-West", "x_m": 5, "y_m": 25, "radius_x_m": 52, "radius_y_m": 44, "hoehe_m": 26, "steilheit": 0.45, "rampe_grad": 200 },
+		{ "name": "Eisenjoch-Mitte", "x_m": 22, "y_m": 88, "radius_x_m": 45, "radius_y_m": 52, "hoehe_m": 24, "steilheit": 0.45 },
+		{ "name": "Eisenjoch-Ost", "x_m": 28, "y_m": 128, "radius_x_m": 38, "radius_y_m": 44, "hoehe_m": 21, "steilheit": 0.45, "rampe_grad": 20 },
+		{ "name": "Wächterkuppe", "x_m": -25, "y_m": -110, "radius_x_m": 42, "radius_y_m": 42, "hoehe_m": 18, "steilheit": 0.42, "rampe_grad": 135 },
 		{ "name": "Klippenkap-Nordwest", "x_m": 135, "y_m": -225, "radius_x_m": 45, "radius_y_m": 32, "hoehe_m": 22, "steilheit": 0.38, "rampe_grad": 340 },
 		{ "name": "Ostgrat-Fels", "x_m": 25, "y_m": 210, "radius_x_m": 35, "radius_y_m": 26, "hoehe_m": 14, "steilheit": 0.45, "rampe_grad": 240 },
 		{ "name": "Schluchtring-Wall", "x_m": 65, "y_m": -135, "innen_radius_m": 20, "aussen_radius_m": 38, "hoehe_m": 11, "luecke_grad": [135, 310] }
@@ -231,7 +231,7 @@
 		"eingang_nord": { "x_m": 58, "y_m": 65, "hoehe_m": 0.0 },
 		"eingang_sued": { "x_m": -28, "y_m": 72, "hoehe_m": 0.0 },
 		"eingang_west": { "x_m": 8, "y_m": -8, "hoehe_m": 0.0 },
-		"halle_mitte": { "x_m": 14, "y_m": 58, "radius_m": 18, "hoehe_m": 0.0, "decke_hoehe_m": 9.0 },
+		"halle_mitte": { "x_m": 14, "y_m": 58, "radius_m": 12, "hoehe_m": 0.0, "decke_hoehe_m": 9.0 },
 		"gang_breite_m": 10.0,
 		"gang_hoehe_m": 6.0
 	},

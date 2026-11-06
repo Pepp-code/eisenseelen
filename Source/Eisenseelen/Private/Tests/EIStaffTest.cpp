@@ -247,6 +247,22 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 		return !Enemy;
 	}));
 
+	// A fireball aimed at the floor right beside an enemy still catches it in its blast radius.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
+		Context.Player->SetControlRotation(FRotator(-12.0f, 0.0f, 0.0f));
+		Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), FVector(-950.0f, 200.0f, HeroHeight), FRotator(0.0f, 180.0f, 0.0f));
+	}));
+	Steps.Add(Wait(0.1));
+	AddChargedRelease(Steps);
+	Steps.Add(WaitUntil(TEXT("the ground fireball blast kills the nearby runner"), 3.0, [](const FEIPlayContext& Context)
+	{
+		TActorIterator<AEIEnemy> Enemy(Context.World);
+		return !Enemy;
+	}));
+	Steps.Add(WaitForFullMana());
+
 	// The switch back: the class stays over a restart, and the blade warden swings instead of firing.
 	AddTap(Steps, EKeys::R);
 	Steps.Add(WaitUntil(TEXT("the fresh hero exists"), 3.0, [](const FEIPlayContext& Context) { return Context.Hero->GetHealth()->GetHealth() > 0.0f && Context.Movement->IsMovingOnGround(); }));

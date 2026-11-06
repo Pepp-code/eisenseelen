@@ -293,7 +293,20 @@ bool FEIBossRunTest::RunTest(const FString& Parameters)
 		Context.Test->TestFalse(TEXT("Before the boss the fire stays cold"), Run->GetActiveFire()->IsLit());
 		Context.Test->TestEqual(TEXT("And the run goes on"), GetState(Context)->GetRunPhase(), EEIRunPhase::Exploring);
 		Context.Test->TestTrue(TEXT("The note says why"), Context.Player->GetProfile()->GetRewardText().Contains(TEXT("Boss")));
+		FEIContract OpenContract;
+		OpenContract.Kind = EEIContractKind::Shrine;
+		Context.World->GetGameState<AEIGameState>()->SetContracts({ OpenContract });
 		StandBeside(Context, Run->GetAnchors()[0], 200.0f);
+	}));
+
+	// Before the side jobs are done, the Bannbruch stays locked.
+	Steps.Add(Wait(0.15));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const TArray<TObjectPtr<AEIAnchorStone>>& Anchors = GetRun(Context)->GetAnchors();
+		Context.Test->TestFalse(TEXT("With open side jobs nobody can hold a stone"), Anchors[0]->IsHeld());
+		Context.Test->TestEqual(TEXT("Its time stays untouched"), Anchors[0]->GetHoldLeft(), ShortHoldSeconds);
+		GetRun(Context)->SkipContracts(1);
 	}));
 
 	// In the zone of a stone the time runs, and only there.
