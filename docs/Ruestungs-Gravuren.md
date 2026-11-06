@@ -18,27 +18,27 @@ Bei uns heißt das: Gravuren (Stufen 1–5), Meisterstücke (der Krönungs-Slot)
 
 Bei DRG gehört der Ausbau jeder einzelnen Waffe. Bei uns haben Waffen eine Zwischenebene: Alle Exemplare einer Grundform teilen sich die Gravuren (Langschwert-Gravuren gelten für jedes Langschwert), gekauft wird pro Exemplar.
 
-Für die Rüstung gibt es drei Möglichkeiten:
+Für die Rüstung gab es drei Möglichkeiten:
 
-1. **Ein Baum je Platz, gehört dem Helden** (empfohlen): Helm, Brustpanzer, Handschuhe und Schuhe haben je einen eigenen Baum mit 5 Stufen. Was du kaufst, gilt für jedes Teil, das du an diesem Platz trägst — Eisenwacht-Helm oder Frostwacht-Helm. Die Set-Boni der Art bleiben trotzdem der Grund, die Art zu wechseln; die Gravuren machen dich unabhängig davon stärker.
+1. **Ein Baum je Platz, gehört dem Helden:** Helm, Brustpanzer, Handschuhe und Schuhe haben je einen eigenen Baum mit 5 Stufen. Was du kaufst, gilt für jedes Teil, das du an diesem Platz trägst — Eisenwacht-Helm oder Frostwacht-Helm. Die Set-Boni der Art bleiben trotzdem der Grund, die Art zu wechseln; die Gravuren machen dich unabhängig davon stärker.
 2. Ein Baum je Art (10 Bäume): alle vier Teile einer Art zusammen. Wer die Art wechselt, verliert den Fortschritt — hart, aber am nächsten an „pro Waffe kaufen" der Einzelteile.
 3. Ein Baum je einzelner Teil (40 Bäume): am nächsten an DRG, aber unbezahlbar — ein Vollausbau käme auf rund 260.000 Gold.
 
-**Empfehlung ist Möglichkeit 1**, aus drei Gründen: Die Gesamtkosten bleiben im Bereich von vier Waffen (spielbar), der Spieler muss nicht denselben Baum vierzigmal bezahlen, und die Baustelle im Menü bleibt übersichtlich (vier Bäume, nicht vierzig). Bei den Waffen gilt dasselbe Prinzip schon: Der Baum gehört der Grundform, nicht dem einzelnen gekauften Exemplar — nur dass dort pro Exemplar gekauft wird, weil man nur eine Waffe trägt.
+**Entschieden am 6. November 2026: Möglichkeit 1, ein Baum je Platz.** Die Gesamtkosten bleiben im Bereich von vier Waffen (spielbar), der Spieler muss nicht denselben Baum vierzigmal bezahlen, und die Baustelle im Menü bleibt übersichtlich (vier Bäume, nicht vierzig). Bei den Waffen gilt dasselbe Prinzip schon: Der Baum gehört der Grundform, nicht dem einzelnen gekauften Exemplar — nur dass dort pro Exemplar gekauft wird, weil man nur eine Waffe trägt.
 
 Kosten der Punkte: Rüstungs-Gravuren kosten Gold und Punkte der Fraktion, zu der das Teil gehört, das du beim Kauf an dem Platz trägst. Wer also in der Frostwacht kauft, zahlt Frostpunkte — genau wie Feuerwaffen Feuerpunkte kosten.
 
 ## Die vier Bäume
 
-Jeder Baum hat wie die Waffen 5 Stufen mit je 2 (selten 3) Gravuren, von denen eine aktiv ist. Die Stufen 1 bis 4 verbessern vorhandene Werte, die Stufe 5 ändert wie bei den Waffen eine Regel. Alle Zahlen sind erste Annahmen und stehen dann in `Data/gravuren.json` zum Ändern.
+Jeder Baum hat wie die Waffen 5 Stufen mit je 2 bis 3 Gravuren (entschieden am 6. November 2026: wie bei den Waffen 2–3), von denen eine aktiv ist. Die Stufen 1 bis 4 verbessern vorhandene Werte, die Stufe 5 ändert wie bei den Waffen eine Regel. Alle Zahlen sind erste Annahmen und stehen dann in `Data/gravuren.json` zum Ändern.
 
 ### Helm — Zauber und Sinne
 
 | Stufe | Thema | Zur Wahl | Kosten |
 | --- | --- | --- | --- |
-| 1 | Zauber | Runenkranz: E +15 % Schaden, oder Klarer Kranz: E 15 % schneller bereit | 200 Gold, 10 Punkte |
+| 1 | Zauber | Runenkranz: E +15 % Schaden, oder Klarer Kranz: E 15 % schneller bereit, oder Heller Kranz: +10 % Zaubermacht | 200 Gold, 10 Punkte |
 | 2 | Mana | Kristallkranz: +25 Mana, oder Sparsamer Kranz: −10 % Manakosten | 350 Gold, 15 Punkte |
-| 3 | Zustände | Tiefer Kranz: Zustände 25 % länger, oder Weißer Kranz: +15 % Zaubermacht | 500 Gold, 20 Punkte |
+| 3 | Zustände | Tiefer Kranz: Zustände 25 % länger, oder Weißer Kranz: +15 % Zaubermacht, oder Kühler Kranz: Zustände auf dir 25 % kürzer | 500 Gold, 20 Punkte |
 | 4 | Reaktion | Zeitkranz: 0,5 s mehr Reaktionsfenster, oder Funkelkranz: +20 % Reaktionsschaden | 700 Gold, 30 Punkte |
 | 5 | Neue Regel | Klare Stimme: Q wirkt bei vollem Mana 25 % stärker, oder Zweitgedanke: Q 20 % schneller bereit, dafür +10 % Manakosten aller Zauber | 1.000 Gold, 40 Punkte |
 
@@ -46,8 +46,8 @@ Jeder Baum hat wie die Waffen 5 Stufen mit je 2 (selten 3) Gravuren, von denen e
 
 | Stufe | Thema | Zur Wahl | Kosten |
 | --- | --- | --- | --- |
-| 1 | Leben | Gefüttert: +40 Leben, oder Gehärtet: +5 % Rüstung | 200 Gold, 10 Punkte |
-| 2 | Erholung | Ruhige Brust: Leben-Erholung setzt 1 s früher ein, oder Dickes Fell: +8 % Rüstung | 350 Gold, 15 Punkte |
+| 1 | Leben | Gefüttert: +40 Leben, oder Gehärtet: +5 % Rüstung, oder Vernietet: +25 Leben und +2 % Rüstung | 200 Gold, 10 Punkte |
+| 2 | Erholung | Ruhige Brust: Leben-Erholung setzt 1 s früher ein, oder Dickes Fell: +8 % Rüstung, oder Starke Lunge: Leben-Erholung heilt +2 % pro Sekunde | 350 Gold, 15 Punkte |
 | 3 | Widerstand | Brennfeste Platte: −25 % Zustandsschaden, oder Stoßdämpfer: −20 % Schaden von schweren Hieben | 500 Gold, 20 Punkte |
 | 4 | Standhaft | Fester Stand: weniger Rückstoß durch Treffer, oder Zäher Kern: unter 30 % Leben 20 % weniger Schaden | 700 Gold, 30 Punkte |
 | 5 | Neue Regel | Letzter Atem: einmal je Lauf tödlicher Schaden lässt dich mit 25 % Leben weiterkämpfen, oder Adlerbrust: +15 % Leben, aber 1 s länger keine Leben-Erholung | 1.000 Gold, 40 Punkte |
@@ -56,9 +56,9 @@ Jeder Baum hat wie die Waffen 5 Stufen mit je 2 (selten 3) Gravuren, von denen e
 
 | Stufe | Thema | Zur Wahl | Kosten |
 | --- | --- | --- | --- |
-| 1 | Angriff | Feste Hand: +8 % Angriffskraft, oder Schnelle Hand: +8 % Angriffstempo | 200 Gold, 10 Punkte |
+| 1 | Angriff | Feste Hand: +8 % Angriffskraft, oder Schnelle Hand: +8 % Angriffstempo, oder Wuchtige Hand: +10 % Schaden mit schwerem Hieb | 200 Gold, 10 Punkte |
 | 2 | Block | Breiter Griff: +10 % Blockstärke, oder Wuchtiger Griff: schwerer Hieb lädt 20 % schneller | 350 Gold, 15 Punkte |
-| 3 | Treffer | Scharfer Daumen: +25 % Schaden gegen taumelnde Gegner, oder Langer Griff: +10 % Angriffsreichweite | 500 Gold, 20 Punkte |
+| 3 | Treffer | Scharfer Daumen: +25 % Schaden gegen taumelnde Gegner, oder Langer Griff: +10 % Angriffsreichweite, oder Grober Griff: +15 % Schaden gegen blockende Gegner | 500 Gold, 20 Punkte |
 | 4 | Zauber | Zaubertatze: Q +15 % Schaden, oder Flinke Tatze: Q 15 % schneller bereit | 700 Gold, 30 Punkte |
 | 5 | Neue Regel | Doppelschwung: der schwere Hieb trifft in einem kleinen Kreis statt nur vor dir, oder Eiserne Faust: Parieren macht den nächsten Hieb sofort bereit, aber −10 % Angriffstempo | 1.000 Gold, 40 Punkte |
 
@@ -66,37 +66,45 @@ Jeder Baum hat wie die Waffen 5 Stufen mit je 2 (selten 3) Gravuren, von denen e
 
 | Stufe | Thema | Zur Wahl | Kosten |
 | --- | --- | --- | --- |
-| 1 | Tempo | Leichte Sohlen: +5 % Tempo, oder Feste Sohlen: +2 % Rüstung | 200 Gold, 10 Punkte |
+| 1 | Tempo | Leichte Sohlen: +5 % Tempo, oder Feste Sohlen: +2 % Rüstung, oder Griffige Sohlen: volles Tempo im Flachwasser | 200 Gold, 10 Punkte |
 | 2 | Ausdauer | Läufersohlen: Sprünge weiter, oder Stille Sohlen: Gegner bemerken dich 20 % später | 350 Gold, 15 Punkte |
-| 3 | Trittfest | Rutschfeste Sohlen: weniger Rutschen auf Eis und im Wind, oder Sprintsohlen: nach 2 s Laufen +10 % Tempo | 500 Gold, 20 Punkte |
+| 3 | Trittfest | Rutschfeste Sohlen: weniger Rutschen auf Eis und im Wind, oder Sprintsohlen: nach 2 s Laufen +10 % Tempo, oder Fester Tritt: Blocken bremst dich nicht | 500 Gold, 20 Punkte |
 | 4 | Reaktion | Flinke Sohlen: nach einer Parade 1 s +20 % Tempo, oder Flinker Rückzug: nach einem Treffer kurz +15 % Tempo | 700 Gold, 30 Punkte |
 | 5 | Neue Regel | Windläufer: Wind und Rückstoß stoßen dich nicht mehr zurück, dafür −10 Leben, oder Doppelschritt: einmal je 12 s ein kurzer Sprung nach vorn in Blickrichtung | 1.000 Gold, 40 Punkte |
 
-Alle vier Bäume zusammen kosten so etwa 26.000 Gold und 460 Punkte — wie vier Waffen im Vollausbau. Ein voll ausgebauter Held (Waffe + Rüstung) investiert damit in etwa 20 bis 25 gute Läufe, das ist bewusst ein langfristiges Ziel. Die Preise stehen in `Data/gravuren.json` und lassen sich jederzeit senken.
+Alle vier Bäume zusammen kosten so etwa 26.000 Gold und 460 Punkte — wie vier Waffen im Vollausbau. Ein voll ausgebauter Held (Waffe + Rüstung) investiert damit in etwa 20 bis 25 gute Läufe. **Entschieden am 6. November 2026: Die Kosten bleiben so hoch.** Das Spiel soll viele Stunden tragen, nicht in einem Lauf durchgespielt sein. Die Preise stehen in `Data/gravuren.json` und lassen sich jederzeit ändern.
 
 ## Meisterstücke für die Rüstung
 
-Bei den Waffen trägt jedes Exemplar ein Meisterstück (Sauber / Ausgewogen / Riskant, 1.500 Gold, 80 Punkte, eine seltene Zutat). Für die Rüstung empfiehlt dieser Plan: **nur der Brustpanzer bekommt ein Meisterstück**, das „Herzstück" der Rüstung. Vier Meisterstück-Slots je Held würde die seltene Zutat entwerten, und die Brust ist der Platz der großen Regel (Stufe 5). Beispiele:
+Bei den Waffen trägt jedes Exemplar ein Meisterstück (Sauber / Ausgewogen / Riskant, 1.500 Gold, 80 Punkte, eine seltene Zutat). **Entschieden am 6. November 2026: Neben der Waffe bekommen die Brust und die Handschuhe Meisterstücke.** Helm und Schuhe bleiben ohne — drei Slots halten die seltene Zutat wertvoll, und die Brust ist der Platz der großen Regel (Stufe 5), die Handschuhe der Platz des Angriffs. Beispiele:
+
+**Herzstück (Brustpanzer):**
 
 - **Sauber:** Herz aus Eisen — +10 % Rüstung, kein Nachteil.
 - **Ausgewogen:** glühendes Herz — +20 % Leben, aber 1 s später beginnt die Leben-Erholung.
 - **Riskant:** Herz der Leere — +30 % Schaden, aber −25 % Leben.
 
-Ob Handschuhe, Helm und Schuhe später auch Meisterstücke bekommen, bleibt offen (siehe unten).
+**Meistergriff (Handschuhe):**
+
+- **Sauber:** Eisenhände — +8 % Angriffskraft, kein Nachteil.
+- **Ausgewogen:** schwere Hände — +20 % Angriffskraft, aber −10 % Angriffstempo.
+- **Riskant:** rissige Hände — Parieren macht den nächsten Hieb doppelt so stark, aber −15 % Angriffskraft.
 
 ## Umsetzung in Schritten
 
 - **R1 — Daten:** `Data/gravuren.json` bekommt neben den Waffen-Grundformen einen Abschnitt `ruestung` mit den vier Bäumen. Struktur wie bei den Waffen, damit der vorhandene Parser fast unverändert bleibt.
 - **R2 — Fortschritt:** Das Profil speichert Gravuren-Fortschritt je Platz (bisher je Waffe). Die Menü-Seite „Gravuren" zeigt oben: getragene Waffe und die vier Plätze; Auswahl schaltet um, darunter der bekannte Stufen-Baum.
 - **R3 — Wirkung:** Die Gravuren wirken über die vorhandenen Werte (Leben, Rüstung, Tempo, Manakosten, Reaktionsfenster ...). Neue Regeln der Stufe 5 brauchen je ein paar Zeilen Code, wie bei den Waffen-Regeln der Stufe 5.
-- **R4 — Meisterwerk:** Zusammen mit den Waffen-Meisterstücken (Schritt G), derselbe Ablauf in der Schmiede.
+- **R4 — Meisterwerk:** Zusammen mit den Waffen-Meisterstücken (Schritt G), derselbe Ablauf in der Schmiede. Herzstück für die Brust, Meistergriff für die Handschuhe.
 - **R5 — Tests:** Kauf, Wechseln, Wirkung je Baum nach dem Muster der Waffen-Gravuren-Tests; die Bäume sind reine Daten, also laufen die Structure-Checks über JSON.
 
 Zeitlich passt R1 bis R3 in einen Arbeitsschritt, R4 liegt bei Schritt G (Meisterstücke). Der alte Entwurf (3 Stufen, 24 Zeilen) wird damit ersetzt.
 
-## Offene Fragen
+## Entscheidungen
 
-1. Bäume je Platz und Held (Empfehlung), je Art oder je einzelner Teil?
-2. Reichen zwei Auswahlmöglichkeiten je Stufe, oder sollen einzelne Stufen drei haben wie bei den Waffen?
-3. Soll es außer dem Brustpanzer später Meisterstücke für weitere Plätze geben?
-4. Passt die Gesamtrechnung (rund 26.000 Gold für die Rüstung, etwa wie vier Waffen)?
+Alle Fragen vom 6. November 2026 sind beantwortet:
+
+1. **Ein Baum je Platz** (Möglichkeit 1), gekauft mit den Punkten der Fraktion, zu der das getragene Teil gehört.
+2. **Je Stufe 2 bis 3 Gravuren zur Wahl**, wie bei den Waffen.
+3. **Meisterstücke für Waffe, Brust (Herzstück) und Handschuhe (Meistergriff).**
+4. **Die Kosten bleiben hoch** (rund 26.000 Gold, etwa 20 bis 25 gute Läufe): Das Spiel soll viele Stunden tragen, nicht in einem Lauf durchgespielt sein.

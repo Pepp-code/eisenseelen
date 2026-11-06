@@ -37,7 +37,7 @@ Bei uns ist die Anlegestelle mit der Barke der Saloon: Jagdbrett (jetzt mit Gebi
 | # | Element | Was es tun soll | Warum |
 | --- | --- | --- | --- |
 | A1 | Mitspieler-Rahmen | Kleine Leisten oben: Name, Klasse, Leben, Mana, Zustand (brennt/verlangsamt), Gefallen | Koop-Kern; heute sieht man von den anderen nichts |
-| A2 | Schadenszahlen | Kurze Zahlen über getroffenen Gegnern, eigene Treffer weiß, Reaktionen farbig | Gefühl für Wirkung der Builds |
+| A2 | Schadenszahlen | Kurze Zahlen über getroffenen Gegnern, nur eigene Treffer (entschieden am 6. November 2026), in den Einstellungen abschaltbar; Reaktionen farbig | Gefühl für Wirkung der Builds |
 | A3 | Beute-Meldungen | Eingenommenes Gold/Punkte/Zutaten als kurze Zeile unten, wiederholbar | Heute sieht man Beute erst in der Abrechnung |
 | A4 | Blutmond-Uhr | Countdown, wenn der Blutmond noch nicht da ist („Blutmond in 1:20") | Entscheidungsgrund, zu fliehen oder zu bleiben |
 | A5 | Vertragsfortschritt | Statt nur „2 von 4": je Vertrag eine Zeile mit Ziel und Abstand im Haupt-HUD (kompakt) | Wegfinden ohne Karte |
@@ -52,7 +52,7 @@ Bei uns ist die Anlegestelle mit der Barke der Saloon: Jagdbrett (jetzt mit Gebi
 | # | Element | Was es tun soll |
 | --- | --- | --- |
 | B1 | Legende | Was die Farben und Buchstaben bedeuten, immer sichtbar |
-| B2 | Lager und Truhen | Graue Punkte für Lager (entdeckt beim Vorbeikommen), Truhen der Leeren Wacht |
+| B2 | Lager und Truhen | Graue Punkte für Lager, aber nur entdeckte (entschieden am 6. November 2026: nur, was man gesehen hat), dazu Truhen der Leeren Wacht |
 | B3 | Mitspieler | Standorte der anderen mit Blickrichtung |
 | B4 | Barke | Standort, wenn sie da ist |
 | B5 | Gebietsgrenzen | Die gebiete aus laufkarte.json als Kreise mit Namen |
@@ -105,10 +105,13 @@ Jeder Schritt ist ein eigener Auftrag mit grünen Tests am Ende. Reihenfolge nac
 
 Tests: Menü-Inhalte nach dem Elementlisten-Muster (Knöpfe klicken, Zustand prüfen); HUD-Werte über den GameState/Meldungs-Dienst; Karten-Inhalte als reine Daten (was gezeigt wird, nicht wie).
 
+## Entscheidungen vom 6. November 2026
+
+- **Schadenszahlen:** Es werden nur eigene Treffer angezeigt, in den Einstellungen abschaltbar (A2).
+- **Karte:** Sie zeigt nur entdeckte Lager, nicht alle (B2).
+- **Rüstungs-Gravuren** (siehe `docs/Ruestungs-Gravuren.md`): ein Baum je Platz, 2 bis 3 zur Wahl je Stufe, Meisterstücke für Waffe, Brust und Handschuhe, Kosten bleiben hoch.
+
 ## Offene Fragen
 
 1. Soll das Titelbild (D1) schon vor dem ersten Spielen da sein, oder erst, wenn Freunde mitspielen können?
-2. Schadenszahlen: immer an, oder als Einstellung (an / nur eigene / aus)?
-3. Zeigt die Karte (M) auch unentdeckte Lager — oder nur, die man schon gesehen hat (Empfehlung: nur entdeckte)?
-4. Maus im Menü: Heute klickt das Menü mit der Maus. Soll alles zusätzlich per Tasten gehen (Pfeile + Enter), damit später Controller möglich bleiben?
-5. Reicht die Reihenfolge U1 bis U8, oder soll etwas nach vorn?
+2. Maus im Menü: Heute klickt das Menü mit der Maus. Soll alles zusätzlich per Tasten gehen (Pfeile + Enter), damit später Controller möglich bleiben?
