@@ -46,10 +46,13 @@ def tap(key):
 
 
 def ground_at(x, y):
-    """The height of the terrain, or 0 where nothing is below."""
-    start, end = unreal.Vector(x, y, 10000), unreal.Vector(x, y, -10000)
-    hit = unreal.SystemLibrary.line_trace_single(world(), start, end, unreal.TraceTypeQuery.ECC_VISIBILITY, False, [pawn()], unreal.DrawDebugTrace.NONE, True)
-    return hit.to_tuple()[4].z if hit is not None and hit.to_tuple()[0] else 0.0
+    """The height of the terrain, or 0 where nothing is below. Traces from below the tunnel roof first."""
+    for start_z in (400, 10000):
+        start, end = unreal.Vector(x, y, start_z), unreal.Vector(x, y, -10000)
+        hit = unreal.SystemLibrary.line_trace_single(world(), start, end, unreal.TraceTypeQuery.ECC_VISIBILITY, False, [pawn()], unreal.DrawDebugTrace.NONE, True)
+        if hit is not None and hit.to_tuple()[0]:
+            return hit.to_tuple()[4].z
+    return 0.0
 
 
 def stand_looking_at(location, target, height=None):
@@ -204,7 +207,7 @@ def scenario():
     yield AFTER_SHOT_SECONDS
 
     # The sky under the blood moon, and back for the rest of the pictures.
-    stand_looking_at((0, 0), (4000, 0, 900))
+    stand_looking_at((2500, -5500), (6000, -1000, 1400))
     player().preview_blood_moon(True)
     yield 5.0
     shot()
@@ -217,6 +220,17 @@ def scenario():
         movement().set_movement_mode(unreal.MovementMode.MOVE_FLYING)
         pawn().set_actor_location(unreal.Vector(x, y, OVERVIEW_HEIGHT), False, True)
         player().set_control_rotation(unreal.Rotator(0, -22, yaw))
+        yield SETTLE_SECONDS
+        shot()
+        yield AFTER_SHOT_SECONDS
+
+    # Forest road in Der Seelenforst, inside the torch-lit Eisenjoch cavern, and across Das Bleiche Moor.
+    for loc, tgt in (
+        ((11000, -2500), (3500, -5500, 300)),
+        ((-800, 5800), (1400, 5800, 220)),
+        ((-10200, 10800), (-13500, 14500, 180)),
+    ):
+        stand_looking_at(loc, tgt)
         yield SETTLE_SECONDS
         shot()
         yield AFTER_SHOT_SECONDS

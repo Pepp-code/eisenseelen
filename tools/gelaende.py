@@ -277,6 +277,207 @@ class Gelaende:
         land_h = dry_h * (1.0 - coast_blend) + beach_h * coast_blend
         return land_h * (1.0 - pave) - streams * (1.0 - flat)
 
+    def slope_deg(self, x, y, step_m=1.0):
+        """Geländeneigung in Grad an der Stelle (x, y)."""
+        h = self.height_m(x, y)
+        dx = (self.height_m(x + step_m, y) - h) / step_m
+        dy = (self.height_m(x, y + step_m) - h) / step_m
+        return math.degrees(math.atan(math.hypot(dx, dy)))
+
+    def is_forest_clear(self, x, y, allow_shallow_water=False):
+        """Prüft, dass ein Baum oder Busch keinen Weg, Platz, Tunnel, Felsen oder Boss-Korridor versperrt."""
+        wald_cfg = self.design.get("wald", {})
+        road_pad = wald_cfg.get("weg_puffer_m", 5.0)
+        spot_pad = wald_cfg.get("platz_puffer_m", 5.0)
+
+        r = math.hypot(x, y)
+        coast_r = self.coast_radius(x, y)
+        if allow_shallow_water:
+            if r > coast_r + 12.0:
+                return False
+        else:
+            if r > coast_r - 10.0 or self.stream_depth(x, y) > 0.05:
+                return False
+
+        if self.flat_weight(x, y, blend_override=spot_pad) > 0.01:
+            return False
+        if self.tunnel_cut_weight(x, y) > 0.01 or self.bridge_bank_weight(x, y) > 0.01:
+            return False
+
+        for road in self.design.get("wege", {}).get("polylinien", []):
+            if _polyline_distance(x, y, road["punkte"]) < road["breite_m"] * 0.5 + road_pad:
+                return False
+
+        for b in self.design.get("bruecken", []):
+            ang = math.radians(b["drehung_grad"])
+            hl = b["laenge_m"] * 0.5 + 3.0
+            p0 = (b["x_m"] - hl * math.cos(ang), b["y_m"] - hl * math.sin(ang))
+            p1 = (b["x_m"] + hl * math.cos(ang), b["y_m"] + hl * math.sin(ang))
+            if _segment_distance(x, y, p0[0], p0[1], p1[0], p1[1]) < b["breite_m"] * 0.5 + 6.0:
+                return False
+
+        # Boss-Rücklaufkorridor (48 m nach Norden für FEIBossRunTest) freihalten
+        for bp in self.karte.get("bossplaetze", []):
+            if _segment_distance(x, y, bp["x_m"], bp["y_m"], bp["x_m"] + 54.0, bp["y_m"]) < 7.0:
+                return False
+
+        # Sprungfelder samt Landeturm (+3.5 m Nord) freihalten
+        for pad in self.karte.get("sprungfelder", []):
+            if math.hypot(x - (pad["x_m"] + 3.5), y - pad["y_m"]) < 12.0:
+                return False
+
+        # Felsen und Felsmauern freihalten
+        felsen = self.design.get("felsen", {})
+        for kl in felsen.get("klippen", []):
+            rad = max(kl["groesse_m"][0], kl["groesse_m"][1]) * 0.5 + 3.0
+            if math.hypot(x - kl["x_m"], y - kl["y_m"]) < rad:
+                return False
+        for mw in felsen.get("felsmauern", []):
+            ang = math.radians(mw.get("drehung_grad", 0.0))
+            hl = mw["laenge_m"] * 0.5
+            p0 = (mw["x_m"] - hl * math.cos(ang), mw["y_m"] - hl * math.sin(ang))
+            p1 = (mw["x_m"] + hl * math.cos(ang), mw["y_m"] + hl * math.sin(ang))
+            if _segment_distance(x, y, p0[0], p0[1], p1[0], p1[1]) < mw["breite_m"] * 0.5 + 3.5:
+                return False
+
+        for c in wald_cfg.get("freihalten_kreise", []):
+            if math.hypot(x - c["x_m"], y - c["y_m"]) < c["radius_m"]:
+                return False
+
+        h = self.height_m(x, y)
+        if allow_shallow_water:
+            if not (-0.85 <= h <= 1.2):
+                return False
+        else:
+            if not (0.15 <= h <= 17.5):
+                return False
+
+        if self.slope_deg(x, y) > 32.0:
+            return False
+        return True
+
+    def forest_density(self, x, y):
+        """Walddichte (0.0 bis 0.85) an der Stelle (x, y)."""
+        if not self.is_forest_clear(x, y, allow_shallow_water=False):
+            return 0.0
+        dichte = self.design.get("wald", {}).get("dichte", {})
+        offen = dichte.get("offen", 0.08)
+        kern = dichte.get("kernwald", 0.85)
+        uebergang = dichte.get("uebergang", 0.36)
+
+        # Offene Regionen: Brachfelder (Nord), Steinbruch & Eisenturm (Nordost), Wrackküste (West)
+        if x > 115.0 and -105.0 < y < 45.0:
+            return offen
+        if x > 75.0 and y > 45.0 and math.hypot(x - 135.0, y - 120.0) < 95.0:
+            return offen
+        if y < -175.0 and -125.0 < x < 35.0:
+            return offen
+
+        # Dichter Kernwald rund um Eisenjoch, Wächterkuppe und Seelenforst
+        d_core = math.hypot((x - 10.0) / 135.0, (y - (-10.0)) / 155.0)
+        d_south = math.hypot((x - (-65.0)) / 80.0, (y - (-20.0)) / 105.0)
+        if d_core < 1.0 or d_south < 1.0:
+            return kern
+        return uebergang
+
+    def generate_forest(self):
+        """Erzeugt deterministisch Kiefern, tote Bäume und Büsche für Planbild und Laufkarte."""
+        wald_cfg = self.design.get("wald", {})
+        rng = random.Random(self.design.get("zufall", 13) + wald_cfg.get("zufall_versatz", 99))
+        step = float(wald_cfg.get("raster_m", 10.0))
+        jitter = float(wald_cfg.get("streuung_m", 3.4))
+        half = self.half_m - 25.0
+
+        items = []
+        trunks = []
+
+        def trunk_free(px, py, min_dist=4.5):
+            return all(math.hypot(px - tx, py - ty) >= min_dist for tx, ty in trunks)
+
+        # 1. Kiefern und Sumpfbäume über das Inselraster
+        x = -half
+        while x <= half:
+            y = -half
+            while y <= half:
+                jx = x + rng.uniform(-jitter, jitter)
+                jy = y + rng.uniform(-jitter, jitter)
+                dens = self.forest_density(jx, jy)
+                if dens > 0.0 and rng.random() < dens and trunk_free(jx, jy, 4.8):
+                    z = self.height_m(jx, jy)
+                    in_moor = jx < -65.0 and jy > 70.0
+                    in_marsch = jx > 40.0 and jy < -95.0 and z < 0.55
+                    if (in_moor and rng.random() < 0.65) or (in_marsch and rng.random() < 0.35):
+                        items.append({
+                            "art": "baum_tot",
+                            "x_m": round(jx, 2),
+                            "y_m": round(jy, 2),
+                            "z_m": round(z, 2),
+                            "breite_m": round(rng.uniform(1.8, 2.6), 2),
+                            "hoehe_m": round(rng.uniform(7.5, 10.8), 2),
+                            "stamm_m": round(rng.uniform(0.58, 0.76), 2),
+                            "drehung_grad": round(rng.uniform(0.0, 360.0), 1),
+                        })
+                    else:
+                        items.append({
+                            "art": "kiefer",
+                            "x_m": round(jx, 2),
+                            "y_m": round(jy, 2),
+                            "z_m": round(z, 2),
+                            "breite_m": round(rng.uniform(3.8, 5.2), 2),
+                            "hoehe_m": round(rng.uniform(10.8, 14.2), 2),
+                            "stamm_m": round(rng.uniform(0.72, 0.90), 2),
+                            "drehung_grad": round(rng.uniform(0.0, 360.0), 1),
+                        })
+                    trunks.append((jx, jy))
+
+                # Unterholz-Busch versetzt prüfen (ohne Kollision)
+                bx = x + rng.uniform(-jitter, jitter)
+                by = y + rng.uniform(-jitter, jitter)
+                b_dens = self.forest_density(bx, by)
+                if b_dens > 0.0 and rng.random() < b_dens * 0.42 and trunk_free(bx, by, 2.4):
+                    bz = self.height_m(bx, by)
+                    items.append({
+                        "art": "busch",
+                        "x_m": round(bx, 2),
+                        "y_m": round(by, 2),
+                        "z_m": round(bz, 2),
+                        "breite_m": round(rng.uniform(1.6, 2.5), 2),
+                        "hoehe_m": round(rng.uniform(1.0, 1.45), 2),
+                        "stamm_m": 0.0,
+                        "drehung_grad": round(rng.uniform(0.0, 360.0), 1),
+                    })
+                y += step
+            x += step
+
+        # 2. Gezielte Gruppen toter Bäume im Bleichen Moor, in der Nebelmarsch und im Küsten-Flachwasser
+        for grp in wald_cfg.get("tote_baeume_gruppen", []):
+            gx, gy, grad = grp["x_m"], grp["y_m"], grp["radius_m"]
+            placed = 0
+            attempts = 0
+            while placed < grp["anzahl"] and attempts < grp["anzahl"] * 12:
+                attempts += 1
+                ang = rng.uniform(0.0, 2.0 * math.pi)
+                dist = grad * math.sqrt(rng.random())
+                tx = gx + dist * math.cos(ang)
+                ty = gy + dist * math.sin(ang)
+                if not self.is_forest_clear(tx, ty, allow_shallow_water=True) or not trunk_free(tx, ty, 4.2):
+                    continue
+                tz = self.height_m(tx, ty)
+                items.append({
+                    "art": "baum_tot",
+                    "x_m": round(tx, 2),
+                    "y_m": round(ty, 2),
+                    "z_m": round(tz, 2),
+                    "breite_m": round(rng.uniform(1.8, 2.5), 2),
+                    "hoehe_m": round(rng.uniform(7.5, 11.0), 2),
+                    "stamm_m": round(rng.uniform(0.58, 0.76), 2),
+                    "drehung_grad": round(rng.uniform(0.0, 360.0), 1),
+                })
+                trunks.append((tx, ty))
+                placed += 1
+
+        return items
+
     def resolution(self):
         res = self.design["aufloesung"]
         side = res["teile_pro_seite"] * res["quadrate_pro_teil"] + 1
@@ -381,6 +582,16 @@ def draw_preview(path):
         p0 = to_pixel(mw["x_m"] - hl * math.cos(ang), mw["y_m"] - hl * math.sin(ang))
         p1 = to_pixel(mw["x_m"] + hl * math.cos(ang), mw["y_m"] + hl * math.sin(ang))
         draw.line([p0, p1], fill=(105, 110, 118), width=max(2, int(mw["breite_m"] * scale)))
+    forest = terrain.generate_forest()
+    for item in forest:
+        px, py = to_pixel(item["x_m"], item["y_m"])
+        rad = max(2.0, item["breite_m"] * 0.5 * scale)
+        if item["art"] == "busch":
+            draw.ellipse([px - rad, py - rad, px + rad, py + rad], fill=(56, 88, 38))
+        elif item["art"] == "baum_tot":
+            draw.ellipse([px - rad, py - rad, px + rad, py + rad], fill=(142, 128, 108), outline=(78, 68, 56), width=1)
+        else:
+            draw.ellipse([px - rad, py - rad, px + rad, py + rad], fill=(32, 64, 24), outline=(18, 42, 14), width=1)
     tun = terrain.design.get("tunnel")
     if tun:
         hm = tun["halle_mitte"]
@@ -396,7 +607,10 @@ def draw_preview(path):
         px, py = to_pixel(reg["x_m"], reg["y_m"])
         draw.rectangle([px - 52, py - 8, px + 52, py + 8], fill=(20, 25, 30))
         draw.text((px - 48, py - 6), reg["name"], fill=(255, 245, 200))
-    draw.text((12, 12), f"Aschenwerder ({int(terrain.size_m)}x{int(terrain.size_m)} m): Höhe {low / 100:.1f} bis {high / 100:.1f} m (+X = Nord oben, +Y = Ost rechts)", fill=(255, 255, 255))
+    n_pines = sum(1 for item in forest if item["art"] == "kiefer")
+    n_dead = sum(1 for item in forest if item["art"] == "baum_tot")
+    n_bushes = sum(1 for item in forest if item["art"] == "busch")
+    draw.text((12, 12), f"Aschenwerder ({int(terrain.size_m)}x{int(terrain.size_m)} m): Höhe {low / 100:.1f} bis {high / 100:.1f} m | Wald: {n_pines} Kiefern, {n_dead} tote Bäume, {n_bushes} Büsche", fill=(255, 255, 255))
     image.save(path)
     return path
 

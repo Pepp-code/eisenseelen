@@ -514,8 +514,8 @@ In `Source/Eisenseelen/Private/Tests/EIRunTest.cpp` erweitern wir `Eisenseelen.P
 - **K2 Grundform (`600 × 600 m` Insel-Landschaft, Höhenplan, geschichtetes `M_Gelaende`, `Run.Terrain`):** erledigt (58/58 Tests grün)
 - **K3 Spielorte neu verteilen:** erledigt (4 Küsten-Ankünfte, 4 Bossplätze, 4 Signalfeuer, 8 Altäre/Schreine, 18 Lager, 5 Sprungfelder, 14 Truhen; Bannbruch erst nach Abschluss aller 3 Nebenaufträge)
 - **K4 Wasser und Wege:** erledigt (Wasserspiegel `M_Wasser` auf `-0,15 m`, unsichtbare Tiefwasser-Küstensperre, `85 %` Tempo im Flachwasser, 9 Holzbrücken/Stege mit `M_Holz`, alle Wege als Sandschicht in `M_Gelaende`)
-- **K5 Felsmassiv und Tunnel:** erledigt (Y-förmiger Tunnel durch das Eisenjoch mit Mittelhalle, Banditenlager `lager[0]`, 4 Stützpfeilern, Felsdach, 3 Portalen und Fackelbeleuchtung; 25 Klippen/Schären und 8 niedrige Felsmauern aus `bauteil.*` mit `M_Fels`)
-- **K6 Wald:** als Nächstes
-- **K7 Orte mit Charakter:** offen
+- **K5 Felsmassiv und Tunnel:** erledigt (Y-förmiger Tunnel durch das Eisenjoch mit Mittelhalle, Banditenlager `lager[0]`, 4 Stützpfeilern, Felsdach, 3 Portalen und Fackelbeleuchtung; 25 Klippen/Schären und 10 niedrige Felsmauern aus `bauteil.*` mit `M_Fels`)
+- **K6 Wald:** erledigt (306 Kiefern `bauteil.kiefer` mit 2-stufiger Krone ab `4,6 m` Höhe, 58 tote Bäume `bauteil.baum_tot` in Sumpf/Marsch/Flachwasser und 112 kollisionsfreie Büsche `bauteil.busch` mit `M_Laub` und `120 m` Sichtweite, gebündelt in 4 `AEIInstancedMeshActor`-Containern aus `UEIWorldTools::BuildInstancedMesh`; alle Wege, Sandkreise und Spielorte frei)
+- **K7 Orte mit Charakter:** als Nächstes
 - **K8 Orientierung und Stimmung:** offen
 - **K9 Feinschliff & Doku:** offen
