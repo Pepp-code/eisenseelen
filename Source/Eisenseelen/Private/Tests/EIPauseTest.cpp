@@ -134,35 +134,37 @@ bool FEIPauseMenuArenaTest::RunTest(const FString& Parameters)
 	TArray<FEIPlayStep> Steps;
 
 	// Esc opens the pause menu.
-	AddTap(Steps, EKeys::Escape);
-	Steps.Add(Wait(0.05));
+	AddRealTap(Steps, EKeys::Escape);
+	Steps.Add(RealWait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestTrue(TEXT("Esc opens the pause menu"), Context.Player->IsPauseOpen());
+		Context.Test->TestTrue(TEXT("The world stands still while the menu is open"), Context.World->IsPaused());
 		BuildMenu(Context);
 		Context.Test->TestTrue(TEXT("The page says Pause"), Context.Player->GetPauseMenu().Shows(TEXT("Pause")));
 	}));
 
 	// Esc closes it again.
-	AddTap(Steps, EKeys::Escape);
-	Steps.Add(Wait(0.05));
+	AddRealTap(Steps, EKeys::Escape);
+	Steps.Add(RealWait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestFalse(TEXT("Esc closes the pause menu again"), Context.Player->IsPauseOpen());
 	}));
 
 	// The button does the same.
-	AddTap(Steps, EKeys::Escape);
-	Steps.Add(Wait(0.05));
+	AddRealTap(Steps, EKeys::Escape);
+	Steps.Add(RealWait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		ClickButton(Context, TEXT("Fortsetzen"));
 		Context.Test->TestFalse(TEXT("Keep playing closes the menu"), Context.Player->IsPauseOpen());
+		Context.Test->TestFalse(TEXT("Keep playing lets the world run again"), Context.World->IsPaused());
 	}));
 
 	// The settings page turns the knobs and flips the switches.
-	AddTap(Steps, EKeys::Escape);
-	Steps.Add(Wait(0.05));
+	AddRealTap(Steps, EKeys::Escape);
+	Steps.Add(RealWait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		ClickButton(Context, TEXT("Einstellungen"));
@@ -224,11 +226,12 @@ bool FEIPauseRunTest::RunTest(const FString& Parameters)
 	}));
 
 	// One wrong press of R must not throw the run away. It only opens the pause menu.
-	AddTap(Steps, EKeys::R);
-	Steps.Add(Wait(0.05));
+	AddRealTap(Steps, EKeys::R);
+	Steps.Add(RealWait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestTrue(TEXT("R opens the pause menu at the dock"), Context.Player->IsPauseOpen());
+		Context.Test->TestTrue(TEXT("The world stands still at the dock menu"), Context.World->IsPaused());
 		Context.Test->TestEqual(TEXT("The run still stands at the dock"), Context.World->GetGameState<AEIGameState>()->GetRunPhase(), EEIRunPhase::AtDock);
 		BuildMenu(Context);
 		Context.Test->TestNull(TEXT("At the dock the run cannot be left"), Context.Player->GetPauseMenu().FindButton(TEXT("Lauf verlassen")));
@@ -256,8 +259,8 @@ bool FEIPauseRunTest::RunTest(const FString& Parameters)
 	}));
 
 	// Out in the land Esc opens the menu, and the menu offers leaving.
-	AddTap(Steps, EKeys::Escape);
-	Steps.Add(Wait(0.05));
+	AddRealTap(Steps, EKeys::Escape);
+	Steps.Add(RealWait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		Context.Test->TestTrue(TEXT("Esc opens the pause menu in the land"), Context.Player->IsPauseOpen());

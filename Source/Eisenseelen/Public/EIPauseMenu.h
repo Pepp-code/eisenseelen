@@ -42,7 +42,7 @@ private:
 	void AddText(float X, float Y, const FString& Text, const FLinearColor& Color, float Scale = 1.0f);
 	void AddBox(float X, float Y, float Width, float Height, const FLinearColor& Color);
 	void AddButton(float X, float Y, float Width, float Height, const FString& Text, bool bActive, float MouseX, float MouseY, TFunction<void()> OnClick);
-	void AddKnob(AEIPlayerController& Player, const FString& Name, float Value, float Left, float Y, float MouseX, float MouseY, TFunction<void(int32)> Turn);
+	void AddKnob(AEIPlayerController& Player, const FString& Name, const FString& ValueText, float Left, float Y, float MouseX, float MouseY, TFunction<void(int32)> Turn);
 	void AddSwitch(AEIPlayerController& Player, const FString& Name, bool bOn, float Left, float Y, float MouseX, float MouseY, TFunction<void()> Toggle);
 	void BuildMain(AEIPlayerController& Player, float Left, float Top, float Width, float MouseX, float MouseY);
 	void BuildControls(float Left, float Top);

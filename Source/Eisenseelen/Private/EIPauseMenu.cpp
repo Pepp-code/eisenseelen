@@ -58,12 +58,13 @@ void FEIPauseMenu::AddButton(float X, float Y, float Width, float Height, const 
 	Elements.Add(MoveTemp(Element));
 }
 
-void FEIPauseMenu::AddKnob(AEIPlayerController& Player, const FString& Name, float Value, float Left, float Y, float MouseX, float MouseY, TFunction<void(int32)> Turn)
+void FEIPauseMenu::AddKnob(AEIPlayerController& Player, const FString& Name, const FString& ValueText, float Left, float Y, float MouseX, float MouseY, TFunction<void(int32)> Turn)
 {
-	const float KnobsX = Left + PageWidth - KnobWidth * 2.0f - ValueWidth - RowGap;
+	const float KnobsX = Left + PageWidth - KnobWidth * 2.0f - RowGap;
+	AddText(Left + 32.0f, Y + TextDrop, Name, NormalColor);
+	AddText(KnobsX - RowGap - ValueWidth, Y + TextDrop, ValueText, NormalColor);
 	AddButton(KnobsX, Y, KnobWidth, RowHeight, TEXT("-"), false, MouseX, MouseY, [&Player, Turn]() { Turn(-1); Player.OnSettingsChanged(); });
 	AddButton(KnobsX + KnobWidth + RowGap, Y, KnobWidth, RowHeight, TEXT("+"), false, MouseX, MouseY, [&Player, Turn]() { Turn(1); Player.OnSettingsChanged(); });
-	AddText(KnobsX + KnobWidth * 2.0f + RowGap * 2.0f, Y + TextDrop, FString::Printf(TEXT("%s: %.2f"), *Name, Value), NormalColor);
 }
 
 void FEIPauseMenu::AddSwitch(AEIPlayerController& Player, const FString& Name, bool bOn, float Left, float Y, float MouseX, float MouseY, TFunction<void()> Toggle)
@@ -87,7 +88,7 @@ void FEIPauseMenu::Build(AEIPlayerController& Player, float ScreenWidth, float S
 	}
 	else if (Page == EEIPausePage::Controls)
 	{
-		Rows = 11;
+		Rows = 10;
 	}
 	else if (Page == EEIPausePage::Settings)
 	{
@@ -167,11 +168,11 @@ void FEIPauseMenu::BuildSettings(AEIPlayerController& Player, float Left, float 
 {
 	FEISettings& Settings = Player.GetSettings();
 	float Y = Top + TitleDrop;
-	AddKnob(Player, TEXT("Maus-Empfindlichkeit"), Settings.MouseFactor, Left, Y, MouseX, MouseY, [&Settings](int32 Steps) { Settings.AddMouseFactor(Steps); });
+	AddKnob(Player, TEXT("Maus-Empfindlichkeit"), FString::Printf(TEXT("x%.1f"), Settings.MouseFactor), Left, Y, MouseX, MouseY, [&Settings](int32 Steps) { Settings.AddMouseFactor(Steps); });
 	Y += RowHeight + RowGap;
-	AddKnob(Player, TEXT("Effekte-Lautst\u00E4rke"), Settings.EffectsVolume, Left, Y, MouseX, MouseY, [&Settings](int32 Steps) { Settings.AddEffectsVolume(Steps); });
+	AddKnob(Player, TEXT("Effekte-Lautst\u00E4rke"), FString::Printf(TEXT("%.0f %%"), Settings.EffectsVolume * 100.0f), Left, Y, MouseX, MouseY, [&Settings](int32 Steps) { Settings.AddEffectsVolume(Steps); });
 	Y += RowHeight + RowGap;
-	AddKnob(Player, TEXT("Musik-Lautst\u00E4rke"), Settings.MusicVolume, Left, Y, MouseX, MouseY, [&Settings](int32 Steps) { Settings.AddMusicVolume(Steps); });
+	AddKnob(Player, TEXT("Musik-Lautst\u00E4rke"), FString::Printf(TEXT("%.0f %%"), Settings.MusicVolume * 100.0f), Left, Y, MouseX, MouseY, [&Settings](int32 Steps) { Settings.AddMusicVolume(Steps); });
 	Y += RowHeight + RowGap;
 	AddSwitch(Player, TEXT("Blick invertieren"), Settings.bInvertLook, Left, Y, MouseX, MouseY, [&Settings]() { Settings.bInvertLook = !Settings.bInvertLook; });
 	Y += RowHeight + RowGap;

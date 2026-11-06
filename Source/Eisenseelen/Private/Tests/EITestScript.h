@@ -148,6 +148,27 @@ namespace EITestScript
 		Steps.Add(Release(Key));
 	}
 
+	/** Real-time wait: unlike Wait it also passes while the world stands paused. */
+	inline FEIPlayStep RealWait(double Seconds)
+	{
+		return [Seconds, StartedAt = -1.0](const FEIPlayContext& Context) mutable
+		{
+			if (StartedAt < 0.0)
+			{
+				StartedAt = FPlatformTime::Seconds();
+			}
+			return FPlatformTime::Seconds() - StartedAt >= Seconds;
+		};
+	}
+
+	/** A short tap that also works while the pause menu has the world on ice. */
+	inline void AddRealTap(TArray<FEIPlayStep>& Steps, const FKey& Key)
+	{
+		Steps.Add(Press(Key));
+		Steps.Add(RealWait(0.03));
+		Steps.Add(Release(Key));
+	}
+
 	inline FEIPlayStep WaitForGround()
 	{
 		return WaitUntil(TEXT("the hero lands"), 6.0, [](const FEIPlayContext& Context) { return Context.Movement->IsMovingOnGround(); });

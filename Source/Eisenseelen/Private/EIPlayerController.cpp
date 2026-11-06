@@ -112,6 +112,12 @@ void AEIPlayerController::SetPauseOpen(bool bOpen)
 		Hero->ReleasePrimary();
 		Hero->ReleaseSecondary();
 	}
+	// A pause menu that pauses nothing lets the clock and the horde eat the reader.
+	// Only a lone player stands the world still; in co-op nobody may stop the others.
+	if (HasAuthority())
+	{
+		SetPause(bOpen && GetWorld()->GetNumPlayerControllers() == 1);
+	}
 }
 
 void AEIPlayerController::OnSettingsChanged()
@@ -404,6 +410,10 @@ void AEIPlayerController::SetupInputComponent()
 	MenuAction = MakeAction(this, EInputActionValueType::Boolean);
 	MapAction = MakeAction(this, EInputActionValueType::Boolean);
 	PauseAction = MakeAction(this, EInputActionValueType::Boolean);
+	// While the world stands paused, the menu itself still needs Esc and mouse clicks.
+	// The other keys stay silent on their own: Enhanced Input drops them without this flag.
+	PauseAction->bTriggerWhenPaused = true;
+	PrimaryAction->bTriggerWhenPaused = true;
 
 	Mapping = NewObject<UInputMappingContext>(this);
 	MapMoveKey(Mapping, MoveAction, EKeys::W, true, false);
@@ -594,11 +604,22 @@ void AEIPlayerController::ServerInteract_Implementation()
 
 void AEIPlayerController::HandleHorde()
 {
+	// With the pause menu open the keys stay quiet in co-op too.
+	// The gear page is different: there C and the page follow each other by design.
+	if (bPauseOpen)
+	{
+		return;
+	}
 	ServerToggleHorde();
 }
 
 void AEIPlayerController::HandleRestart()
 {
+	// With the pause menu open the keys are dead; the restart runs through the menu.
+	if (bPauseOpen)
+	{
+		return;
+	}
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	const EEIRunPhase Phase = State != nullptr ? State->GetRunPhase() : EEIRunPhase::None;
 	// In the arena, and after the settlement, R keeps its old meaning: everything anew.
@@ -655,6 +676,12 @@ void AEIPlayerController::HandleRuneSpell()
 
 void AEIPlayerController::HandleClass()
 {
+	// With the pause menu open the keys stay quiet in co-op too.
+	// The gear page is different: there C and the page follow each other by design.
+	if (bPauseOpen)
+	{
+		return;
+	}
 	ServerToggleClass();
 }
 
