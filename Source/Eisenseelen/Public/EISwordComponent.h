@@ -88,6 +88,9 @@ public:
 	float GetBlockFlash() const { return BlockFlashRemaining; }
 	bool WasParry() const { return bFlashIsParry; }
 
+	/** Server only. Whether a parry has made the next swing stronger, through the engraving Gegenschlag. */
+	bool HasCounterReady() const { return bCounterReady; }
+
 	bool IsSwinging() const { return bSwinging; }
 	EEISwingKind GetSwingKind() const { return SwingKind; }
 	bool IsHolding() const { return bHolding; }
@@ -127,6 +130,8 @@ private:
 	float BlockLift = 0.0f;
 	float BlockFlashRemaining = 0.0f;
 	bool bFlashIsParry = false;
+	bool bCounterReady = false;
+	bool bCounterSwing = false;
 	bool bHasQueuedSwing = false;
 	EEISwingKind QueuedSwing = EEISwingKind::Light1;
 	bool bServerHasQueuedSwing = false;

@@ -24,17 +24,19 @@ struct FEIMenuElement
 	bool Contains(float PointX, float PointY) const;
 };
 
-/** The three pages of the menu, chosen by the tabs at its top. */
+/** The pages of the menu, chosen by the tabs at its top. */
 enum class EEIMenuPage : uint8
 {
 	Gear,
 	Forge,
-	LootBook
+	LootBook,
+	Engravings
 };
 
 /**
- * The menu with its three pages. The gear page has the seven slots on the left, what fits the chosen slot in the middle,
- * and the sum of all values on the right. The forge shows what the level opens and gold buys. It only makes a list of
+ * The menu with its pages. The gear page has the seven slots on the left, what fits the chosen slot in the middle,
+ * and the sum of all values on the right. The forge shows what the level opens and gold buys. The engravings page
+ * shows the tiers of engravings for the weapon in hand. It only makes a list of
  * what is on the page, and the HUD draws that list. So it can be tested without a screen, and all it changes goes through
  * the player's profile.
  */
@@ -81,6 +83,7 @@ private:
 	void BuildForge(UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, float Left, float Top, float InnerWidth, float Bottom, float MouseX, float MouseY);
 	void BuildForgeSlots(const UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
 	int32 BuildOffers(UEIProfileComponent& Profile, float X, float Y, float Width, float MouseX, float MouseY);
+	void BuildEngravings(UEIProfileComponent& Profile, float Left, float Top, float InnerWidth, float MouseX, float MouseY);
 
 	TArray<FEIMenuElement> Elements;
 	EEISlot SelectedSlot = EEISlot::Weapon;

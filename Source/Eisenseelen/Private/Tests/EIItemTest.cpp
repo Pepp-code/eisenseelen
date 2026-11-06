@@ -264,6 +264,23 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("An empty slot stays empty"), Loaded.Classes[1].Slots[RuneSlot].IsEmpty());
 	TestEqual(TEXT("The test arena keeps its own things"), Loaded.ArenaClasses[1].Slots[WeaponSlot], FString(TEXT("Donnerzepter")));
 	TestEqual(TEXT("A real run is not touched by that"), Loaded.Classes[1].Slots[WeaponSlot], FString(TEXT("Feuerstab")));
+	TestTrue(TEXT("A new player has no engravings"), Loaded.Engravings.IsEmpty());
+
+	FEISavedEngravings& Engraved = Save.Engravings.Add(TEXT("Flammenschwert"));
+	Engraved.Owned = { TEXT("Lange Klinge"), TEXT("Geschliffene Schneide") };
+	Engraved.Active = { TEXT("Lange Klinge"), TEXT("Weiter Schwung") };
+	Engraved.ArenaActive = { TEXT("Gegenschlag") };
+	FEISaveGame Reloaded = FEISaveGame::MakeNew(Table);
+	TestTrue(TEXT("A file with engravings can be read"), Reloaded.FromJson(Save.ToJson(), Error));
+	const FEISavedEngravings* Back = Reloaded.Engravings.Find(TEXT("Flammenschwert"));
+	TestNotNull(TEXT("The engravings of a weapon stay"), Back);
+	if (Back != nullptr)
+	{
+		TestEqual(TEXT("All bought engravings stay"), Back->Owned.Num(), 2);
+		TestTrue(TEXT("The active one stays active"), Back->Active.Contains(TEXT("Lange Klinge")));
+		TestFalse(TEXT("What was never bought cannot be active"), Back->Active.Contains(TEXT("Weiter Schwung")));
+		TestTrue(TEXT("The test arena keeps its own engravings"), Back->ArenaActive.Contains(TEXT("Gegenschlag")));
+	}
 
 	FEISaveGame Untouched = FEISaveGame::MakeNew(Table);
 	TestFalse(TEXT("A broken file is refused"), Untouched.FromJson(TEXT("{ das ist kein Spielstand"), Error));
@@ -944,6 +961,270 @@ bool FEIArenaFreeTest::RunTest(const FString& Parameters)
 		Enemy->TakeDamage(100000.0f, FDamageEvent(), nullptr, nullptr);
 		Context.Test->TestEqual(TEXT("In the arena no enemy pays"), Player->GetSave().Experience, 0);
 	}));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIEngravingTableTest,
+	"Eisenseelen.Data.Engravings",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIEngravingTableTest::RunTest(const FString& Parameters)
+{
+	FEIEngravingTable Table;
+	FString Error;
+	TestTrue(TEXT("Data/gravuren.json can be read"), FEIEngravingTable::LoadFromProjectFile(Table, Error));
+	TestEqual(TEXT("Fire weapons pay with the points of Feuer"), Table.GetFaction(EEIElement::Fire), FString(TEXT("Feuer")));
+	for (const TCHAR* Key : { TEXT("langschwert"), TEXT("stab") })
+	{
+		const FEIEngravingForm* Form = Table.FindForm(Key);
+		TestNotNull(*FString::Printf(TEXT("%s has engravings"), Key), Form);
+		if (Form == nullptr)
+		{
+			continue;
+		}
+		TestEqual(*FString::Printf(TEXT("%s has five tiers"), Key), Form->Tiers.Num(), 5);
+		for (const FEIEngravingTier& Tier : Form->Tiers)
+		{
+			TestTrue(TEXT("Every tier offers a choice"), Tier.Choices.Num() >= 2 && Tier.Choices.Num() <= 3);
+			TestTrue(TEXT("Every tier costs something"), Tier.Gold > 0 && Tier.Points > 0);
+			for (const FEIEngraving& Choice : Tier.Choices)
+			{
+				TestTrue(*FString::Printf(TEXT("%s does something"), *Choice.Name), Choice.Stats.Num() + Choice.Rules.Num() > 0);
+			}
+		}
+	}
+
+	const auto Refuses = [this](const TCHAR* What, const FString& Json, const TCHAR* Named)
+	{
+		FEIEngravingTable Broken;
+		FString BrokenError;
+		TestFalse(What, FEIEngravingTable::LoadFromString(Json, Broken, BrokenError));
+		TestTrue(*FString::Printf(TEXT("The error names %s: %s"), Named, *BrokenError), BrokenError.Contains(Named));
+	};
+	const FString Factions = TEXT("\"fraktion_je_element\": { \"feuer\": \"Feuer\", \"eis\": \"Frost\", \"blitz\": \"Blitz\", \"wind\": \"Wind\" }");
+	Refuses(TEXT("An unknown effect is refused"), FString::Printf(TEXT("{ %s, \"grundformen\": { \"stab\": { \"stufen\": [ { \"thema\": \"A\", \"gold\": 1, \"punkte\": 1, \"wahl\": [ { \"name\": \"Probe\", \"text\": \"t\", \"wirkung\": { \"zauberkraft\": 1 } } ] } ] } } }"), *Factions), TEXT("zauberkraft"));
+	Refuses(TEXT("A name twice is refused"), FString::Printf(TEXT("{ %s, \"grundformen\": { \"stab\": { \"stufen\": [ { \"thema\": \"A\", \"gold\": 1, \"punkte\": 1, \"wahl\": [ { \"name\": \"Probe\", \"text\": \"t\", \"wirkung\": { \"angriffskraft\": 1 } }, { \"name\": \"Probe\", \"text\": \"t\", \"wirkung\": { \"reichweite\": 1 } } ] } ] } } }"), *Factions), TEXT("Probe"));
+	Refuses(TEXT("A missing faction is refused"), TEXT("{ \"fraktion_je_element\": { \"feuer\": \"Feuer\" }, \"grundformen\": {} }"), TEXT("eis"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIEngravingRunTest,
+	"Eisenseelen.Play.Run.Engravings",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIEngravingRunTest::RunTest(const FString& Parameters)
+{
+	struct FBefore
+	{
+		float Reach = 0.0f;
+		float HeavyReach = 0.0f;
+		float Targets = 0.0f;
+		float Cooldown = 0.0f;
+	};
+	const TSharedRef<FBefore> Before = MakeShared<FBefore>();
+	TArray<FEIPlayStep> Steps;
+
+	// At the dock, gold and the faction's points buy engravings, one tier after the other.
+	Steps.Add(Do([Before](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		FEISaveGame& Save = Player->GetSave();
+		Save.Gold = 0;
+		const int32 Sword = Player->GetWornWeapon();
+		Context.Test->TestEqual(TEXT("The blade warden holds the start sword"), Player->GetTable().Items[Sword].Name, FString(TEXT("Flammenschwert")));
+		Context.Test->TestEqual(TEXT("A fire weapon pays with fire points"), Player->GetEngravingFaction(Sword), FString(TEXT("Feuer")));
+		Context.Test->TestNotNull(TEXT("A long sword has engravings"), Player->GetEngravingForm(Sword));
+		Context.Test->TestTrue(TEXT("Without gold the first tier is too dear"), Player->GetEngravingState(Sword, 0, 0) == EEIEngravingState::TooPoor);
+		Context.Test->TestTrue(TEXT("The second tier is shut"), Player->GetEngravingState(Sword, 1, 0) == EEIEngravingState::Locked);
+		Context.Test->TestFalse(TEXT("Without gold nothing is bought"), Player->BuyEngravingByName(TEXT("Lange Klinge")));
+
+		const FEISwordValues& Values = Context.Hero->GetSword()->GetValues();
+		Before->Reach = Values.Light.ReachMeters;
+		Before->HeavyReach = Values.Heavy.ReachMeters;
+		Before->Targets = Values.Light.MaxTargets;
+		Before->Cooldown = Context.Hero->GetCaster()->GetSpellCooldownSeconds();
+
+		Save.Gold = 10000;
+		Save.FactionPoints.Add(TEXT("Feuer"), 100);
+		Context.Test->TestTrue(TEXT("With gold and points the first tier can be bought"), Player->GetEngravingState(Sword, 0, 1) == EEIEngravingState::Buyable);
+		Context.Test->TestFalse(TEXT("The second tier waits for the first"), Player->BuyEngravingByName(TEXT("Leichte Klinge")));
+		Context.Test->TestTrue(TEXT("Buying works"), Player->BuyEngravingByName(TEXT("Geschliffene Schneide")));
+		Context.Test->TestEqual(TEXT("It costs gold"), Save.Gold, 9800);
+		Context.Test->TestEqual(TEXT("And points of Feuer"), Save.FactionPoints.FindRef(TEXT("Feuer")), 90);
+		Context.Test->TestTrue(TEXT("What is bought is used at once"), Player->GetEngravingState(Sword, 0, 0) == EEIEngravingState::Active);
+		Context.Test->TestTrue(TEXT("Then the next tier opens"), Player->GetEngravingState(Sword, 1, 0) == EEIEngravingState::Buyable);
+		Context.Test->TestFalse(TEXT("Nothing is bought twice"), Player->BuyEngravingByName(TEXT("Geschliffene Schneide")));
+		Context.Test->TestTrue(TEXT("The other choice of a tier can be bought too"), Player->BuyEngravingByName(TEXT("Lange Klinge")));
+		Context.Test->TestTrue(TEXT("Then it is the one in use"), Player->GetEngravingState(Sword, 0, 1) == EEIEngravingState::Active);
+		Context.Test->TestTrue(TEXT("And the first one only owned"), Player->GetEngravingState(Sword, 0, 0) == EEIEngravingState::Owned);
+		Context.Test->TestTrue(TEXT("Tier 2"), Player->BuyEngravingByName(TEXT("Leichte Klinge")));
+		Context.Test->TestTrue(TEXT("Tier 3"), Player->BuyEngravingByName(TEXT("Weiter Schwung")));
+		Context.Test->TestTrue(TEXT("Tier 4"), Player->BuyEngravingByName(TEXT("Schnelle Rille")));
+		Context.Test->TestEqual(TEXT("All of it costs its gold"), Save.Gold, 10000 - 200 - 200 - 350 - 500 - 700);
+		Context.Test->TestEqual(TEXT("And its points"), Save.FactionPoints.FindRef(TEXT("Feuer")), 100 - 10 - 10 - 15 - 20 - 30);
+		Context.Test->TestTrue(TEXT("The screen says so"), Player->GetRewardText().Contains(TEXT("Schnelle Rille")));
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([Before](const FEIPlayContext& Context)
+	{
+		const FEISwordValues& Values = Context.Hero->GetSword()->GetValues();
+		Context.Test->TestEqual(TEXT("Lange Klinge gives the light swing more reach"), Values.Light.ReachMeters, Before->Reach * 1.15f, 0.01f);
+		Context.Test->TestEqual(TEXT("And the heavy one"), Values.Heavy.ReachMeters, Before->HeavyReach * 1.15f, 0.01f);
+		Context.Test->TestEqual(TEXT("Weiter Schwung hits two more"), Values.Light.MaxTargets, Before->Targets + 2.0f, 0.01f);
+		Context.Test->TestEqual(TEXT("Schnelle Rille makes the spell come back sooner"), Context.Hero->GetCaster()->GetSpellCooldownSeconds(), Before->Cooldown * 0.8f, 0.01f);
+		const TArray<FString> Active = Gear(Context)->GetActiveEngravings();
+		Context.Test->TestTrue(TEXT("The gear knows what is engraved"), Active.Contains(TEXT("Lange Klinge")) && !Active.Contains(TEXT("Geschliffene Schneide")));
+
+		// A click on what is in use takes it off again, and a click on what is owned puts it back.
+		Context.Test->TestTrue(TEXT("An engraving can be taken off"), Profile(Context)->ChooseEngravingByName(TEXT("Weiter Schwung")));
+		Context.Test->TestTrue(TEXT("Then it is only owned"), Profile(Context)->GetEngravingState(Profile(Context)->GetWornWeapon(), 2, 0) == EEIEngravingState::Owned);
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([Before](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("Without Weiter Schwung the targets are as before"), Context.Hero->GetSword()->GetValues().Light.MaxTargets, Before->Targets, 0.01f);
+	}));
+
+	// The page of the engravings buys with a click.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		FEISaveGame& Save = Player->GetSave();
+		Save.FactionPoints.Add(TEXT("Feuer"), 100);
+		FEIGearMenu& Menu = Context.Player->GetMenu();
+		Menu.ShowPage(EEIMenuPage::Gear);
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("The gear page names the engravings"), Menu.Shows(TEXT("Gravuren: Lange Klinge, Leichte Klinge, Schnelle Rille")));
+		const FEIMenuElement* Tab = Menu.FindButton(TEXT("Gravuren"));
+		Context.Test->TestNotNull(TEXT("The page has a tab for the engravings"), Tab);
+		if (Tab == nullptr)
+		{
+			return;
+		}
+		Menu.Click(Tab->X + 1.0f, Tab->Y + 1.0f);
+		Context.Test->TestTrue(TEXT("The tab opens the engravings"), Menu.GetPage() == EEIMenuPage::Engravings);
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("The page names the weapon"), Menu.Shows(TEXT("Gravuren: Flammenschwert")));
+		Context.Test->TestTrue(TEXT("The page names the price"), Menu.Shows(TEXT("500 Gold, 20 Feuer-Punkte")));
+		Context.Test->TestTrue(TEXT("The page shows what is in use"), Menu.Shows(TEXT("Lange Klinge \u2013 aktiv")));
+		Context.Test->TestTrue(TEXT("And what is only owned"), Menu.Shows(TEXT("Geschliffene Schneide \u2013 w\u00E4hlen")));
+		Context.Test->TestTrue(TEXT("And what each one does"), Menu.Shows(TEXT("+15 % Reichweite der Hiebe")));
+		for (const FEIMenuElement& Element : Menu.GetElements())
+		{
+			Context.Test->TestTrue(*FString::Printf(TEXT("%s fits on the screen"), *Element.Text), Element.X + Element.Width <= 1600.0f && Element.Y + Element.Height <= 900.0f);
+		}
+		const FEIMenuElement* Offer = Menu.FindButton(TEXT("Wuchtiger Knauf \u2013 kaufen"));
+		Context.Test->TestNotNull(TEXT("What is open and paid for has a button"), Offer);
+		if (Offer == nullptr)
+		{
+			return;
+		}
+		const int32 Gold = Save.Gold;
+		Menu.Click(Offer->X + 1.0f, Offer->Y + 1.0f);
+		Context.Test->TestTrue(TEXT("A click buys it"), Save.Engravings.FindRef(TEXT("Flammenschwert")).Owned.Contains(TEXT("Wuchtiger Knauf")));
+		Context.Test->TestEqual(TEXT("And pays for it"), Save.Gold, Gold - 500);
+		Save.Gold = 0;
+		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
+		Context.Test->TestTrue(TEXT("Then it is in use"), Menu.Shows(TEXT("Wuchtiger Knauf \u2013 aktiv")));
+		Context.Test->TestTrue(TEXT("Without gold the rest waits"), Menu.Shows(TEXT("Gegenschlag \u2013 zu teuer")));
+		const FEIMenuElement* Owned = Menu.FindButton(TEXT("Geschliffene Schneide"));
+		if (Owned != nullptr)
+		{
+			Menu.Click(Owned->X + 1.0f, Owned->Y + 1.0f);
+		}
+		Context.Test->TestTrue(TEXT("A click chooses what is owned"), Save.Engravings.FindRef(TEXT("Flammenschwert")).Active.Contains(TEXT("Geschliffene Schneide")));
+		Context.Test->TestFalse(TEXT("And puts the other of its tier away"), Save.Engravings.FindRef(TEXT("Flammenschwert")).Active.Contains(TEXT("Lange Klinge")));
+		Menu.ShowPage(EEIMenuPage::Gear);
+
+		// A weapon of another element pays with other points, and has its own engravings.
+		const int32 Blade = Player->GetTable().FindItem(TEXT("Frostklinge"));
+		Context.Test->TestEqual(TEXT("An ice weapon pays with frost points"), Player->GetEngravingFaction(Blade), FString(TEXT("Frost")));
+	}));
+
+	// Once the run has begun, nothing is engraved any more.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		Player->GetSave().Gold = 100000;
+		Player->GetSave().FactionPoints.Add(TEXT("Feuer"), 1000);
+		Context.World->GetAuthGameMode<AEIGameMode>()->GetRun()->BeginRunNow();
+		Context.Test->TestFalse(TEXT("During a run nothing can be engraved"), Player->BuyEngravingByName(TEXT("Gegenschlag")));
+		Context.Test->TestEqual(TEXT("And nothing is paid"), Player->GetSave().Gold, 100000);
+		Context.Test->TestFalse(TEXT("Nor changed"), Player->ChooseEngravingByName(TEXT("Lange Klinge")));
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIEngravingArenaTest,
+	"Eisenseelen.Play.Engravings",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIEngravingArenaTest::RunTest(const FString& Parameters)
+{
+	constexpr float AimDistanceCm = 1000.0f;
+	constexpr float EyeHeightAboveDummyCenter = 64.0f;
+	const TSharedRef<float> Normal = MakeShared<float>(0.0f);
+	TArray<FEIPlayStep> Steps;
+
+	// In the test arena every engraving is free, and the real save does not change.
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIProfileComponent* Player = Profile(Context);
+		Context.Test->TestEqual(TEXT("C switches to the arcanist"), Context.Hero->GetHeroClass(), EEIHeroClass::Arcanist);
+		const int32 Staff = Player->GetWornWeapon();
+		Context.Test->TestTrue(TEXT("In the arena the last tier is open"), Player->GetEngravingState(Staff, 4, 1) == EEIEngravingState::Owned);
+		Context.Test->TestFalse(TEXT("Nothing is bought in the arena"), Player->BuyEngravingByName(TEXT("Ladekammer")));
+		Context.Test->TestTrue(TEXT("But anything can be chosen"), Player->ChooseEngravingByName(TEXT("Ladekammer")));
+		const FEISavedEngravings Saved = Player->GetSave().Engravings.FindRef(Player->GetTable().Items[Staff].Name);
+		Context.Test->TestTrue(TEXT("The arena keeps its own choice"), Saved.ArenaActive.Contains(TEXT("Ladekammer")));
+		Context.Test->TestTrue(TEXT("The real save stays as it was"), Saved.Owned.IsEmpty() && Saved.Active.IsEmpty());
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("The gear has the rule of Ladekammer"), Gear(Context)->GetRule(EEIEngravingRule::StrongShotEvery), 4.0f);
+		const FVector Middle = SortedDummies(Context.World)[1]->GetActorLocation();
+		Teleport(Context, FVector(Middle.X - AimDistanceCm, Middle.Y, HeroHeight), 0.0f);
+		Context.Player->SetControlRotation(FRotator(-FMath::RadiansToDegrees(FMath::Atan2(EyeHeightAboveDummyCenter, AimDistanceCm)), 0.0f, 0.0f));
+		for (AEITrainingDummy* Dummy : SortedDummies(Context.World))
+		{
+			Dummy->ResetHits();
+		}
+	}));
+	Steps.Add(Wait(0.3));
+
+	// Every fourth bolt is a strong one.
+	for (int32 Shot = 1; Shot <= 4; ++Shot)
+	{
+		AddTap(Steps, EKeys::LeftMouseButton);
+		Steps.Add(WaitUntil(TEXT("the bolt hits"), 3.0, [Shot](const FEIPlayContext& Context) { return SortedDummies(Context.World)[1]->GetHitCount() >= Shot; }));
+		Steps.Add(Do([Shot, Normal](const FEIPlayContext& Context)
+		{
+			const float Damage = SortedDummies(Context.World)[1]->GetLastDamage();
+			if (Shot == 1)
+			{
+				*Normal = Damage;
+				Context.Test->TestTrue(TEXT("A bolt does damage"), Damage > 0.0f);
+			}
+			else if (Shot < 4)
+			{
+				Context.Test->TestEqual(TEXT("The bolts before are normal"), Damage, *Normal, 0.01f);
+			}
+			else
+			{
+				Context.Test->AddInfo(FString::Printf(TEXT("Normal bolt %.0f, fourth bolt %.0f"), *Normal, Damage));
+				Context.Test->TestEqual(TEXT("The fourth bolt does twice the damage"), Damage, *Normal * 2.0f, 0.01f);
+			}
+		}));
+		Steps.Add(Wait(0.4));
+	}
+	AddTap(Steps, EKeys::C);
+	Steps.Add(Wait(0.1));
 	return RunInArena(this, MoveTemp(Steps));
 }
 

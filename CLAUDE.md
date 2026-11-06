@@ -62,7 +62,7 @@ Der Entwickler startet den Editor mit `Editor_starten.bat` (Laufkarte) oder `Tes
 
 ## Aktueller Stand
 
-Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 60 Tests sind grün, darunter sechs mit echtem Gast im Netz.
+Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 63 Tests sind grün, darunter sechs mit echtem Gast im Netz.
 
 - **Bewegung:** Laufen, Sprint auf Shift, Sprung 1 m, Schwerkraft-Faktor 1,6, Luftlenkung, Sprungfelder. Das Ausweichen ist auf Wunsch des Entwicklers ganz gestrichen. Bunnyhop und Tempo-Kette sind auf Wunsch des Entwicklers gestrichen: Ein Sprung nimmt nie mehr Tempo mit als am Boden erlaubt.
 - **Leben:** Wer 6 Sekunden weder getroffen wurde noch selbst getroffen hat, bekommt Leben zurück. Werte in `Data/held.json`.
@@ -84,9 +84,9 @@ Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestan
 
 Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war ein Wunsch nach dem ersten Spielen. Alles andere wurde noch nicht selbst gespielt.
 
-**Als Nächstes:** Der Umbau nach dem Plan-Reiter „Items und Builds“ läuft, die Schritte heißen dort A bis G. Die Schritte A (Anlegestelle, Überfahrt, Signalfeuer), B (der erste Boss) C (Seelenrufer, Jagdbriefe, Beutebuch) und D (Schmiede) sind gebaut. Jetzt spielt der Entwickler alles zusammen. Danach kommt Schritt E: Gravuren für Langschwert und Stab.
+**Als Nächstes:** Der Umbau nach dem Plan-Reiter „Items und Builds“ läuft, die Schritte heißen dort A bis G. Die Schritte A (Anlegestelle, Überfahrt, Signalfeuer), B (der erste Boss) C (Seelenrufer, Jagdbriefe, Beutebuch) D (Schmiede) und E (Gravuren für Langschwert und Stab, `Data/gravuren.json`, Reiter „Gravuren“ im Menü) sind gebaut. Jetzt spielt der Entwickler alles zusammen. Danach kommt Schritt F.
 
-**Bewusst noch nicht dabei:** Echte Modelle und Niagara-Effekte (nur die Anschlüsse sind gebaut), die Leere Wacht und weitere Bosse, Gravuren und Meisterstücke (Schritte E bis G im Plan), Herzkristalle (der Platz ist da, er bleibt leer), die Rute, vier weitere Rüstungsarten, der Auftrag Ruine säubern, Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Totenrufer, Klassen-Passive.
+**Bewusst noch nicht dabei:** Echte Modelle und Niagara-Effekte (nur die Anschlüsse sind gebaut), die Leere Wacht und weitere Bosse, Meisterstücke, Gravuren für andere Waffen und für Rüstung (Schritte F und G im Plan), Herzkristalle (der Platz ist da, er bleibt leer), die Rute, vier weitere Rüstungsarten, der Auftrag Ruine säubern, Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Totenrufer, Klassen-Passive.
 
 **Nicht geprüft:** Töne kann der Agent nicht hören, und die Klingenspur erscheint in keinem Standbild. Der echte Mauszeiger im Menü läuft ohne Fenster nicht, die Tests klicken das Menü direkt an. Viele Items, Erfahrung und Belohnungen sind erste Annahmen und nicht abgestimmt. Ob der Lauf ohne Omen noch schaffbar ist und wie stark der Boss sein darf, zeigt erst das Spielen.
 

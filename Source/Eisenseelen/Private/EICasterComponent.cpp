@@ -24,6 +24,7 @@ namespace
 
 	constexpr float CentimetersPerMeter = 100.0f;
 	constexpr float SlowestChargeFactor = 0.1f;
+	constexpr float MaxEngravingCooldownCut = 0.9f;
 	// The flash starts at the hand, because straight ahead of the eye its end would fill the view.
 	const FVector ChainStartCm(100.0f, 24.0f, -30.0f);
 
@@ -145,10 +146,10 @@ void UEICasterComponent::ApplyGear(const UEIGearComponent& Gear)
 	if (Form != nullptr && Form->bStaff)
 	{
 		Values.Bolt.Damage = Form->BoltDamage;
-		Values.Bolt.RadiusMeters = Form->BoltRadiusMeters;
-		Values.Bolt.SpeedMetersPerSecond = Form->BoltSpeedMetersPerSecond;
+		Values.Bolt.RadiusMeters = Form->BoltRadiusMeters * (1.0f + Gear.GetRule(EEIEngravingRule::BoltRadius));
+		Values.Bolt.SpeedMetersPerSecond = Form->BoltSpeedMetersPerSecond * (1.0f + Gear.GetRule(EEIEngravingRule::BoltSpeed));
 		Values.Bolt.ManaCost = Form->BoltMana;
-		Values.bBoltPierces = Form->bBoltPierces;
+		Values.bBoltPierces = Form->bBoltPierces || Gear.GetRule(EEIEngravingRule::BoltPierces) > 0.0f;
 	}
 }
 
@@ -173,7 +174,9 @@ float UEICasterComponent::GetChargeFraction() const
 
 float UEICasterComponent::GetSpellCooldownSeconds() const
 {
-	return GetSpell().CooldownSeconds * GetHero()->GetClassValues().SpellCooldownFactor * GetHero()->GetGear()->GetCooldownFactor();
+	const UEIGearComponent* Gear = GetHero()->GetGear();
+	const float EngravingCut = FMath::Clamp(Gear->GetRule(EEIEngravingRule::SpellCooldown), 0.0f, MaxEngravingCooldownCut);
+	return GetSpell().CooldownSeconds * GetHero()->GetClassValues().SpellCooldownFactor * Gear->GetCooldownFactor() * (1.0f - EngravingCut);
 }
 
 float UEICasterComponent::GetSpellCooldownFraction() const
@@ -364,7 +367,7 @@ void UEICasterComponent::SpawnProjectile(EEICast Kind, const FVector& Target)
 	const UEIGearComponent* Gear = Hero->GetGear();
 	const EEIElement Element = Gear->GetWeaponElement();
 	// A charge of the staff is a shot, and only the spell key is a spell.
-	const float Factor = Kind == EEICast::Spell ? Gear->GetSpellFactor() : Gear->GetShotFactor();
+	const float Factor = Kind == EEICast::Spell ? Gear->GetSpellFactor() + Gear->GetRule(EEIEngravingRule::SpellDamage) : Gear->GetShotFactor();
 	if (Kind != EEICast::Bolt && Element == EEIElement::Lightning)
 	{
 		CastChain(Target, Values.ChainLightning.Damage * Factor);
@@ -384,6 +387,19 @@ void UEICasterComponent::SpawnProjectile(EEICast Kind, const FVector& Target)
 		Setup.RadiusCm = Values.Bolt.RadiusMeters * CentimetersPerMeter;
 		Setup.SpeedCm = Values.Bolt.SpeedMetersPerSecond * CentimetersPerMeter;
 		Setup.bPierces = Values.bBoltPierces;
+		Setup.bCarriesElement = Gear->GetRule(EEIEngravingRule::BoltElement) > 0.0f;
+		Setup.SlowShare = FMath::Clamp(Gear->GetRule(EEIEngravingRule::BoltSlow), 0.0f, 1.0f);
+		Setup.SlowSeconds = Setup.SlowShare > 0.0f ? Gear->GetRule(EEIEngravingRule::BoltSlowSeconds) * Gear->GetStatusFactor() : 0.0f;
+		// Counted on the server only, so that the owner and the server never disagree about the mana.
+		const int32 StrongEvery = FMath::RoundToInt32(Gear->GetRule(EEIEngravingRule::StrongShotEvery));
+		if (StrongEvery > 0 && ++BoltsSinceStrongShot >= StrongEvery)
+		{
+			BoltsSinceStrongShot = 0;
+			const float Strong = 1.0f + Gear->GetRule(EEIEngravingRule::StrongShotBonus);
+			Setup.Damage *= Strong;
+			Setup.RadiusCm *= Strong;
+			Setup.bBig = true;
+		}
 	}
 	else
 	{

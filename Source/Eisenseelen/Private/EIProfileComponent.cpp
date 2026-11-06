@@ -70,6 +70,10 @@ void UEIProfileComponent::LoadTable()
 	{
 		FEIDataFile::ReportError(TEXT("bosse.json"), Error);
 	}
+	if (!FEIEngravingTable::LoadFromProjectFile(EngravingTable, Error))
+	{
+		FEIDataFile::ReportError(TEXT("gravuren.json"), Error);
+	}
 }
 
 void UEIProfileComponent::LoadSave()
@@ -259,6 +263,111 @@ bool UEIProfileComponent::BuyByName(const FString& Name)
 	return Buy(Table.FindItem(Name));
 }
 
+const FEIEngravingForm* UEIProfileComponent::GetEngravingForm(int32 Weapon) const
+{
+	const FEIWeaponForm* Form = Table.Items.IsValidIndex(Weapon) ? Table.GetForm(Table.Items[Weapon]) : nullptr;
+	return Form != nullptr ? EngravingTable.FindForm(Form->Key) : nullptr;
+}
+
+const FString& UEIProfileComponent::GetEngravingFaction(int32 Weapon) const
+{
+	return EngravingTable.GetFaction(Table.Items.IsValidIndex(Weapon) ? Table.Items[Weapon].Element : EEIElement::Fire);
+}
+
+EEIEngravingState UEIProfileComponent::GetEngravingState(int32 Weapon, int32 Tier, int32 Choice) const
+{
+	const FEIEngravingForm* Form = GetEngravingForm(Weapon);
+	if (Form == nullptr || !Form->Tiers.IsValidIndex(Tier) || !Form->Tiers[Tier].Choices.IsValidIndex(Choice))
+	{
+		return EEIEngravingState::Locked;
+	}
+	const FEIEngravingTier& Entry = Form->Tiers[Tier];
+	const FString& Name = Entry.Choices[Choice].Name;
+	const FEISavedEngravings* Saved = Save.Engravings.Find(Table.Items[Weapon].Name);
+	if (IsFreeChoice())
+	{
+		return Saved != nullptr && Saved->ArenaActive.Contains(Name) ? EEIEngravingState::Active : EEIEngravingState::Owned;
+	}
+	if (Saved != nullptr && Saved->Owned.Contains(Name))
+	{
+		return Saved->Active.Contains(Name) ? EEIEngravingState::Active : EEIEngravingState::Owned;
+	}
+	const bool bOpen = Tier == 0 || (Saved != nullptr && Form->Tiers[Tier - 1].Choices.ContainsByPredicate([Saved](const FEIEngraving& Before) { return Saved->Owned.Contains(Before.Name); }));
+	if (!bOpen)
+	{
+		return EEIEngravingState::Locked;
+	}
+	const bool bAffords = Save.Gold >= Entry.Gold && Save.FactionPoints.FindRef(GetEngravingFaction(Weapon)) >= Entry.Points;
+	return bAffords ? EEIEngravingState::Buyable : EEIEngravingState::TooPoor;
+}
+
+void UEIProfileComponent::ActivateEngraving(int32 Weapon, int32 Tier, int32 Choice)
+{
+	const FEIEngravingTier& Entry = GetEngravingForm(Weapon)->Tiers[Tier];
+	FEISavedEngravings& Saved = Save.Engravings.FindOrAdd(Table.Items[Weapon].Name);
+	TSet<FString>& Active = IsFreeChoice() ? Saved.ArenaActive : Saved.Active;
+	for (const FEIEngraving& Other : Entry.Choices)
+	{
+		Active.Remove(Other.Name);
+	}
+	Active.Add(Entry.Choices[Choice].Name);
+	WriteSave();
+	SendSetups();
+}
+
+bool UEIProfileComponent::BuyEngraving(int32 Weapon, int32 Tier, int32 Choice)
+{
+	if (!IsOwnerSide() || IsFreeChoice() || !CanChangeGear() || !Owns(Weapon) || GetEngravingState(Weapon, Tier, Choice) != EEIEngravingState::Buyable)
+	{
+		return false;
+	}
+	const FEIEngravingTier& Entry = GetEngravingForm(Weapon)->Tiers[Tier];
+	Save.Gold -= Entry.Gold;
+	Save.FactionPoints.FindOrAdd(GetEngravingFaction(Weapon)) -= Entry.Points;
+	Save.Engravings.FindOrAdd(Table.Items[Weapon].Name).Owned.Add(Entry.Choices[Choice].Name);
+	ActivateEngraving(Weapon, Tier, Choice);
+	ClientShowNote_Implementation(FString::Printf(TEXT("Gravur gekauft: %s für %s"), *Entry.Choices[Choice].Name, *Table.Items[Weapon].Name));
+	EIVisuals::PlaySound2D(this, TEXT("Sprungfeld"));
+	return true;
+}
+
+bool UEIProfileComponent::ChooseEngraving(int32 Weapon, int32 Tier, int32 Choice)
+{
+	const EEIEngravingState State = GetEngravingState(Weapon, Tier, Choice);
+	if (!IsOwnerSide() || !CanChangeGear() || !Owns(Weapon) || (State != EEIEngravingState::Active && State != EEIEngravingState::Owned))
+	{
+		return false;
+	}
+	if (State == EEIEngravingState::Owned)
+	{
+		ActivateEngraving(Weapon, Tier, Choice);
+		return true;
+	}
+	FEISavedEngravings& Saved = Save.Engravings.FindOrAdd(Table.Items[Weapon].Name);
+	(IsFreeChoice() ? Saved.ArenaActive : Saved.Active).Remove(GetEngravingForm(Weapon)->Tiers[Tier].Choices[Choice].Name);
+	WriteSave();
+	SendSetups();
+	return true;
+}
+
+bool UEIProfileComponent::BuyEngravingByName(const FString& Name)
+{
+	const int32 Weapon = GetWornWeapon();
+	const FEIEngravingForm* Form = GetEngravingForm(Weapon);
+	int32 Tier = 0;
+	int32 Choice = 0;
+	return Form != nullptr && Form->Find(Name, Tier, Choice) && BuyEngraving(Weapon, Tier, Choice);
+}
+
+bool UEIProfileComponent::ChooseEngravingByName(const FString& Name)
+{
+	const int32 Weapon = GetWornWeapon();
+	const FEIEngravingForm* Form = GetEngravingForm(Weapon);
+	int32 Tier = 0;
+	int32 Choice = 0;
+	return Form != nullptr && Form->Find(Name, Tier, Choice) && ChooseEngraving(Weapon, Tier, Choice);
+}
+
 TArray<int32> UEIProfileComponent::ListOffers(EEISlot Slot) const
 {
 	const bool bArcanist = GetCurrentClass() == EEIHeroClass::Arcanist;
@@ -346,6 +455,21 @@ FEIHeroSetup UEIProfileComponent::BuildSetup(bool bArcanist) const
 		else if (Slot != static_cast<int32>(EEISlot::Weapon))
 		{
 			Setup.Slots[Slot].Item = INDEX_NONE;
+		}
+	}
+	const int32 Weapon = Setup.Slots[static_cast<int32>(EEISlot::Weapon)].Item;
+	if (const FEIEngravingForm* Form = GetEngravingForm(Weapon))
+	{
+		Setup.Engravings.Init(INDEX_NONE, Form->Tiers.Num());
+		for (int32 Tier = 0; Tier < Form->Tiers.Num(); ++Tier)
+		{
+			for (int32 Choice = 0; Choice < Form->Tiers[Tier].Choices.Num(); ++Choice)
+			{
+				if (GetEngravingState(Weapon, Tier, Choice) == EEIEngravingState::Active)
+				{
+					Setup.Engravings[Tier] = Choice;
+				}
+			}
 		}
 	}
 	return Setup;

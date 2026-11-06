@@ -139,4 +139,7 @@ private:
 	float ManaFactor = 1.0f;
 
 	float ManaDeniedRemaining = 0.0f;
+
+	/** Server only. Shots since the last strong one, for the engraving Ladekammer. */
+	int32 BoltsSinceStrongShot = 0;
 };

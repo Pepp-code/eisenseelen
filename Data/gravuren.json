@@ -1,0 +1,111 @@
+{
+	"fraktion_je_element": {
+		"feuer": "Feuer",
+		"eis": "Frost",
+		"blitz": "Blitz",
+		"wind": "Wind"
+	},
+	"grundformen": {
+		"langschwert": {
+			"stufen": [
+				{
+					"thema": "Schaden",
+					"gold": 200,
+					"punkte": 10,
+					"wahl": [
+						{ "name": "Geschliffene Schneide", "text": "+15 % Angriffskraft", "wirkung": { "angriffskraft": 0.15 } },
+						{ "name": "Lange Klinge", "text": "+15 % Reichweite der Hiebe", "wirkung": { "reichweite": 0.15 } }
+					]
+				},
+				{
+					"thema": "Tempo",
+					"gold": 350,
+					"punkte": 15,
+					"wahl": [
+						{ "name": "Leichte Klinge", "text": "+15 % Angriffstempo", "wirkung": { "angriffstempo": 0.15 } },
+						{ "name": "Schwerer Griff", "text": "Schwerer Hieb lädt 25 % schneller", "wirkung": { "aufladetempo": 0.25 } }
+					]
+				},
+				{
+					"thema": "Treffer",
+					"gold": 500,
+					"punkte": 20,
+					"wahl": [
+						{ "name": "Weiter Schwung", "text": "Jeder Hieb trifft 2 Gegner mehr", "wirkung": { "ziele_mehr": 2 } },
+						{ "name": "Wuchtiger Knauf", "text": "Schwerer Hieb lässt 50 % länger taumeln", "wirkung": { "taumeln_laenger": 0.5 } }
+					]
+				},
+				{
+					"thema": "Zauber",
+					"gold": 700,
+					"punkte": 30,
+					"wahl": [
+						{ "name": "Runenrille", "text": "+25 % Schaden des Zaubers auf Q", "wirkung": { "q_schaden": 0.25 } },
+						{ "name": "Schnelle Rille", "text": "Zauber auf Q 20 % schneller wieder bereit", "wirkung": { "q_abklingzeit": 0.2 } },
+						{ "name": "Tiefe Rille", "text": "Zustände halten 30 % länger", "wirkung": { "zustandsdauer": 0.3 } }
+					]
+				},
+				{
+					"thema": "Neue Regel",
+					"gold": 1000,
+					"punkte": 40,
+					"wahl": [
+						{ "name": "Gegenschlag", "text": "Nach einer Parade: nächster Hieb +50 % Schaden", "wirkung": { "parade_staerkt_hieb": 0.5 } },
+						{ "name": "Elementklinge", "text": "Schwerer Hieb löst Element-Reaktionen aus", "wirkung": { "schwerer_hieb_element": 1 } }
+					]
+				}
+			]
+		},
+		"stab": {
+			"stufen": [
+				{
+					"thema": "Schaden",
+					"gold": 200,
+					"punkte": 10,
+					"wahl": [
+						{ "name": "Geschliffener Kristall", "text": "+15 % Angriffskraft", "wirkung": { "angriffskraft": 0.15 } },
+						{ "name": "Weiter Kristall", "text": "+30 % Radius der Schüsse", "wirkung": { "schuss_radius": 0.3 } }
+					]
+				},
+				{
+					"thema": "Tempo und Mana",
+					"gold": 350,
+					"punkte": 15,
+					"wahl": [
+						{ "name": "Schneller Kristall", "text": "Schüsse fliegen 30 % schneller", "wirkung": { "schuss_tempo": 0.3 } },
+						{ "name": "Sparsamer Griff", "text": "-20 % Manakosten", "wirkung": { "manakosten": -0.2 } },
+						{ "name": "Quellader", "text": "+20 % Manarückkehr", "wirkung": { "manarueckkehr": 0.2 } }
+					]
+				},
+				{
+					"thema": "Treffer",
+					"gold": 500,
+					"punkte": 20,
+					"wahl": [
+						{ "name": "Spitzer Kristall", "text": "Schüsse durchschlagen Gegner", "wirkung": { "schuss_durchschlag": 1 } },
+						{ "name": "Bleierner Kristall", "text": "Schüsse verlangsamen 1,5 s um 30 %", "wirkung": { "schuss_verlangsamung": 0.3, "schuss_verlangsamung_s": 1.5 } }
+					]
+				},
+				{
+					"thema": "Zauber",
+					"gold": 700,
+					"punkte": 30,
+					"wahl": [
+						{ "name": "Zauberrille", "text": "+25 % Schaden des Zaubers auf Q", "wirkung": { "q_schaden": 0.25 } },
+						{ "name": "Eilige Rille", "text": "Zauber auf Q 20 % schneller wieder bereit", "wirkung": { "q_abklingzeit": 0.2 } },
+						{ "name": "Lange Rille", "text": "Zustände halten 30 % länger", "wirkung": { "zustandsdauer": 0.3 } }
+					]
+				},
+				{
+					"thema": "Neue Regel",
+					"gold": 1000,
+					"punkte": 40,
+					"wahl": [
+						{ "name": "Elementkristall", "text": "Schüsse lösen Element-Reaktionen aus", "wirkung": { "schuss_element": 1 } },
+						{ "name": "Ladekammer", "text": "Jeder 4. Schuss: doppelter Schaden und Radius", "wirkung": { "starker_schuss_alle": 4, "starker_schuss_bonus": 1.0 } }
+					]
+				}
+			]
+		}
+	}
+}

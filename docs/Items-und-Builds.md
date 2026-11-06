@@ -3,7 +3,7 @@
 
 # Items und Builds
 
-**Stand: 5. November 2026.** Der Ablauf wurde am 5. November noch einmal geändert und folgt jetzt enger dem Vorbild. Die Schritte A bis D sind gebaut: Anlegestelle, Überfahrt, 3 Nebenaufträge, das Signalfeuer, die Jagdbriefe, die zwei Bosse Der Gefesselte und Der Seelenrufer mit je einem Beute-Set, das Beutebuch und die Schmiede. Attribute, die drei Qualitäten und Items von Gegnern sind raus. Noch nicht gebaut sind die Gravuren und alles danach. Alle Zahlen sind erste Annahmen. Was schon gebaut ist, steht in Textdateien, die du selbst ändern kannst.
+**Stand: 5. November 2026.** Der Ablauf wurde am 5. November noch einmal geändert und folgt jetzt enger dem Vorbild. Die Schritte A bis D sind gebaut: Anlegestelle, Überfahrt, 3 Nebenaufträge, das Signalfeuer, die Jagdbriefe, die zwei Bosse Der Gefesselte und Der Seelenrufer mit je einem Beute-Set, das Beutebuch und die Schmiede. Attribute, die drei Qualitäten und Items von Gegnern sind raus. Seit dem 6. November sind auch die Gravuren für Langschwert und Stab gebaut (Schritt E). Noch nicht gebaut ist alles danach. Alle Zahlen sind erste Annahmen. Was schon gebaut ist, steht in Textdateien, die du selbst ändern kannst.
 
 ## Kurzfassung
 
@@ -163,15 +163,29 @@ Gebaut sind 5 der 6 Grundformen in allen vier Elementen, also 20 Waffen, die Rut
 
 Waffen werden nach dem Prinzip von Deep Rock Galactic verbessert, nur mit eigenen Namen. Jede Waffe hat 5 Stufen mit je 2 oder 3 Gravuren zur Wahl, und pro Stufe ist eine aktiv. Was du gekauft hast, gehört dir, und zwischen den Läufen wechselst du kostenlos. Die nächste Stufe öffnet sich, sobald du in der vorherigen etwas gekauft hast. Waffen derselben Grundform haben dieselben Gravuren, gekauft wird aber für jede Waffe einzeln. Feuerwaffen kosten Feuerpunkte, Windwaffen Windpunkte und so weiter.
 
-Beispiel Langschwert:
+**Gebaut:** Alles steht in `Data/gravuren.json`, dort kannst du Namen, Wirkung und Preise ändern. Gekauft und gewählt wird auf der Anlegestelle im Menü (I) im Reiter **Gravuren**, und zwar für die Waffe, die du gerade trägst. Ein Klick auf eine aktive Gravur nimmt sie wieder ab. In der Testarena ist jede Gravur frei, und was du dort wählst, gilt nur dort. Im Lauf lässt sich nichts ändern.
+
+Langschwert:
 
 | Stufe | Thema | Zur Wahl | Kosten |
 | --- | --- | --- | --- |
-| 1 | Schaden | +15 % Hiebschaden oder +15 % Reichweite | 200 Gold, 10 Punkte |
-| 2 | Tempo | Hiebe 15 % schneller, schwerer Hieb schneller aufgeladen oder weniger Erholung nach dem Hieb | 350 Gold, 15 Punkte |
-| 3 | Treffer | 2 Ziele mehr je Hieb oder Gegner taumeln länger | 500 Gold, 20 Punkte |
-| 4 | Zauber | Q macht 25 % mehr Schaden, kürzere Abklingzeit oder Zustände halten länger | 700 Gold, 30 Punkte |
-| 5 | Neue Regel | Eine Parade verstärkt den nächsten Hieb, oder der schwere Hieb trägt das Element der Waffe auf | 1.000 Gold, 40 Punkte |
+| 1 | Schaden | Geschliffene Schneide: +15 % Angriffskraft, oder Lange Klinge: +15 % Reichweite | 200 Gold, 10 Punkte |
+| 2 | Tempo | Leichte Klinge: +15 % Angriffstempo, oder Schwerer Griff: schwerer Hieb lädt 25 % schneller | 350 Gold, 15 Punkte |
+| 3 | Treffer | Weiter Schwung: 2 Ziele mehr je Hieb, oder Wuchtiger Knauf: 50 % länger taumeln | 500 Gold, 20 Punkte |
+| 4 | Zauber | Runenrille: Q +25 % Schaden, Schnelle Rille: Q 20 % schneller bereit, oder Tiefe Rille: Zustände 30 % länger | 700 Gold, 30 Punkte |
+| 5 | Neue Regel | Gegenschlag: nach einer Parade macht der nächste Hieb 50 % mehr Schaden, oder Elementklinge: der schwere Hieb löst Element-Reaktionen aus | 1.000 Gold, 40 Punkte |
+
+Die „weniger Erholung nach dem Hieb“ aus dem ersten Entwurf gibt es nicht, weil das Spiel keinen solchen Wert hat. Der Gegenschlag wartet ohne Zeitgrenze auf den nächsten Hieb.
+
+Stab:
+
+| Stufe | Thema | Zur Wahl | Kosten |
+| --- | --- | --- | --- |
+| 1 | Schaden | Geschliffener Kristall: +15 % Angriffskraft, oder Weiter Kristall: +30 % Radius der Schüsse | 200 Gold, 10 Punkte |
+| 2 | Mana | Schneller Kristall: Schüsse 30 % schneller, Sparsamer Griff: -20 % Manakosten, oder Quellader: +20 % Manarückkehr | 350 Gold, 15 Punkte |
+| 3 | Treffer | Spitzer Kristall: Schüsse durchschlagen Gegner, oder Bleierner Kristall: Schüsse verlangsamen 1,5 s um 30 % | 500 Gold, 20 Punkte |
+| 4 | Zauber | Zauberrille: Q +25 % Schaden, Eilige Rille: Q 20 % schneller bereit, oder Lange Rille: Zustände 30 % länger | 700 Gold, 30 Punkte |
+| 5 | Neue Regel | Elementkristall: Schüsse lösen Element-Reaktionen aus, oder Ladekammer: jeder 4. Schuss macht doppelten Schaden mit doppeltem Radius | 1.000 Gold, 40 Punkte |
 
 Alle Gravuren einer Waffe kosten so etwa 6.500 Gold und 275 Punkte, also rund 10 gute Läufe.
 
@@ -323,7 +337,7 @@ Eine Runde ist wie im Masterplan etwa 2 Stunden deiner Zeit. Alles bleibt zuerst
 | B | Boss-Grundlage, Der Gefesselte, Beute-Set, Verfolgung | gebaut. Trägt der ganze Lauf? | 5–6 |
 | C | Der Seelenrufer, Jagdbriefe, Beutebuch | gebaut. Wen jagst du? | 4–6 |
 | D | Schmiede: Waffen und Rüstung kaufen, Item-Belohnungen raus | gebaut. Worauf sparst du? | 2 |
-| E | Gravuren für Langschwert und Stab | Spürt man die Gravuren wirklich? | 3–4 |
+| E | Gravuren für Langschwert und Stab (gebaut am 6. November) | Spürt man die Gravuren wirklich? | 3–4 |
 | F | Die Leere Wacht, 2 weitere graue Gebiete | Bleibt der Lauf abwechslungsreich? | 5–7 |
 | G | Meisterstücke, Rüstungs-Gravuren und 4-Teile-Regeln, weitere Waffen, Wind | Eigene Builds bauen | 12–17 |
 

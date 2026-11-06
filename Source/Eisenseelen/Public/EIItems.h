@@ -177,4 +177,8 @@ struct FEIHeroSetup
 	/** One entry per slot. */
 	UPROPERTY()
 	TArray<FEIWornItem> Slots;
+
+	/** The engraving chosen in each tier of the weapon, by its place in the tier. INDEX_NONE for none. */
+	UPROPERTY()
+	TArray<int32> Engravings;
 };

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "EIEngravings.h"
 #include "EIItems.h"
 #include "EIGearComponent.generated.h"
 
@@ -34,6 +35,12 @@ public:
 	const FEIWeaponForm* GetWeaponForm() const;
 	EEIElement GetWeaponElement() const;
 
+	/** What the active engravings of the weapon add up to in this rule. */
+	float GetRule(EEIEngravingRule Rule) const { return Rules[static_cast<int32>(Rule)]; }
+
+	/** The names of the engravings that are active on the weapon. */
+	TArray<FString> GetActiveEngravings() const;
+
 	/** What the numbers mean together. Each is a factor on the base damage of what hits. */
 	float GetSwordFactor() const;
 	float GetShotFactor() const;
@@ -61,10 +68,14 @@ private:
 	AEIHeroCharacter* GetHero() const;
 	float GetElementBonus(EEIElement Element) const;
 
+	const FEIEngravingForm* GetEngravingForm() const;
+
 	FEIItemTable Table;
+	FEIEngravingTable Engravings;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Setup)
 	FEIHeroSetup Setup;
 
 	float Stats[EIStatCount] = {};
+	float Rules[EIEngravingRuleCount] = {};
 };

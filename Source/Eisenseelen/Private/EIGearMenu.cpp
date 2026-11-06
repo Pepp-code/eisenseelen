@@ -38,6 +38,25 @@ namespace
 	constexpr float BossNameBrighten = 0.4f;
 	constexpr float BookChanceShare = 0.55f;
 	constexpr float BookStockShare = 0.76f;
+	constexpr int32 EngravingColumns = 3;
+	constexpr float EngravingTierGap = 10.0f;
+
+	FString EngravingLabel(const UEIProfileComponent& Profile, int32 Weapon, int32 Tier, int32 Choice, const FString& Name)
+	{
+		switch (Profile.GetEngravingState(Weapon, Tier, Choice))
+		{
+		case EEIEngravingState::Active:
+			return FString::Printf(TEXT("%s \u2013 aktiv"), *Name);
+		case EEIEngravingState::Owned:
+			return FString::Printf(TEXT("%s \u2013 wählen"), *Name);
+		case EEIEngravingState::Buyable:
+			return FString::Printf(TEXT("%s \u2013 kaufen"), *Name);
+		case EEIEngravingState::TooPoor:
+			return FString::Printf(TEXT("%s \u2013 zu teuer"), *Name);
+		default:
+			return FString::Printf(TEXT("%s \u2013 gesperrt"), *Name);
+		}
+	}
 
 	/** The values of an item, added to what stands in the array. */
 	void AddItemStats(const FEIItemTable& Table, int32 Item, float Sign, float (&Sums)[EIStatCount])
@@ -143,6 +162,11 @@ void FEIGearMenu::Build(UEIProfileComponent& Profile, const AEIHeroCharacter& He
 		BuildForge(Profile, Hero, Left, Top, InnerWidth, Bottom, MouseX, MouseY);
 		return;
 	}
+	if (Page == EEIMenuPage::Engravings)
+	{
+		BuildEngravings(Profile, Left, Top, InnerWidth, MouseX, MouseY);
+		return;
+	}
 
 	const bool bArcanist = Profile.GetCurrentClass() == EEIHeroClass::Arcanist;
 	AddText(Left, Top, FString::Printf(TEXT("Ausrüstung: %s"), bArcanist ? TEXT("Arkanist") : TEXT("Klingenwacht")), TitleColor, TitleScale);
@@ -174,6 +198,7 @@ void FEIGearMenu::BuildTabs(float Left, float Top, float MouseX, float MouseY)
 	const FTab Tabs[] = {
 		{ EEIMenuPage::Gear, TEXT("Ausrüstung") },
 		{ EEIMenuPage::Forge, TEXT("Schmiede") },
+		{ EEIMenuPage::Engravings, TEXT("Gravuren") },
 		{ EEIMenuPage::LootBook, TEXT("Beutebuch") },
 	};
 	float X = Left;
@@ -405,6 +430,12 @@ void FEIGearMenu::BuildSums(const UEIProfileComponent& Profile, const AEIHeroCha
 	LineY += LineHeight;
 	const FEIRune* Rune = Hero.GetRunes()->GetRune();
 	AddText(X, LineY, FString::Printf(TEXT("Zauber auf E: %s"), Rune != nullptr ? *Rune->SpellName : TEXT("keiner")), NormalColor);
+	const TArray<FString> Engraved = Gear->GetActiveEngravings();
+	if (!Engraved.IsEmpty())
+	{
+		LineY += LineHeight;
+		AddText(X, LineY, FString::Printf(TEXT("Gravuren: %s"), *FString::Join(Engraved, TEXT(", "))), NormalColor);
+	}
 }
 
 void FEIGearMenu::BuildComparison(const UEIProfileComponent& Profile, const AEIHeroCharacter& Hero, int32 Item, float X, float Y)
@@ -509,6 +540,59 @@ void FEIGearMenu::BuildLootBook(const UEIProfileComponent& Profile, float Left, 
 			LineY += RowHeight + RowGap;
 		}
 		RowBottom = FMath::Max(RowBottom, LineY);
+	}
+}
+
+void FEIGearMenu::BuildEngravings(UEIProfileComponent& Profile, float Left, float Top, float InnerWidth, float MouseX, float MouseY)
+{
+	const int32 Weapon = Profile.GetWornWeapon();
+	const FEIItemTable& Table = Profile.GetTable();
+	const FEIWeaponForm* WeaponForm = Table.Items.IsValidIndex(Weapon) ? Table.GetForm(Table.Items[Weapon]) : nullptr;
+	const FString WeaponName = Table.Items.IsValidIndex(Weapon) ? Table.Items[Weapon].Name : FString(TEXT("keine Waffe"));
+	AddText(Left, Top, FString::Printf(TEXT("Gravuren: %s (%s)"), *WeaponName, WeaponForm != nullptr ? *WeaponForm->Name : TEXT("?")), TitleColor, TitleScale);
+	const FString& Faction = Profile.GetEngravingFaction(Weapon);
+	const FString Hint = Profile.IsFreeChoice()
+		? FString(TEXT("Testarena: jede Gravur ist frei und zählt nur hier.   Klick wählt oder nimmt ab   I schließt"))
+		: FString::Printf(TEXT("Gilt nur für diese Waffe. Bezahlt wird mit Gold und %s-Punkten.   I schließt"), *Faction);
+	AddText(Left, Top + LineHeight * 1.5f, Hint, QuietColor);
+	BuildPurse(Profile, Left + InnerWidth * (SlotsShare + ChoicesShare), Top);
+
+	const FEIEngravingForm* Form = Profile.GetEngravingForm(Weapon);
+	float LineY = Top + HeadHeight;
+	if (Form == nullptr)
+	{
+		AddText(Left, LineY, FString::Printf(TEXT("Gravuren für %s kommen später."), WeaponForm != nullptr ? *WeaponForm->Name : *WeaponName), QuietColor);
+		return;
+	}
+	const float Width = (InnerWidth - ColumnGap * (EngravingColumns - 1)) / EngravingColumns;
+	UEIProfileComponent* ProfilePointer = &Profile;
+	for (int32 Tier = 0; Tier < Form->Tiers.Num(); ++Tier)
+	{
+		const FEIEngravingTier& Entry = Form->Tiers[Tier];
+		const FString Cost = Profile.IsFreeChoice() ? FString(TEXT("frei")) : FString::Printf(TEXT("%d Gold, %d %s-Punkte"), Entry.Gold, Entry.Points, *Faction);
+		AddText(Left, LineY, FString::Printf(TEXT("Stufe %d \u00b7 %s \u00b7 %s"), Tier + 1, *Entry.Theme, *Cost), TitleColor);
+		LineY += LineHeight;
+		for (int32 Choice = 0; Choice < Entry.Choices.Num(); ++Choice)
+		{
+			const float X = Left + (Width + ColumnGap) * (Choice % EngravingColumns);
+			const EEIEngravingState State = Profile.GetEngravingState(Weapon, Tier, Choice);
+			const bool bBuy = State == EEIEngravingState::Buyable;
+			const FLinearColor Color = State == EEIEngravingState::Locked || State == EEIEngravingState::TooPoor ? QuietColor : (State == EEIEngravingState::Active ? TitleColor : NormalColor);
+			AddButton(X, LineY, Width, RowHeight, EngravingLabel(Profile, Weapon, Tier, Choice, Entry.Choices[Choice].Name), Color, State == EEIEngravingState::Active, MouseX, MouseY,
+				[ProfilePointer, Weapon, Tier, Choice, bBuy]()
+				{
+					if (bBuy)
+					{
+						ProfilePointer->BuyEngraving(Weapon, Tier, Choice);
+					}
+					else
+					{
+						ProfilePointer->ChooseEngraving(Weapon, Tier, Choice);
+					}
+				});
+			AddText(X + TextInset, LineY + RowHeight + RowGap, Entry.Choices[Choice].Text, QuietColor);
+		}
+		LineY += RowHeight + RowGap + LineHeight + EngravingTierGap;
 	}
 }
 

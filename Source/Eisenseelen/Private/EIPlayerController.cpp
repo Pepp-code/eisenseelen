@@ -115,7 +115,7 @@ void AEIPlayerController::PreviewLootBook(bool bShow)
 
 void AEIPlayerController::PreviewMenuPage(int32 Page)
 {
-	Menu.ShowPage(static_cast<EEIMenuPage>(FMath::Clamp(Page, 0, static_cast<int32>(EEIMenuPage::LootBook))));
+	Menu.ShowPage(static_cast<EEIMenuPage>(FMath::Clamp(Page, 0, static_cast<int32>(EEIMenuPage::Engravings))));
 }
 
 void AEIPlayerController::PreviewBuy(const FString& Name)

@@ -128,14 +128,18 @@ void UEISwordComponent::ApplyGear(const UEIGearComponent& Gear)
 		return;
 	}
 	const float SwingFactor = FMath::Max(SlowestSwingFactor, 1.0f + Gear.GetStat(EEIStat::AttackSpeed));
+	const float Reach = Form->LengthFactor * (1.0f + Gear.GetRule(EEIEngravingRule::Reach));
+	const float ExtraTargets = Gear.GetRule(EEIEngravingRule::ExtraTargets);
 	Values.Light.Damage = Form->LightDamage;
 	Values.Light.DurationSeconds = Form->LightSeconds / SwingFactor;
-	Values.Light.ReachMeters *= Form->LengthFactor;
+	Values.Light.ReachMeters *= Reach;
+	Values.Light.MaxTargets += ExtraTargets;
 	Values.Heavy.Damage = Form->HeavyDamage;
 	Values.Heavy.DurationSeconds = Form->HeavySeconds / SwingFactor;
-	Values.Heavy.ReachMeters *= Form->LengthFactor;
+	Values.Heavy.ReachMeters *= Reach;
+	Values.Heavy.MaxTargets += ExtraTargets;
 	Values.ChargeSeconds = Form->ChargeSeconds / FMath::Max(SlowestSwingFactor, 1.0f + Gear.GetStat(EEIStat::ChargeSpeed));
-	Values.HeavyStaggerSeconds = Form->StaggerSeconds;
+	Values.HeavyStaggerSeconds = Form->StaggerSeconds * (1.0f + Gear.GetRule(EEIEngravingRule::LongerStagger));
 }
 
 AEIHeroCharacter* UEISwordComponent::GetHero() const
@@ -247,6 +251,10 @@ float UEISwordComponent::BlockDamage(float Damage, AActor* Causer)
 	{
 		Enemy->Stagger(Values.Block.StaggerSeconds);
 	}
+	if (bParry && Hero->GetGear()->GetRule(EEIEngravingRule::ParryEmpowers) > 0.0f)
+	{
+		bCounterReady = true;
+	}
 	MulticastBlockFeedback(bParry);
 	const float Blocked = bParry ? Values.Block.ParryDamageReduction : Values.Block.DamageReduction + Hero->GetGear()->GetStat(EEIStat::BlockStrength);
 	return Damage * (1.0f - FMath::Min(Blocked, 1.0f));
@@ -349,6 +357,11 @@ void UEISwordComponent::BeginSwing(EEISwingKind Kind)
 	SwingKind = Kind;
 	SwingElapsed = 0.0f;
 	HitThisSwing.Reset();
+	if (GetOwner()->HasAuthority())
+	{
+		bCounterSwing = bCounterReady;
+		bCounterReady = false;
+	}
 
 	AEIHeroCharacter* Hero = GetHero();
 	Hero->ShowLookEvent(Kind == EEISwingKind::Heavy ? TEXT("schwerer_hieb") : TEXT("hieb"));
@@ -470,7 +483,9 @@ void UEISwordComponent::HitActor(AActor* Target, const FVector& Location)
 		return;
 	}
 
-	const float Damage = Swing.Damage * FMath::Max(0.0f, 1.0f - Swing.TargetFalloff * HitThisSwing.Num()) * Hero->GetGear()->GetSwordFactor();
+	const UEIGearComponent* Gear = Hero->GetGear();
+	const float Counter = bCounterSwing ? 1.0f + Gear->GetRule(EEIEngravingRule::ParryEmpowers) : 1.0f;
+	const float Damage = Swing.Damage * FMath::Max(0.0f, 1.0f - Swing.TargetFalloff * HitThisSwing.Num()) * Gear->GetSwordFactor() * Counter;
 	HitThisSwing.Add(Target);
 	AEIEnemy* Enemy = SwingKind == EEISwingKind::Heavy ? Cast<AEIEnemy>(Target) : nullptr;
 	if (Enemy != nullptr)
@@ -482,6 +497,10 @@ void UEISwordComponent::HitActor(AActor* Target, const FVector& Location)
 		}
 	}
 	UGameplayStatics::ApplyDamage(Target, Damage, Hero->GetController(), Hero, nullptr);
+	if (Enemy != nullptr && !Enemy->IsDead() && Gear->GetRule(EEIEngravingRule::HeavyElement) > 0.0f)
+	{
+		Hero->GetRunes()->HitWithElement(Enemy, Gear->GetWeaponElement());
+	}
 	if (Enemy != nullptr)
 	{
 		Enemy->StaggerFromHeavyHit(Values.HeavyStaggerSeconds);

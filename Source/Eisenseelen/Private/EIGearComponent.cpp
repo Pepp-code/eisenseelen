@@ -23,6 +23,10 @@ void UEIGearComponent::LoadValues()
 	{
 		FEIDataFile::ReportError(TEXT("items.json"), Error);
 	}
+	if (!FEIEngravingTable::LoadFromProjectFile(Engravings, Error))
+	{
+		FEIDataFile::ReportError(TEXT("gravuren.json"), Error);
+	}
 }
 
 AEIHeroCharacter* UEIGearComponent::GetHero() const
@@ -58,6 +62,28 @@ EEIElement UEIGearComponent::GetWeaponElement() const
 {
 	const FEIItem* Weapon = GetWorn(EEISlot::Weapon);
 	return Weapon != nullptr ? Weapon->Element : EEIElement::Fire;
+}
+
+const FEIEngravingForm* UEIGearComponent::GetEngravingForm() const
+{
+	const FEIWeaponForm* Form = GetWeaponForm();
+	return Form != nullptr ? Engravings.FindForm(Form->Key) : nullptr;
+}
+
+TArray<FString> UEIGearComponent::GetActiveEngravings() const
+{
+	TArray<FString> Names;
+	if (const FEIEngravingForm* Form = GetEngravingForm())
+	{
+		for (int32 Tier = 0; Tier < FMath::Min(Form->Tiers.Num(), Setup.Engravings.Num()); ++Tier)
+		{
+			if (Form->Tiers[Tier].Choices.IsValidIndex(Setup.Engravings[Tier]))
+			{
+				Names.Add(Form->Tiers[Tier].Choices[Setup.Engravings[Tier]].Name);
+			}
+		}
+	}
+	return Names;
 }
 
 float UEIGearComponent::GetElementBonus(EEIElement Element) const
@@ -110,6 +136,7 @@ void UEIGearComponent::Recalculate()
 	const auto Add = [this](EEIStat Stat, float Amount) { Stats[static_cast<int32>(Stat)] += Amount; };
 
 	FMemory::Memzero(Stats);
+	FMemory::Memzero(Rules);
 	TMap<FString, int32> Pieces;
 	for (int32 Slot = 0; Slot < EISlotCount; ++Slot)
 	{
@@ -134,6 +161,25 @@ void UEIGearComponent::Recalculate()
 			for (const FEIStatLine& Line : Set->PerTwoPieces)
 			{
 				Add(Line.Stat, Line.Amount * (Pair.Value / 2));
+			}
+		}
+	}
+	if (const FEIEngravingForm* Form = GetEngravingForm())
+	{
+		for (int32 Tier = 0; Tier < FMath::Min(Form->Tiers.Num(), Setup.Engravings.Num()); ++Tier)
+		{
+			if (!Form->Tiers[Tier].Choices.IsValidIndex(Setup.Engravings[Tier]))
+			{
+				continue;
+			}
+			const FEIEngraving& Engraving = Form->Tiers[Tier].Choices[Setup.Engravings[Tier]];
+			for (const FEIStatLine& Line : Engraving.Stats)
+			{
+				Add(Line.Stat, Line.Amount);
+			}
+			for (const FEIRuleLine& Line : Engraving.Rules)
+			{
+				Rules[static_cast<int32>(Line.Rule)] += Line.Amount;
 			}
 		}
 	}

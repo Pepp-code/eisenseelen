@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "EIBosses.h"
 #include "EIContracts.h"
+#include "EIEngravings.h"
 #include "EIHeroCharacter.h"
 #include "EIItems.h"
 #include "EISaveGame.h"
@@ -18,6 +19,16 @@ enum class EEIOffer : uint8
 	Locked,
 	TooPoor,
 	Buyable
+};
+
+/** How the engravings page offers an engraving to this player. */
+enum class EEIEngravingState : uint8
+{
+	Active,
+	Owned,
+	Buyable,
+	TooPoor,
+	Locked
 };
 
 /**
@@ -84,6 +95,30 @@ public:
 
 	/** In words: what the forge opens on reaching these levels. */
 	FString DescribeUnlocks(int32 FirstLevel, int32 LastLevel) const;
+
+	const FEIEngravingTable& GetEngravingTable() const { return EngravingTable; }
+
+	/** Owner only. The weapon the current class has in hand. */
+	int32 GetWornWeapon() const { return GetEquipped(EEISlot::Weapon).Item; }
+
+	/** The engravings of this weapon's kind. Null if that kind has none yet. */
+	const FEIEngravingForm* GetEngravingForm(int32 Weapon) const;
+
+	/** The faction whose points pay for the engravings of this weapon. */
+	const FString& GetEngravingFaction(int32 Weapon) const;
+
+	/** Owner only. A tier opens once something in the tier before it is bought. In the test arena everything counts as bought. */
+	EEIEngravingState GetEngravingState(int32 Weapon, int32 Tier, int32 Choice) const;
+
+	/** Owner only. Gold and the faction's points buy an engraving for this one weapon, and it is used at once. */
+	bool BuyEngraving(int32 Weapon, int32 Tier, int32 Choice);
+
+	/** Owner only. Makes a bought engraving the one of its tier, or takes it off again if it already is. */
+	bool ChooseEngraving(int32 Weapon, int32 Tier, int32 Choice);
+
+	/** Owner only. For the weapon in hand. */
+	bool BuyEngravingByName(const FString& Name);
+	bool ChooseEngravingByName(const FString& Name);
 
 	/** Owner only. What this run has brought so far. */
 	int32 GetRunExperience() const { return RunExperience; }
@@ -154,12 +189,14 @@ private:
 	void SendSetups();
 	FEIHeroSetup BuildSetup(bool bArcanist) const;
 	FEIHeroSetup MakeStartSetup(bool bArcanist) const;
+	void ActivateEngraving(int32 Weapon, int32 Tier, int32 Choice);
 	FEISavedClass& GetSavedClass(bool bArcanist);
 	const FEISavedClass& GetSavedClass(bool bArcanist) const;
 
 	FEIItemTable Table;
 	FEIContractTable ContractTable;
 	FEIBossTable BossTable;
+	FEIEngravingTable EngravingTable;
 	FEISaveGame Save;
 	bool bSent = false;
 	bool bSentFree = false;

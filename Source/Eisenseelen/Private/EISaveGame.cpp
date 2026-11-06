@@ -30,6 +30,36 @@ namespace
 		return Name;
 	}
 
+	TArray<TSharedPtr<FJsonValue>> WriteNames(const TSet<FString>& Names)
+	{
+		TArray<FString> Sorted = Names.Array();
+		Sorted.Sort();
+		TArray<TSharedPtr<FJsonValue>> Values;
+		for (const FString& Name : Sorted)
+		{
+			Values.Add(MakeShared<FJsonValueString>(Name));
+		}
+		return Values;
+	}
+
+	TSet<FString> ReadNames(const FJsonObject& Parent, const TCHAR* Key)
+	{
+		TSet<FString> Names;
+		const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+		if (Parent.TryGetArrayField(Key, Values))
+		{
+			for (const TSharedPtr<FJsonValue>& Value : *Values)
+			{
+				FString Name;
+				if (Value->TryGetString(Name) && !Name.IsEmpty())
+				{
+					Names.Add(Name);
+				}
+			}
+		}
+		return Names;
+	}
+
 	TSharedRef<FJsonObject> WriteClass(const FEISavedClass& Saved)
 	{
 		const TSharedRef<FJsonObject> Slots = MakeShared<FJsonObject>();
@@ -84,7 +114,7 @@ FEISaveGame FEISaveGame::MakeNew(const FEIItemTable& Table)
 FString FEISaveGame::ToJson() const
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
-	Root->SetNumberField(TEXT("version"), 2);
+	Root->SetNumberField(TEXT("version"), 3);
 	Root->SetNumberField(TEXT("erfahrung"), Experience);
 	Root->SetNumberField(TEXT("gold"), Gold);
 	const TSharedRef<FJsonObject> Points = MakeShared<FJsonObject>();
@@ -124,6 +154,17 @@ FString FEISaveGame::ToJson() const
 		Arena->SetObjectField(ClassKeys[Index], WriteClass(ArenaClasses[Index]));
 	}
 	Root->SetObjectField(TEXT("testarena"), Arena);
+
+	const TSharedRef<FJsonObject> Engraved = MakeShared<FJsonObject>();
+	for (const TPair<FString, FEISavedEngravings>& Pair : Engravings)
+	{
+		const TSharedRef<FJsonObject> Weapon = MakeShared<FJsonObject>();
+		Weapon->SetArrayField(TEXT("gekauft"), WriteNames(Pair.Value.Owned));
+		Weapon->SetArrayField(TEXT("aktiv"), WriteNames(Pair.Value.Active));
+		Weapon->SetArrayField(TEXT("aktiv_testarena"), WriteNames(Pair.Value.ArenaActive));
+		Engraved->SetObjectField(Pair.Key, Weapon);
+	}
+	Root->SetObjectField(TEXT("gravuren"), Engraved);
 
 	FString Json;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Json);
@@ -224,6 +265,23 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 		if (bHasArena)
 		{
 			ReadClass(**Arena, ClassKeys[Index], Loaded.ArenaClasses[Index]);
+		}
+	}
+	// Since version 3 the weapons have engravings. A file from before has none.
+	Loaded.Engravings.Reset();
+	const TSharedPtr<FJsonObject>* Engraved = nullptr;
+	if (Root->TryGetObjectField(TEXT("gravuren"), Engraved))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Engraved)->Values)
+		{
+			const TSharedPtr<FJsonObject>* Weapon = nullptr;
+			if (Pair.Value->TryGetObject(Weapon))
+			{
+				FEISavedEngravings& Saved = Loaded.Engravings.Add(RenamedItem(Pair.Key));
+				Saved.Owned = ReadNames(**Weapon, TEXT("gekauft"));
+				Saved.Active = ReadNames(**Weapon, TEXT("aktiv")).Intersect(Saved.Owned);
+				Saved.ArenaActive = ReadNames(**Weapon, TEXT("aktiv_testarena"));
+			}
 		}
 	}
 	*this = Loaded;

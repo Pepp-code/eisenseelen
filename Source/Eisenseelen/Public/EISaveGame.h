@@ -12,6 +12,16 @@ struct EISENSEELEN_API FEISavedClass
 	FEISavedClass() { Slots.SetNum(EISlotCount); }
 };
 
+/** The engravings of one weapon, by their names. */
+struct EISENSEELEN_API FEISavedEngravings
+{
+	TSet<FString> Owned;
+	TSet<FString> Active;
+
+	/** In the test arena every engraving is free, and what is chosen there stays there. */
+	TSet<FString> ArenaActive;
+};
+
 /**
  * What stays between two runs, as a file of the player. Every player has their own on their own machine. The test arena
  * has a part of its own, where everything is free, so that trying things out there changes nothing in a real run.
@@ -36,6 +46,9 @@ struct EISENSEELEN_API FEISaveGame
 	/** By class: first the blade warden, then the arcanist. */
 	FEISavedClass Classes[2];
 	FEISavedClass ArenaClasses[2];
+
+	/** By the name of the weapon. */
+	TMap<FString, FEISavedEngravings> Engravings;
 
 	/** What a new player begins with. */
 	static FEISaveGame MakeNew(const FEIItemTable& Table);
