@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+#include "EIUiAnimation.h"
 #include "GameFramework/HUD.h"
 #include "EIHud.generated.h"
 
@@ -11,11 +13,12 @@ class EISENSEELEN_API AEIHud : public AHUD
 	GENERATED_BODY()
 
 public:
+	virtual void BeginPlay() override;
 	virtual void DrawHUD() override;
 
 private:
 	void DrawScreen();
-	void DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Color);
+	void DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Color, const FEIUiGhost* Ghost = nullptr);
 	void DrawLine(const FString& Text, float X, float Y, const FLinearColor& Color, float Scale = 1.0f);
 
 	/** Red marks at the screen edge for enemies winding up outside the view. */
@@ -52,5 +55,15 @@ private:
 	/** The overview: a small map of the contracts and a list of what they ask for and pay. */
 	void DrawContractBoard(const class AEIHeroCharacter* Hero, const class AEIGameState* State, const struct FEIContractTable& Table);
 
-	float CrossingFade = 0.0f;
+	/** The times of every HUD animation, from Data/ui.json. */
+	FEIUiTimes Times;
+	FEIUiFade CrossingFade;
+	FEIUiGhost GhostLife;
+	FEIUiGhost GhostMana;
+	FEIUiGhost GhostBoss;
+	FEIUiPulse Pulse;
+	FEIUiSwing CrossingSwing;
+	FEIUiSwing SettlementSwing;
+	bool bCrossingBegun = false;
+	bool bSettlementBegun = false;
 };

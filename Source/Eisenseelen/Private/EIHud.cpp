@@ -5,6 +5,7 @@
 #include "EICasterComponent.h"
 #include "EIChest.h"
 #include "EIContracts.h"
+#include "EIDataFile.h"
 #include "EIEnemy.h"
 #include "EIForge.h"
 #include "EIGameState.h"
@@ -27,6 +28,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/PlatformTime.h"
 
 namespace
 {
@@ -65,7 +67,6 @@ namespace
 	constexpr float BossBarY = 172.0f;
 	constexpr float BossMarkAboveCm = 620.0f;
 	constexpr double BossMarkFromCm = 3000.0;
-	constexpr float CrossingFadePerSecond = 2.0f;
 	const FLinearColor TextShadowColor(0.0f, 0.0f, 0.0f, 0.75f);
 	constexpr float TextShadowOffset = 1.5f;
 	constexpr float ContractMarkAboveCm = 220.0f;
@@ -97,10 +98,35 @@ namespace
 	constexpr float HuntListLine = 26.0f;
 }
 
-void AEIHud::DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Color)
+void AEIHud::BeginPlay()
 {
+	Super::BeginPlay();
+	FString Error;
+	if (!FEIUiTimes::LoadFromProjectFile(Times, Error))
+	{
+		FEIDataFile::ReportError(TEXT("ui.json"), Error);
+	}
+}
+
+void AEIHud::DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Color, const FEIUiGhost* Ghost)
+{
+	const float Filled = FMath::Clamp(Fraction, 0.0f, 1.0f);
 	DrawRect(BarBack, X, Y, Width, Height);
-	DrawRect(Color, X, Y, Width * FMath::Clamp(Fraction, 0.0f, 1.0f), Height);
+	if (Ghost != nullptr)
+	{
+		// The lighter ghost bar shows what just broke away, until it catches up with the value.
+		const float Behind = FMath::Clamp(Ghost->Fraction, 0.0f, 1.0f);
+		if (Behind > Filled)
+		{
+			FLinearColor GhostColor = Color;
+			GhostColor.R = FMath::Lerp(GhostColor.R, 1.0f, 0.6f);
+			GhostColor.G = FMath::Lerp(GhostColor.G, 1.0f, 0.6f);
+			GhostColor.B = FMath::Lerp(GhostColor.B, 1.0f, 0.6f);
+			GhostColor.A = 0.45f;
+			DrawRect(GhostColor, X, Y, Width * Behind, Height);
+		}
+	}
+	DrawRect(Color, X, Y, Width * Filled, Height);
 }
 
 void AEIHud::DrawLine(const FString& Text, float X, float Y, const FLinearColor& Color, float Scale)
@@ -113,27 +139,45 @@ void AEIHud::DrawLine(const FString& Text, float X, float Y, const FLinearColor&
 void AEIHud::DrawHUD()
 {
 	Super::DrawHUD();
-	DrawScreen();
 	if (const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>())
 	{
+		// A new run gets a fresh swing on its settlement title.
+		const EEIRunPhase Phase = State->GetRunPhase();
+		if (Phase != EEIRunPhase::Failed && Phase != EEIRunPhase::Escaped)
+		{
+			bSettlementBegun = false;
+		}
 		DrawCrossing(State);
 	}
+	DrawScreen();
 }
 
 void AEIHud::DrawCrossing(const AEIGameState* State)
 {
 	const bool bCrossing = State->GetRunPhase() == EEIRunPhase::Crossing;
-	CrossingFade = FMath::FInterpConstantTo(CrossingFade, bCrossing ? 1.0f : 0.0f, RenderDelta, CrossingFadePerSecond);
-	if (CrossingFade <= 0.0f)
+	const double Now = FPlatformTime::Seconds();
+	if (bCrossing && !bCrossingBegun)
+	{
+		bCrossingBegun = true;
+		CrossingSwing.Begin(Now);
+	}
+	else if (!bCrossing)
+	{
+		bCrossingBegun = false;
+	}
+	CrossingFade.Update(bCrossing, Times, RenderDelta);
+	if (CrossingFade.Alpha <= 0.0f)
 	{
 		return;
 	}
-	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, CrossingFade), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
-	if (bCrossing && CrossingFade >= 1.0f)
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, CrossingFade.Alpha), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
+	if (bCrossing && CrossingFade.Alpha >= 1.0f)
 	{
 		const FEIHuntLetter* Letter = State->GetChosenHuntLetter();
 		const FString Area = Letter != nullptr ? Letter->Area : FString();
-		DrawLine(FString::Printf(TEXT("Die Barke bringt euch nach %s ..."), *Area), Canvas->SizeX / 2.0f - 220.0f, Canvas->SizeY / 2.0f - 20.0f, TextColor, 2.0f);
+		// The line swings in instead of just appearing, and the scale keeps its own center.
+		const float Swing = CrossingSwing.Scale(Now, Times);
+		DrawLine(FString::Printf(TEXT("Die Barke bringt euch nach %s ..."), *Area), Canvas->SizeX / 2.0f - 220.0f * Swing, Canvas->SizeY / 2.0f - 20.0f * Swing, TextColor, 2.0f * Swing);
 	}
 }
 
@@ -226,7 +270,9 @@ void AEIHud::DrawScreen()
 
 	const UEIHealthComponent* Health = Hero->GetHealth();
 	const float LifeY = Height - Margin - BarHeight;
-	DrawBar(Margin, LifeY, BarWidth, BarHeight, Health->GetHealth() / FMath::Max(Health->GetMaxHealth(), 1.0f), Health->IsRecovering() ? RecoveringColor : LifeColor);
+	const float LifeFraction = Health->GetHealth() / FMath::Max(Health->GetMaxHealth(), 1.0f);
+	GhostLife.Update(LifeFraction, Times, RenderDelta);
+	DrawBar(Margin, LifeY, BarWidth, BarHeight, LifeFraction, Health->IsRecovering() ? RecoveringColor : LifeColor, &GhostLife);
 	DrawLine(FString::Printf(TEXT("Leben %.0f / %.0f%s"), Health->GetHealth(), Health->GetMaxHealth(), Health->IsRecovering() ? TEXT("   erholt sich") : TEXT("")), Margin, LifeY - 24.0f, TextColor);
 
 	const float Speed = static_cast<float>(Hero->GetVelocity().Size2D()) / 100.0f;
@@ -246,7 +292,9 @@ void AEIHud::DrawScreen()
 
 	if (Caster->GetMaxMana() > 0.0f)
 	{
-		DrawBar(Margin, SpellY, BarWidth, BarHeight, Caster->GetMana() / Caster->GetMaxMana(), ManaColor);
+		const float ManaFraction = Caster->GetMana() / Caster->GetMaxMana();
+		GhostMana.Update(ManaFraction, Times, RenderDelta);
+		DrawBar(Margin, SpellY, BarWidth, BarHeight, ManaFraction, ManaColor, &GhostMana);
 		if (Caster->GetManaDeniedFlash() > 0.0f)
 		{
 			DrawRect(NoManaColor, Margin, SpellY, BarWidth, BarHeight);
@@ -257,7 +305,11 @@ void AEIHud::DrawScreen()
 	const float Charge = bArcanist ? Caster->GetChargeFraction() : Hero->GetSword()->GetChargeFraction();
 	if (Charge > 0.25f)
 	{
-		const FLinearColor ChargeBarColor = bArcanist && !Caster->CanAffordSpell() ? NoManaColor : (Charge >= 1.0f ? FLinearColor::White : ChargeColor);
+		// A full charge breathes, so the eye knows it is ready without a number.
+		Pulse.Advance(Times, RenderDelta);
+		const float Breathing = Charge >= 1.0f ? FMath::Clamp(Pulse.Factor(Times), 0.0f, 1.0f) : 1.0f;
+		FLinearColor ChargeBarColor = bArcanist && !Caster->CanAffordSpell() ? NoManaColor : (Charge >= 1.0f ? FLinearColor::White : ChargeColor);
+		ChargeBarColor.A *= Breathing;
 		DrawBar(Width / 2.0f - 60.0f, Height / 2.0f + 40.0f, 120.0f, 8.0f, Charge, ChargeBarColor);
 	}
 }
@@ -351,7 +403,14 @@ void AEIHud::DrawSettlement(const AEIHeroCharacter* Hero, const AEIGameState* St
 	DrawRect(PanelColor, X, Y, PanelWidth, PanelHeight);
 	const float TextX = X + PanelPadding;
 	Y += PanelPadding;
-	DrawLine(bEscaped ? TEXT("Entkommen!") : TEXT("Lauf gescheitert"), TextX, Y, bEscaped ? TextColor : WarningTextColor, 2.0f);
+	// The verdict swings in once per run, big like the moment it is.
+	if (!bSettlementBegun)
+	{
+		bSettlementBegun = true;
+		SettlementSwing.Begin(FPlatformTime::Seconds());
+	}
+	const float TitleScale = 2.0f * SettlementSwing.Scale(FPlatformTime::Seconds(), Times);
+	DrawLine(bEscaped ? TEXT("Entkommen!") : TEXT("Lauf gescheitert"), TextX, Y, bEscaped ? TextColor : WarningTextColor, TitleScale);
 	Y += 40.0f + PanelLine / 2.0f;
 	DrawLine(FString::Printf(TEXT("Laufzeit %s, %d von %d Nebenauftr\u00E4gen erf\u00FCllt"), *Clock, State->CountContractsDone(), State->GetContracts().Num()), TextX, Y, TextColor);
 	Y += PanelLine;
@@ -597,7 +656,9 @@ void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 	DrawLine(FString::Printf(TEXT("Besiege: %s"), *Values->Name), Margin, LineY, RewardColor);
 	const UEIHealthComponent* Life = Boss->GetHealth();
 	DrawLine(Boss->IsShielded() ? FString::Printf(TEXT("%s, gesch\u00FCtzt solange seine Diener leben"), *Values->Name) : Values->Name, CenterX - BossBarWidth / 2.0f, BossBarY - 24.0f, Boss->IsShielded() ? WardBarColor : TextColor);
-	DrawBar(CenterX - BossBarWidth / 2.0f, BossBarY, BossBarWidth, BossBarHeight, Life->GetHealth() / FMath::Max(Life->GetMaxHealth(), 1.0f), Boss->IsShielded() ? WardBarColor : BossLifeColor);
+	const float BossFraction = Life->GetHealth() / FMath::Max(Life->GetMaxHealth(), 1.0f);
+	GhostBoss.Update(BossFraction, Times, RenderDelta);
+	DrawBar(CenterX - BossBarWidth / 2.0f, BossBarY, BossBarWidth, BossBarHeight, BossFraction, Boss->IsShielded() ? WardBarColor : BossLifeColor, &GhostBoss);
 }
 
 void AEIHud::DrawDock(const AEIHeroCharacter* Hero, const AEIGameState* State, float LineY, float PromptY)

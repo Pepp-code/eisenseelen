@@ -1,6 +1,13 @@
 # Arbeitsnotizen
 
-Was hier steht, steht nicht in `CLAUDE.md`, und jeder Punkt hat schon einmal Zeit gekostet. Die Datei ist für jedes Werkzeug gedacht, das an Eisenseelen weiterarbeitet. Stand: 5. November 2026.
+Was hier steht, steht nicht in `CLAUDE.md`, und jeder Punkt hat schon einmal Zeit gekostet. Die Datei ist für jedes Werkzeug gedacht, das an Eisenseelen weiterarbeitet. Stand: 7. November 2026.
+
+## 7. November 2026 — ST1: Animations-Basis
+
+- Alle Animationszeiten fürs UI stehen in `Data/ui.json` (19 Schlüssel, Namen wie in der UI-Stil-Datei). Geladen wird beim Start des HUD über `FEIUiTimes::LoadFromProjectFile` nach dem Muster von `EISettings`; ein fehlender oder außerhalb liegender Schlüssel meldet `FEIDataFile::ReportError`. Fehlt die Datei ganz, nutzt das HUD die Standardwerte aus dem Code.
+- Die Helfer liegen in `EIUiAnimation.h/.cpp`: Fade (Ein-/Ausblenden mit fester Geschwindigkeit), Geist (Balken-Nachlauf mit Haltezeit), Puls (atmende Skalierung), Schwung (Überschwingen beim Einfliegen). Tests dazu in `Tests/EIUiAnimationTest.cpp`.
+- Der Geist rechnet Haltezeit und Abbau in einem Schritt ab: Was vom Frame nach der Haltezeit übrig bleibt, senkt den Geist sofort. So geht bei kurzen Frames keine Zeit verloren und Float-Reste verursachen keine hängenden Balken.
+- Angewandt ist das bisher an Überfahrt (Einblendung, einschwingender Gebiets-Schriftzug), Abrechnung (einschwingender Titel), Leben-, Mana- und Boss-Balken (Geist) und dem weißen Auflade-Balken (Puls bei voller Aufladung). Die übrigen Stellen folgen mit ST2 bis ST8.
 
 ## Wo was liegt
 

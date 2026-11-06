@@ -1,0 +1,21 @@
+{
+	"einblenden_s": 0.25,
+	"geist_verzoegerung_s": 0.6,
+	"geist_abbau_s": 3.0,
+	"puls_periode_s": 1.0,
+	"puls_ausschlag": 0.15,
+	"durchschwingen_s": 0.4,
+	"durchschwingen_start": 0.4,
+	"durchschwingen_ueberziel": 1.12,
+	"schadenszahl_lebensdauer_s": 0.8,
+	"schadenszahl_aufstieg_px": 40,
+	"toast_einschieben_s": 0.2,
+	"toast_stand_s": 2.5,
+	"treffer_aufschlag_s": 0.15,
+	"treffer_abklingen_s": 0.4,
+	"boss_ruck_px": 8,
+	"boss_ruck_s": 0.5,
+	"karte_aufbau_s": 0.3,
+	"karte_marken_versatz_s": 0.03,
+	"slot_aufblinken_s": 0.2
+}
