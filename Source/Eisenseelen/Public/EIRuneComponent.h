@@ -120,8 +120,11 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastSteam(FVector_NetQuantize Location);
 
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastBurst(FVector_NetQuantize Location, float RadiusCm, FLinearColor Color);
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastShatter(FVector_NetQuantize Location, float RadiusCm);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastSparks(FVector_NetQuantize From, const TArray<FVector_NetQuantize>& Targets);
 
 	AEIHeroCharacter* GetHero() const;
 	void FindPlace(const FEIRune& Rune, FVector& OutLocation, float& OutYaw) const;

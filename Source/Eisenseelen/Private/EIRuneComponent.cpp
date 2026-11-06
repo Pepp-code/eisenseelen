@@ -3,9 +3,9 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "EIDataFile.h"
+#include "EIEffects.h"
 #include "EIGearComponent.h"
 #include "EIHeroCharacter.h"
-#include "EIProjectile.h"
 #include "EIRuneField.h"
 #include "EIViewModelComponent.h"
 #include "EIVisuals.h"
@@ -23,11 +23,9 @@ namespace
 	constexpr float PlaceToleranceCm = 300.0f;
 	constexpr float StaffCastSeconds = 0.6f;
 	const FLinearColor SteamColor(0.9f, 0.95f, 1.0f);
-	constexpr float SteamCloudStrength = 0.35f;
-	constexpr float SteamCloudShare = 0.85f;
 	const FLinearColor ShatterColor(0.55f, 0.85f, 1.0f);
 	const FLinearColor SparkColor(1.0f, 0.75f, 0.25f);
-	constexpr float SparkBurstRadiusCm = 130.0f;
+	constexpr float SparkSizeCm = 130.0f;
 
 	bool ReadRune(const FJsonObject& Line, FEIRune& Out, FString& OutError)
 	{
@@ -347,7 +345,7 @@ void UEIRuneComponent::Shatter(AEIEnemy* Enemy)
 	const float RadiusCm = Table.ShatterRadiusMeters * CentimetersPerMeter;
 	Enemy->Unfreeze();
 	HurtAround(Location, RadiusCm, Table.ShatterDamage * GetHero()->GetGear()->GetReactionFactor());
-	MulticastBurst(Location, RadiusCm, ShatterColor);
+	MulticastShatter(Location, RadiusCm);
 }
 
 void UEIRuneComponent::SparksFly(AEIEnemy* Enemy)
@@ -366,38 +364,50 @@ void UEIRuneComponent::SparksFly(AEIEnemy* Enemy)
 	Nearby.Sort([&From](const AEIEnemy& A, const AEIEnemy& B) { return FVector::DistSquared(A.GetActorLocation(), From) < FVector::DistSquared(B.GetActorLocation(), From); });
 	// The enemy itself comes first, because it is the nearest, and it counts on top of the others.
 	const int32 Targets = FMath::Min(Nearby.Num(), FMath::RoundToInt(Table.SparkTargets) + 1);
+	TArray<FVector_NetQuantize> Struck;
 	for (int32 Index = 0; Index < Targets; ++Index)
 	{
 		AEIEnemy* Target = Nearby[Index];
-		MulticastBurst(Target->GetActorLocation(), SparkBurstRadiusCm, SparkColor);
+		Struck.Add(Target->GetActorLocation());
 		Target->ApplyBurn(Table.SparkBurnPerSecond, Table.SparkBurnSeconds * Hero->GetGear()->GetStatusFactor());
 		UGameplayStatics::ApplyDamage(Target, Table.SparkDamage * Hero->GetGear()->GetReactionFactor(), Hero->GetController(), Hero, UEISpellDamage::StaticClass());
 	}
+	MulticastSparks(From, Struck);
 }
 
-void UEIRuneComponent::MulticastBurst_Implementation(FVector_NetQuantize Location, float RadiusCm, FLinearColor Color)
+void UEIRuneComponent::MulticastShatter_Implementation(FVector_NetQuantize Location, float RadiusCm)
 {
 	EIVisuals::PlaySoundAt(this, TEXT("ExplosionKlein"), Location);
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
+	FEIEffectParams Params;
+	Params.Location = Location;
+	Params.RadiusCm = RadiusCm;
+	Params.Color = ShatterColor;
+	AEIEffect::Play(this, TEXT("splitterbruch"), Params);
+}
+
+void UEIRuneComponent::MulticastSparks_Implementation(FVector_NetQuantize From, const TArray<FVector_NetQuantize>& Targets)
+{
+	EIVisuals::PlaySoundAt(this, TEXT("ExplosionKlein"), From);
+	// Each spark jumps from the burning enemy to one of those around it.
+	for (const FVector_NetQuantize& Target : Targets)
 	{
-		FX->Setup(RadiusCm, Color);
+		FEIEffectParams Params;
+		Params.Location = From;
+		Params.Target = Target;
+		Params.RadiusCm = SparkSizeCm;
+		Params.Color = SparkColor;
+		AEIEffect::Play(this, TEXT("funkenflug"), Params);
 	}
 }
 
 void UEIRuneComponent::MulticastSteam_Implementation(FVector_NetQuantize Location)
 {
 	EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), Location);
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
-	{
-		FX->Setup(Table.SteamRadiusMeters * CentimetersPerMeter, SteamColor);
-	}
-	// The cloud that stays hides what is behind it.
-	if (AEIExplosionFX* Cloud = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
-	{
-		Cloud->SetupCloud(Table.SteamRadiusMeters * CentimetersPerMeter * SteamCloudShare, SteamColor, Table.SteamCloudSeconds, SteamCloudStrength);
-	}
+	// The cloud stays a while and hides what is behind it.
+	FEIEffectParams Params;
+	Params.Location = Location;
+	Params.RadiusCm = Table.SteamRadiusMeters * CentimetersPerMeter;
+	Params.Seconds = Table.SteamCloudSeconds;
+	Params.Color = SteamColor;
+	AEIEffect::Play(this, TEXT("dampfexplosion"), Params);
 }

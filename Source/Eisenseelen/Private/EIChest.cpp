@@ -4,7 +4,7 @@
 #include "EIDataFile.h"
 #include "EIEnemy.h"
 #include "EILookComponent.h"
-#include "EIProjectile.h"
+#include "EIEffects.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -215,12 +215,11 @@ void AEIChest::OnRep_Look()
 		else if (bFree)
 		{
 			EIVisuals::PlaySoundAt(this, TEXT("TrefferSchwer"), GetActorLocation());
-			FActorSpawnParameters Params;
-			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(GetMarkLocation(), FRotator::ZeroRotator, Params))
-			{
-				FX->Setup(SealBurstRadiusCm, GemColor);
-			}
+			FEIEffectParams Params;
+			Params.Location = GetMarkLocation();
+			Params.RadiusCm = SealBurstRadiusCm;
+			Params.Color = GemColor;
+			AEIEffect::Play(this, TEXT("truhe_siegel"), Params);
 		}
 	}
 }

@@ -750,6 +750,8 @@ Du beurteilst Vorschaubilder, der Agent ändert die Skripte. Damit bleibt die En
 
 Die Reihenfolge: zuerst Modelle über diese Datei, dann Effekte für Zauber und Treffer, dann die Umgebung von Hand in den Karten. Selbst gesetzte Dinge überstehen jeden Neubau der Karten, denn das Skript ersetzt nur, was es selbst gebaut hat. Alle Regeln zu Maßstab, Richtung, Sockeln und Animationen stehen in `docs/Kunst-Leitfaden.md`.
 
+**Effekte, gebaut am 6. November 2026:** Jeder Zauber, jede Rune, jede Reaktion, jeder Zustand und jedes Elementmal hat einen eigenen sichtbaren Effekt aus leuchtenden Ersatzteilen in der Farbe des Elements. Er läuft auf jedem Rechner nur als Darstellung. Für jeden steht eine Zeile `effekt.<name>` in `Data/aussehen.json`, ein Pfad zu einem Niagara-System ersetzt die Ersatzteile. Die Liste aller 28 Effekte und die Werte, die das Spiel jedem System mitgibt, stehen im Kunst-Leitfaden unter „Effekte“.
+
 ### Sound und Musik
 
 Sound trägt das Trefferfühl und kostet fast nichts. Die [Sonniss-GDC-Pakete](https://sonniss.com/gameaudiogdc/) sind kostenlos und kommerziell nutzbar, ohne Namensnennung. [Ihre Lizenz](https://sonniss.com/gdc-bundle-license/) verbietet aber KI-Training. Musik kommt als CC0-Stücke oder bleibt am Anfang ganz weg. Vertonung gibt es keine.

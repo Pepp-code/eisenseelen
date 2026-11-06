@@ -265,6 +265,119 @@
 		},
 		"ort.lager": {
 			"modell": ""
+		},
+		"_effekte": "Zauber, Reaktionen und Zustände. Hier gehört ein Niagara-Effekt aus /Game/Kunst/Effekte hin. Sobald modell gesetzt ist, verschwinden die leuchtenden Platzhalter-Teilchen, außer leuchtteile_behalten ist true. Farbe, Radius, Dauer, Winkel und Ziel bekommt der Effekt vom Spiel.",
+		"effekt.feuerball": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.feuerball_explosion": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.eislanze": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.eislanze_treffer": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.bolzen": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.bolzen_treffer": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.kettenblitz": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.windstoss": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.frostnova": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.gewitterfeld": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.flammenwand": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.windhose": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.feuerwirbel": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.frostwirbel": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.gewitterwirbel": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.dampfexplosion": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.funkenflug": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.splitterbruch": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.blitzschlag": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.zustand_brennend": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.zustand_verlangsamt": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.zustand_gefroren": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.mal_feuer": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.mal_eis": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.mal_blitz": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.mal_wind": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.glutschaedel_explosion": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"effekt.truhe_siegel": {
+			"modell": "",
+			"leuchtteile_behalten": false
 		}
 	}
 }

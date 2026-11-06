@@ -5,6 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "EIRuneField.generated.h"
 
+class AEIEffect;
 class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 struct FEIRune;
@@ -44,6 +45,9 @@ private:
 	void Pulse();
 	void CollectTargets(TArray<AActor*>& OutTargets) const;
 
+	/** Which effect of Data/aussehen.json shows it. */
+	FName GetEffectName() const;
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastStrikes(const TArray<FVector_NetQuantize>& Targets);
 
@@ -70,7 +74,14 @@ private:
 	bool bTall = false;
 
 	/** A whirl comes from a reaction, so it starts no further reactions. */
+	UPROPERTY(Replicated)
 	bool bWhirl = false;
+
+	UPROPERTY(Replicated)
+	EEIElement Element = EEIElement::Ice;
+
+	/** What everyone sees of it, such as the frost of a nova or the flames of a wall. */
+	TWeakObjectPtr<AEIEffect> Look;
 	float PullCm = 0.0f;
 	float EndFreezeSeconds = 0.0f;
 	float Damage = 0.0f;
@@ -79,7 +90,6 @@ private:
 	float SlowShare = 0.0f;
 	float BurnPerSecond = 0.0f;
 	float StatusSeconds = 0.0f;
-	EEIElement Element = EEIElement::Ice;
 	float Age = 0.0f;
 	float NextPulseIn = 0.0f;
 };

@@ -4,6 +4,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EICasterComponent.h"
+#include "EIEffects.h"
 #include "EIEnemy.h"
 #include "EIHeroCharacter.h"
 #include "EIRuneComponent.h"
@@ -30,16 +31,10 @@ namespace
 	constexpr float BoltLight = 6000.0f;
 	constexpr float FireballLight = 30000.0f;
 
-	constexpr float BurstSeconds = 0.28f;
-	constexpr float BurstGlow = 5.0f;
-	constexpr float BurstLightPerRadius = 200.0f;
-	constexpr float CloudFadeSeconds = 0.8f;
+	constexpr float MinBurstRadiusCm = 60.0f;
 	const FVector LanceSizeCm(140.0f, 16.0f, 16.0f);
 	const FVector PiercingBoltSizeCm(70.0f, 14.0f, 14.0f);
 	constexpr float MinLightRadiusCm = 150.0f;
-	constexpr float BeamSeconds = 0.25f;
-	constexpr float BeamThicknessCm = 7.0f;
-	constexpr float BeamGlow = 1.2f;
 }
 
 AEIProjectile::AEIProjectile()
@@ -114,6 +109,17 @@ void AEIProjectile::BeginPlay()
 	Light->SetIntensity(bBig ? FireballLight : BoltLight);
 	Light->SetAttenuationRadius(FMath::Max(RadiusCm, MinLightRadiusCm) * 2.0f);
 
+	FEIEffectParams Look;
+	Look.Location = GetActorLocation();
+	Look.Rotation = GetActorRotation();
+	Look.Color = Color;
+	Look.AttachTo = Collision;
+	Trail = AEIEffect::Play(this, bBig ? (bPierces ? TEXT("eislanze") : TEXT("feuerball")) : TEXT("bolzen"), Look);
+	if (Trail.IsValid() && Trail->HidesPlaceholder())
+	{
+		Ball->SetVisibility(false);
+	}
+
 	// Heroes never get in the way of fire, not even their own.
 	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
 	{
@@ -132,6 +138,15 @@ void AEIProjectile::BeginPlay()
 			Collision->OnComponentBeginOverlap.AddDynamic(this, &AEIProjectile::HandlePierce);
 		}
 	}
+}
+
+void AEIProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (Trail.IsValid())
+	{
+		Trail->Stop();
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void AEIProjectile::HandlePierce(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -217,107 +232,10 @@ void AEIProjectile::Burst(const FVector& Location)
 void AEIProjectile::MulticastBurst_Implementation(FVector_NetQuantize Location)
 {
 	EIVisuals::PlaySoundAt(this, bBig && !bPierces ? TEXT("ExplosionGross") : TEXT("ExplosionKlein"), Location);
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
-	{
-		FX->Setup(RadiusCm, EIElementColor(Element));
-	}
-}
-
-AEIExplosionFX::AEIExplosionFX()
-{
-	PrimaryActorTick.bCanEverTick = true;
-	InitialLifeSpan = BurstSeconds;
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	Ball = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Ball"));
-	SetRootComponent(Ball);
-	Ball->SetStaticMesh(Sphere.Object);
-	Ball->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Ball->SetCastShadow(false);
-
-	Light = CreateDefaultSubobject<UPointLightComponent>(TEXT("Light"));
-	Light->SetupAttachment(Ball);
-	Light->SetCastShadows(false);
-}
-
-void AEIExplosionFX::Setup(float InRadiusCm)
-{
-	Setup(InRadiusCm, EIElementColor(EEIElement::Fire));
-}
-
-void AEIExplosionFX::Setup(float InRadiusCm, const FLinearColor& Color)
-{
-	RadiusCm = InRadiusCm;
-	Material = EIVisuals::SetGlow(Ball, Color, BurstGlow);
-	Light->SetLightColor(Color);
-	Light->SetAttenuationRadius(RadiusCm * 3.0f);
-	Light->SetIntensity(RadiusCm * BurstLightPerRadius);
-	Ball->SetWorldScale3D(FVector(RadiusCm * 0.2f / SphereMeshRadiusCm));
-}
-
-void AEIExplosionFX::SetupCloud(float InRadiusCm, const FLinearColor& Color, float Seconds, float Strength)
-{
-	RadiusCm = InRadiusCm;
-	LifeSeconds = Seconds;
-	SetLifeSpan(Seconds);
-	Material = EIVisuals::SetGlow(Ball, Color, Strength);
-	Light->SetIntensity(0.0f);
-	Ball->SetWorldScale3D(FVector(RadiusCm * 0.2f / SphereMeshRadiusCm));
-}
-
-void AEIExplosionFX::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	Age += DeltaSeconds;
-	const float T = FMath::Clamp(Age / BurstSeconds, 0.0f, 1.0f);
-	if (LifeSeconds > 0.0f)
-	{
-		Ball->SetWorldScale3D(FVector(RadiusCm * FMath::Lerp(0.2f, 1.0f, 1.0f - FMath::Square(1.0f - T)) / SphereMeshRadiusCm));
-		if (Material != nullptr)
-		{
-			Material->SetScalarParameterValue(TEXT("Deckkraft"), FMath::Clamp((LifeSeconds - Age) / CloudFadeSeconds, 0.0f, 1.0f));
-		}
-		return;
-	}
-	// Fast at first and slowing down, so it reads as a blast and not as a growing ball.
-	const float Growth = 1.0f - FMath::Square(1.0f - T);
-	Ball->SetWorldScale3D(FVector(RadiusCm * FMath::Lerp(0.2f, 1.0f, Growth) / SphereMeshRadiusCm));
-	if (Material != nullptr)
-	{
-		Material->SetScalarParameterValue(TEXT("Deckkraft"), 1.0f - T);
-	}
-	Light->SetIntensity(RadiusCm * BurstLightPerRadius * (1.0f - T));
-}
-
-AEIBeamFX::AEIBeamFX()
-{
-	PrimaryActorTick.bCanEverTick = true;
-	InitialLifeSpan = BeamSeconds;
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	Beam = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Beam"));
-	SetRootComponent(Beam);
-	Beam->SetStaticMesh(Cube.Object);
-	Beam->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Beam->SetCastShadow(false);
-}
-
-void AEIBeamFX::Setup(const FVector& From, const FVector& To, const FLinearColor& Color)
-{
-	SetActorLocationAndRotation((From + To) / 2.0, (To - From).Rotation());
-	Beam->SetWorldScale3D(FVector(FVector::Dist(From, To), BeamThicknessCm, BeamThicknessCm) / 100.0f);
-	Material = EIVisuals::SetGlow(Beam, Color, BeamGlow);
-}
-
-void AEIBeamFX::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-	Age += DeltaSeconds;
-	if (Material != nullptr)
-	{
-		Material->SetScalarParameterValue(TEXT("Deckkraft"), FMath::Clamp(1.0f - Age / BeamSeconds, 0.0f, 1.0f));
-	}
+	FEIEffectParams Look;
+	Look.Location = Location;
+	Look.Rotation = GetActorRotation();
+	Look.Color = EIElementColor(Element);
+	Look.RadiusCm = FMath::Max(RadiusCm, MinBurstRadiusCm);
+	AEIEffect::Play(this, bBig ? (bPierces ? TEXT("eislanze_treffer") : TEXT("feuerball_explosion")) : TEXT("bolzen_treffer"), Look);
 }

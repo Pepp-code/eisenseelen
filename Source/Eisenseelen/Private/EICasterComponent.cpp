@@ -2,6 +2,7 @@
 
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
+#include "EIEffects.h"
 #include "EIEnemy.h"
 #include "EIGearComponent.h"
 #include "EIHeroCharacter.h"
@@ -29,9 +30,8 @@ namespace
 	// The gust: whoever stands this close is always caught, and it lifts a little, so that the floor does not brake it at once.
 	constexpr float GustAlwaysWithinCm = 120.0f;
 	constexpr float GustLiftCm = 250.0f;
-	constexpr int32 GustStreaks = 7;
-	constexpr float GustStreakStartCm = 80.0f;
-	constexpr float GustStreakHeightCm = 60.0f;
+	constexpr float GustStartCm = 80.0f;
+	constexpr float GustHeightCm = 40.0f;
 
 	bool ReadSpell(const FJsonObject& Spells, const TCHAR* Key, FEISpellValues& Out, TSharedPtr<FJsonObject>& OutObject, FString& OutError)
 	{
@@ -511,21 +511,13 @@ void UEICasterComponent::CastGust(const FVector& Target, float Damage)
 
 void UEICasterComponent::MulticastGust_Implementation(FVector_NetQuantize From, FVector_NetQuantizeNormal Direction)
 {
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	const float RangeCm = Values.Gust.RangeMeters * CentimetersPerMeter;
-	const FLinearColor Color = EIElementColor(EEIElement::Wind);
-	for (int32 Streak = 0; Streak < GustStreaks; ++Streak)
-	{
-		const float Share = static_cast<float>(Streak) / static_cast<float>(GustStreaks - 1) - 0.5f;
-		const FVector Way = Direction.RotateAngleAxis(Share * Values.Gust.AngleDegrees, FVector::UpVector);
-		const FVector Height(0.0f, 0.0f, GustStreakHeightCm * (Streak % 2 == 0 ? 1.0f : 0.4f));
-		const FVector Start = From + Way * GustStreakStartCm + Height;
-		if (AEIBeamFX* Beam = GetWorld()->SpawnActor<AEIBeamFX>(Start, FRotator::ZeroRotator, Params))
-		{
-			Beam->Setup(Start, From + Way * RangeCm + Height, Color);
-		}
-	}
+	FEIEffectParams Params;
+	Params.Location = From + Direction * GustStartCm + FVector(0.0f, 0.0f, GustHeightCm);
+	Params.Rotation = Direction.Rotation();
+	Params.RadiusCm = Values.Gust.RangeMeters * CentimetersPerMeter;
+	Params.AngleDegrees = Values.Gust.AngleDegrees;
+	Params.Color = EIElementColor(EEIElement::Wind);
+	AEIEffect::Play(this, TEXT("windstoss"), Params);
 }
 
 AActor* UEICasterComponent::FindNextChainTarget(const FVector& From, const TArray<AActor*>& Struck) const
@@ -554,14 +546,13 @@ AActor* UEICasterComponent::FindNextChainTarget(const FVector& From, const TArra
 
 void UEICasterComponent::MulticastChain_Implementation(const TArray<FVector_NetQuantize>& Points)
 {
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	for (int32 Index = 1; Index < Points.Num(); ++Index)
 	{
-		if (AEIBeamFX* Beam = GetWorld()->SpawnActor<AEIBeamFX>(Points[Index - 1], FRotator::ZeroRotator, Params))
-		{
-			Beam->Setup(Points[Index - 1], Points[Index], EIElementColor(EEIElement::Lightning));
-		}
+		FEIEffectParams Params;
+		Params.Location = Points[Index - 1];
+		Params.Target = Points[Index];
+		Params.Color = EIElementColor(EEIElement::Lightning);
+		AEIEffect::Play(this, TEXT("kettenblitz"), Params);
 		EIVisuals::PlaySoundAt(this, TEXT("ExplosionKlein"), Points[Index]);
 	}
 }

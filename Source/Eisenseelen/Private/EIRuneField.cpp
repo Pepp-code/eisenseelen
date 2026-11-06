@@ -1,8 +1,8 @@
 #include "EIRuneField.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "EIEffects.h"
 #include "EIHeroCharacter.h"
-#include "EIProjectile.h"
 #include "EIRuneComponent.h"
 #include "EIVisuals.h"
 #include "Engine/OverlapResult.h"
@@ -30,6 +30,8 @@ namespace
 	constexpr float TallStrength = 0.18f;
 	constexpr float TallTurnDegreesPerSecond = 240.0f;
 	constexpr float WhirlPartnerShare = 0.6f;
+	// A bolt of a storm field comes down from this high above whom it strikes.
+	constexpr float StrikeFromCm = 700.0f;
 }
 
 AEIRuneField::AEIRuneField()
@@ -57,6 +59,8 @@ void AEIRuneField::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIRuneField, DurationSeconds);
 	DOREPLIFETIME(AEIRuneField, Color);
 	DOREPLIFETIME(AEIRuneField, bTall);
+	DOREPLIFETIME(AEIRuneField, bWhirl);
+	DOREPLIFETIME(AEIRuneField, Element);
 }
 
 void AEIRuneField::Configure(const FEIRune& Rune, float InDamage, float StatusFactor)
@@ -112,6 +116,13 @@ void AEIRuneField::BeginPlay()
 {
 	Super::BeginPlay();
 
+	FEIEffectParams Params;
+	Params.Location = GetActorLocation();
+	Params.Rotation = GetActorRotation();
+	Params.Color = Color;
+	Params.RadiusCm = SizeCm / 2.0f;
+	Params.Seconds = DurationSeconds;
+
 	if (bWall)
 	{
 		Shape->SetStaticMesh(EIVisuals::GetCube());
@@ -129,6 +140,12 @@ void AEIRuneField::BeginPlay()
 		AddActorWorldOffset(FVector(0.0f, 0.0f, CircleHeightCm / 2.0f + LookAboveFloorCm));
 	}
 	Material = EIVisuals::SetGlow(Shape, Color, bWall ? WallStrength : (bTall ? TallStrength : CircleStrength));
+	Params.AttachTo = Shape;
+	Look = AEIEffect::Play(this, GetEffectName(), Params);
+	if (Look.IsValid() && Look->HidesPlaceholder())
+	{
+		Shape->SetVisibility(false);
+	}
 	EIVisuals::PlaySoundAt(this, bWhirl ? TEXT("ExplosionGross") : TEXT("ExplosionKlein"), GetActorLocation());
 	SetLifeSpan(FMath::Max(DurationSeconds, BurstSeconds));
 	if (HasAuthority())
@@ -153,7 +170,40 @@ void AEIRuneField::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			}
 		}
 	}
+	if (Look.IsValid())
+	{
+		Look->Stop();
+	}
 	Super::EndPlay(EndPlayReason);
+}
+
+FName AEIRuneField::GetEffectName() const
+{
+	if (bWhirl)
+	{
+		switch (Element)
+		{
+		case EEIElement::Fire:
+			return TEXT("feuerwirbel");
+		case EEIElement::Ice:
+			return TEXT("frostwirbel");
+		case EEIElement::Lightning:
+			return TEXT("gewitterwirbel");
+		default:
+			return TEXT("windhose");
+		}
+	}
+	switch (Element)
+	{
+	case EEIElement::Fire:
+		return TEXT("flammenwand");
+	case EEIElement::Lightning:
+		return TEXT("gewitterfeld");
+	case EEIElement::Wind:
+		return TEXT("windhose");
+	default:
+		return TEXT("frostnova");
+	}
 }
 
 void AEIRuneField::Tick(float DeltaSeconds)
@@ -229,7 +279,7 @@ void AEIRuneField::Pulse()
 		{
 			UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Hero, UEISpellDamage::StaticClass());
 		}
-		if (bWhirl && Element == EEIElement::Lightning)
+		if (Element == EEIElement::Lightning)
 		{
 			Struck.Add(Target->GetActorLocation());
 		}
@@ -262,14 +312,14 @@ void AEIRuneField::Pulse()
 
 void AEIRuneField::MulticastStrikes_Implementation(const TArray<FVector_NetQuantize>& Targets)
 {
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	// The whirl throws its bolts out of the top of its column, a storm field calls them down from the sky.
 	const FVector Top = GetActorLocation() + FVector(0.0f, 0.0f, TallHeightCm / 2.0f);
 	for (const FVector_NetQuantize& Target : Targets)
 	{
-		if (AEIBeamFX* Beam = GetWorld()->SpawnActor<AEIBeamFX>(Top, FRotator::ZeroRotator, Params))
-		{
-			Beam->Setup(Top, Target, EIElementColor(EEIElement::Lightning));
-		}
+		FEIEffectParams Params;
+		Params.Location = Target;
+		Params.Target = bWhirl ? Top : Target + FVector(0.0f, 0.0f, StrikeFromCm);
+		Params.Color = EIElementColor(EEIElement::Lightning);
+		AEIEffect::Play(this, TEXT("blitzschlag"), Params);
 	}
 }

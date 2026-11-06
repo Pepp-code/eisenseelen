@@ -14,6 +14,8 @@ class UProjectileMovementComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 
+class AEIEffect;
+
 /** The kinds of enemies. Their numbers stand in Data/gegner.json, and the groups they walk in in Data/gruppen.json. */
 UENUM()
 enum class EEIEnemyKind : uint8
@@ -323,6 +325,9 @@ private:
 	void UpdateLook(float DeltaSeconds);
 	void UpdatePose(float DeltaSeconds);
 
+	/** Shows burning, slowness, frost and the element mark as effects on the body, on every machine. */
+	void UpdateStateEffects();
+
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> Body;
 
@@ -366,6 +371,13 @@ private:
 
 	UPROPERTY(Replicated)
 	bool bShieldDown = false;
+
+	/** 0 without a mark, otherwise 1 + the element that marks it, so that everyone sees what a second element would set off. */
+	UPROPERTY(Replicated)
+	uint8 MarkShown = 0;
+
+	/** The effects on the body by their names, such as zustand_brennend. */
+	TMap<FName, TWeakObjectPtr<AEIEffect>> StateEffects;
 
 	UPROPERTY(ReplicatedUsing = OnRep_GroundMark)
 	FEIGroundMarkData GroundMark;

@@ -9,7 +9,7 @@ public class Eisenseelen : ModuleRules
 		bUseUnity = false;
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AIModule", "NavigationSystem", "ProceduralMeshComponent", "Landscape" });
-		PrivateDependencyModuleNames.Add("Json");
+		PrivateDependencyModuleNames.AddRange(new string[] { "Json", "Niagara" });
 
 		if (Target.bBuildEditor)
 		{

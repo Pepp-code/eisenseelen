@@ -5,6 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "EIProjectile.generated.h"
 
+class AEIEffect;
 class UPointLightComponent;
 class UProjectileMovementComponent;
 class USphereComponent;
@@ -48,6 +49,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void LifeSpanExpired() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	UFUNCTION()
@@ -95,59 +97,7 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AActor>> Pierced;
-};
 
-/** The expanding flash of a burst. Purely for the eye, every machine spawns its own. */
-UCLASS()
-class EISENSEELEN_API AEIExplosionFX : public AActor
-{
-	GENERATED_BODY()
-
-public:
-	AEIExplosionFX();
-
-	void Setup(float InRadiusCm);
-	void Setup(float InRadiusCm, const FLinearColor& Color);
-
-	/** Grows just as fast, but stays for a while and only then fades. */
-	void SetupCloud(float InRadiusCm, const FLinearColor& Color, float Seconds, float Strength);
-
-	virtual void Tick(float DeltaSeconds) override;
-
-private:
-	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UStaticMeshComponent> Ball;
-
-	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UPointLightComponent> Light;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> Material;
-
-	float RadiusCm = 150.0f;
-	float Age = 0.0f;
-	float LifeSeconds = 0.0f;
-};
-
-/** A short flash between two points, for a lightning that jumps. Purely for the eye, every machine spawns its own. */
-UCLASS()
-class EISENSEELEN_API AEIBeamFX : public AActor
-{
-	GENERATED_BODY()
-
-public:
-	AEIBeamFX();
-
-	void Setup(const FVector& From, const FVector& To, const FLinearColor& Color);
-
-	virtual void Tick(float DeltaSeconds) override;
-
-private:
-	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UStaticMeshComponent> Beam;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> Material;
-
-	float Age = 0.0f;
+	/** The trail it leaves while it flies. */
+	TWeakObjectPtr<AEIEffect> Trail;
 };

@@ -2,6 +2,7 @@
 
 #include "Dom/JsonObject.h"
 #include "EIDataFile.h"
+#include "EIEffects.h"
 #include "EIEnemy.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
@@ -74,6 +75,10 @@ namespace
 		if (Prefix == TEXT("ort"))
 		{
 			return FEILookTable::GetPlaceNames().Contains(Name);
+		}
+		if (Prefix == TEXT("effekt"))
+		{
+			return AEIEffect::GetNames().Contains(FName(*Name));
 		}
 		if (Prefix == TEXT("gegner"))
 		{
@@ -226,7 +231,7 @@ namespace
 			}
 			if (!IsKnownKey(Entry.Key))
 			{
-				OutError = FString::Printf(TEXT("%s ist kein bekannter Name. Er beginnt mit held., hand., gegner., boss., item., form. oder ort. und nennt etwas, das es im Spiel gibt."), *Entry.Key);
+				OutError = FString::Printf(TEXT("%s ist kein bekannter Name. Er beginnt mit held., hand., gegner., boss., item., form., ort. oder effekt. und nennt etwas, das es im Spiel gibt."), *Entry.Key);
 				return false;
 			}
 			const TSharedPtr<FJsonObject>* Object = nullptr;

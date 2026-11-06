@@ -12,6 +12,7 @@
 #include "EIAnchorStone.h"
 #include "EIChest.h"
 #include "EIDataFile.h"
+#include "EIEffects.h"
 #include "EIEnemy.h"
 #include "EIEnemyCamp.h"
 #include "EIForge.h"
@@ -32,6 +33,7 @@
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/Guid.h"
+#include "NiagaraSystem.h"
 
 using namespace EITestScript;
 
@@ -143,6 +145,7 @@ bool FEILookTableTest::RunTest(const FString& Parameters)
 			"sockel": "hand_r", "leuchtteile_behalten": false
 		},
 		"ort.truhe": { "modell": "" },
+		"effekt.feuerball": { "modell": "", "leuchtteile_behalten": false },
 		"boss.Der Gefesselte": {}
 	} })json"), Table, Error);
 	TestTrue(*FString::Printf(TEXT("A full entry loads: %s"), *Error), bLoaded);
@@ -166,6 +169,7 @@ bool FEILookTableTest::RunTest(const FString& Parameters)
 	const TArray<TPair<const TCHAR*, const TCHAR*>> Broken = {
 		{TEXT("an unknown enemy"), TEXT(R"json({ "aussehen": { "gegner.drache": { "modell": "" } } })json")},
 		{TEXT("an unknown place"), TEXT(R"json({ "aussehen": { "ort.turm": { "modell": "" } } })json")},
+		{TEXT("an unknown effect"), TEXT(R"json({ "aussehen": { "effekt.regenbogen": { "modell": "" } } })json")},
 		{TEXT("an unknown prefix"), TEXT(R"json({ "aussehen": { "waffe.Frostklinge": { "modell": "" } } })json")},
 		{TEXT("an unknown field"), TEXT(R"json({ "aussehen": { "ort.truhe": { "model": "" } } })json")},
 		{TEXT("an unknown moment"), TEXT(R"json({ "aussehen": { "ort.truhe": { "animationen": { "tanzen": "/Game/A" } } } })json")},
@@ -225,6 +229,10 @@ bool FEILookFileTest::RunTest(const FString& Parameters)
 	{
 		Required.Add(TEXT("ort.") + Place);
 	}
+	for (const FName& Effect : AEIEffect::GetNames())
+	{
+		Required.Add(TEXT("effekt.") + Effect.ToString());
+	}
 	TArray<FString> Named;
 	Named.Append(ReadNames(this, TEXT("bosse.json"), TEXT("bosse"), TEXT("boss.")));
 	// Runes show as their spell, not as a thing in the hand.
@@ -247,7 +255,14 @@ bool FEILookFileTest::RunTest(const FString& Parameters)
 		if (Entry.HasModel())
 		{
 			const UObject* Model = LoadObject<UObject>(nullptr, *Entry.Model);
-			TestTrue(*FString::Printf(TEXT("%s: %s is a model"), *Key, *Entry.Model), Cast<UStaticMesh>(Model) != nullptr || Cast<USkeletalMesh>(Model) != nullptr);
+			if (Key.StartsWith(TEXT("effekt.")))
+			{
+				TestNotNull(*FString::Printf(TEXT("%s: %s is a Niagara effect"), *Key, *Entry.Model), Cast<UNiagaraSystem>(Model));
+			}
+			else
+			{
+				TestTrue(*FString::Printf(TEXT("%s: %s is a model"), *Key, *Entry.Model), Cast<UStaticMesh>(Model) != nullptr || Cast<USkeletalMesh>(Model) != nullptr);
+			}
 		}
 		if (!Entry.AnimBlueprint.IsEmpty())
 		{

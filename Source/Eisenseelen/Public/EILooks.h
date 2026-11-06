@@ -32,7 +32,7 @@ struct EISENSEELEN_API FEILookEntry
 
 /**
  * All of Data/aussehen.json. Keys: held.<class> for the body others see, hand.<class> for the own hand, gegner.<kind>,
- * boss.<name>, item.<name>, form.<weapon form> and ort.<place>.
+ * boss.<name>, item.<name>, form.<weapon form>, ort.<place> and effekt.<name> for the Niagara system of a spell or a reaction.
  */
 struct EISENSEELEN_API FEILookTable
 {

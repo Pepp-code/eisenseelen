@@ -7,6 +7,7 @@
 #include "Dom/JsonObject.h"
 #include "Engine/DamageEvents.h"
 #include "EIDataFile.h"
+#include "EIEffects.h"
 #include "EIGameMode.h"
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
@@ -345,6 +346,14 @@ void AEIEnemy::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		ShownMark->Destroy();
 		ShownMark = nullptr;
 	}
+	for (const TPair<FName, TWeakObjectPtr<AEIEffect>>& Shown : StateEffects)
+	{
+		if (Shown.Value.IsValid())
+		{
+			Shown.Value->Stop();
+		}
+	}
+	StateEffects.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -718,6 +727,7 @@ void AEIEnemy::OnRep_LeaderScale()
 void AEIEnemy::UpdateStatus(float DeltaSeconds)
 {
 	ElementMarkRemaining = FMath::Max(0.0f, ElementMarkRemaining - DeltaSeconds);
+	MarkShown = ElementMarkRemaining > 0.0f ? static_cast<uint8>(ElementMark) + 1 : 0;
 	if (bSlowed)
 	{
 		SlowRemaining -= DeltaSeconds;
@@ -835,6 +845,7 @@ void AEIEnemy::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(AEIEnemy, bBurning);
 	DOREPLIFETIME(AEIEnemy, bFrozen);
 	DOREPLIFETIME(AEIEnemy, bShieldDown);
+	DOREPLIFETIME(AEIEnemy, MarkShown);
 	DOREPLIFETIME(AEIEnemy, GroundMark);
 	DOREPLIFETIME(AEIEnemy, LeaderScale);
 }
@@ -852,6 +863,43 @@ void AEIEnemy::Tick(float DeltaSeconds)
 		TickServer(DeltaSeconds);
 	}
 	UpdateLook(DeltaSeconds);
+	UpdateStateEffects();
+}
+
+void AEIEnemy::UpdateStateEffects()
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	const bool bAlive = !IsDead();
+	const EEIElement Marked = static_cast<EEIElement>(FMath::Max(MarkShown, static_cast<uint8>(1)) - 1);
+	const auto Show = [this](FName Name, bool bOn, EEIElement Element)
+	{
+		TWeakObjectPtr<AEIEffect>& Shown = StateEffects.FindOrAdd(Name);
+		if (bOn && !Shown.IsValid())
+		{
+			FEIEffectParams Params;
+			Params.Location = GetActorLocation();
+			Params.Rotation = GetActorRotation();
+			Params.RadiusCm = 100.0f * static_cast<float>(GetActorScale3D().X);
+			Params.Color = EIElementColor(Element);
+			Params.AttachTo = GetRootComponent();
+			Shown = AEIEffect::Play(this, Name, Params);
+		}
+		else if (!bOn && Shown.IsValid())
+		{
+			Shown->Stop();
+			Shown.Reset();
+		}
+	};
+	Show(TEXT("zustand_brennend"), bAlive && bBurning, EEIElement::Fire);
+	Show(TEXT("zustand_verlangsamt"), bAlive && bSlowed && !bFrozen, EEIElement::Ice);
+	Show(TEXT("zustand_gefroren"), bAlive && bFrozen, EEIElement::Ice);
+	Show(TEXT("mal_feuer"), bAlive && MarkShown > 0 && Marked == EEIElement::Fire, EEIElement::Fire);
+	Show(TEXT("mal_eis"), bAlive && MarkShown > 0 && Marked == EEIElement::Ice, EEIElement::Ice);
+	Show(TEXT("mal_blitz"), bAlive && MarkShown > 0 && Marked == EEIElement::Lightning, EEIElement::Lightning);
+	Show(TEXT("mal_wind"), bAlive && MarkShown > 0 && Marked == EEIElement::Wind, EEIElement::Wind);
 }
 
 AActor* AEIEnemy::FindNearestHero() const
@@ -1397,12 +1445,11 @@ void AEIEnemy::MulticastDie_Implementation()
 void AEIEnemy::MulticastExplode_Implementation(FVector_NetQuantize Location, float RadiusCm)
 {
 	EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), Location);
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AEIExplosionFX* FX = GetWorld()->SpawnActor<AEIExplosionFX>(Location, FRotator::ZeroRotator, Params))
-	{
-		FX->Setup(RadiusCm, EmberColor);
-	}
+	FEIEffectParams Params;
+	Params.Location = Location;
+	Params.RadiusCm = RadiusCm;
+	Params.Color = EmberColor;
+	AEIEffect::Play(this, TEXT("glutschaedel_explosion"), Params);
 }
 
 void AEIEnemy::UpdateLook(float DeltaSeconds)
