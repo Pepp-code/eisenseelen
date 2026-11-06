@@ -37,6 +37,9 @@ WOOD_ROUGHNESS = 0.85
 ROCK_COLOR = unreal.LinearColor(0.24, 0.25, 0.27, 1)
 ROCK_DARK_CELL = 0.80
 ROCK_ROUGHNESS = 0.90
+FOLIAGE_COLOR = unreal.LinearColor(0.10, 0.24, 0.08, 1)
+FOLIAGE_DARK_CELL = 0.82
+FOLIAGE_ROUGHNESS = 0.88
 
 library = unreal.MaterialEditingLibrary
 
@@ -204,6 +207,7 @@ def make_water():
 def make_wood():
     """Wooden planks and posts for bridges, piers, and scaffolds."""
     graph = Graph("M_Holz")
+    graph.material.set_editor_property("used_with_instanced_static_meshes", True)
     cell_shade = graph.node(
         unreal.MaterialExpressionLinearInterpolate,
         ("A", graph.number(1.0)),
@@ -219,6 +223,7 @@ def make_wood():
 def make_rock():
     """Granite rock blocks, cliffs, tunnel walls, and low stone walls."""
     graph = Graph("M_Fels")
+    graph.material.set_editor_property("used_with_instanced_static_meshes", True)
     cell_shade = graph.node(
         unreal.MaterialExpressionLinearInterpolate,
         ("A", graph.number(1.0)),
@@ -228,6 +233,22 @@ def make_rock():
     color = graph.color_parameter("Farbe", ROCK_COLOR)
     graph.output(graph.multiply(color, cell_shade), unreal.MaterialProperty.MP_BASE_COLOR)
     graph.output(graph.number(ROCK_ROUGHNESS), unreal.MaterialProperty.MP_ROUGHNESS)
+    graph.finish()
+
+
+def make_foliage():
+    """Pine crowns and bushes in the forest."""
+    graph = Graph("M_Laub")
+    graph.material.set_editor_property("used_with_instanced_static_meshes", True)
+    cell_shade = graph.node(
+        unreal.MaterialExpressionLinearInterpolate,
+        ("A", graph.number(1.0)),
+        ("B", graph.number(FOLIAGE_DARK_CELL)),
+        ("Alpha", checker_is_odd(graph)),
+    )
+    color = graph.color_parameter("Farbe", FOLIAGE_COLOR)
+    graph.output(graph.multiply(color, cell_shade), unreal.MaterialProperty.MP_BASE_COLOR)
+    graph.output(graph.number(FOLIAGE_ROUGHNESS), unreal.MaterialProperty.MP_ROUGHNESS)
     graph.finish()
 
 
@@ -298,6 +319,7 @@ def main():
     make_water()
     make_wood()
     make_rock()
+    make_foliage()
     make_color()
     make_glow()
     make_overlay()

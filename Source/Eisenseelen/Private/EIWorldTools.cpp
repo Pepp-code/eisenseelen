@@ -1,6 +1,9 @@
 #include "EIWorldTools.h"
 
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Engine/CollisionProfile.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Landscape.h"
 #include "LandscapeProxy.h"
@@ -13,6 +16,14 @@ namespace
 	constexpr float UnitsPerCentimeter = 128.0f / HeightScale;
 	constexpr int32 ZeroHeight = 32768;
 	constexpr int32 SectionsPerComponent = 1;
+}
+
+AEIInstancedMeshActor::AEIInstancedMeshActor()
+{
+	PrimaryActorTick.bCanEverTick = false;
+	Instances = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("Instances"));
+	Instances->SetMobility(EComponentMobility::Static);
+	SetRootComponent(Instances);
 }
 
 ALandscape* UEIWorldTools::BuildLandscape(UObject* WorldContext, const TArray<float>& HeightsCm, int32 ComponentsPerSide, int32 QuadsPerComponent, float QuadSizeCm, UMaterialInterface* Material, FName Tag)
@@ -49,6 +60,43 @@ ALandscape* UEIWorldTools::BuildLandscape(UObject* WorldContext, const TArray<fl
 	Landscape->Tags.Add(Tag);
 	Landscape->SetActorLabel(TEXT("Gelaende"));
 	return Landscape;
+#else
+	return nullptr;
+#endif
+}
+
+AEIInstancedMeshActor* UEIWorldTools::BuildInstancedMesh(UObject* WorldContext, UStaticMesh* Mesh, UMaterialInterface* Material, const TArray<FTransform>& Transforms, bool bCollide, int32 EndCullDistanceCm, FName Label, FName Tag)
+{
+#if WITH_EDITOR
+	UWorld* World = GEngine != nullptr ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::LogAndReturnNull) : nullptr;
+	if (World == nullptr || World->IsGameWorld() || Mesh == nullptr || Transforms.IsEmpty())
+	{
+		return nullptr;
+	}
+
+	AEIInstancedMeshActor* Actor = World->SpawnActor<AEIInstancedMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator);
+	if (Actor == nullptr || Actor->Instances == nullptr)
+	{
+		return nullptr;
+	}
+
+	Actor->SetActorEnableCollision(bCollide);
+	UHierarchicalInstancedStaticMeshComponent* Comp = Actor->Instances;
+	Comp->SetStaticMesh(Mesh);
+	if (Material != nullptr)
+	{
+		Comp->SetMaterial(0, Material);
+	}
+	Comp->SetCollisionProfileName(bCollide ? UCollisionProfile::BlockAll_ProfileName : UCollisionProfile::NoCollision_ProfileName);
+	Comp->SetCollisionEnabled(bCollide ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	Comp->SetCanEverAffectNavigation(bCollide);
+	Comp->SetCullDistances(0, FMath::Max(0, EndCullDistanceCm));
+	Comp->AddInstances(Transforms, false, true);
+	Comp->BuildTreeIfOutdated(false, true);
+
+	Actor->Tags.Add(Tag);
+	Actor->SetActorLabel(Label.IsNone() ? TEXT("WaldInstanzen") : Label.ToString());
+	return Actor;
 #else
 	return nullptr;
 #endif

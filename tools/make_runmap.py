@@ -21,6 +21,7 @@ TERRAIN_MATERIAL_PATH = "/Game/Materials/M_Gelaende"
 WATER_MATERIAL_PATH = "/Game/Materials/M_Wasser"
 WOOD_MATERIAL_PATH = "/Game/Materials/M_Holz"
 ROCK_MATERIAL_PATH = "/Game/Materials/M_Fels"
+FOLIAGE_MATERIAL_PATH = "/Game/Materials/M_Laub"
 GLOW_MATERIAL_PATH = "/Game/Materials/M_Glut"
 CUBE_MESH = "/Engine/BasicShapes/Cube.Cube"
 
@@ -437,6 +438,119 @@ def add_rocks(actors):
     return rock_points
 
 
+def _make_transform(center_m, size_m, yaw_deg=0.0):
+    loc = unreal.Vector(center_m[0] * CM_PER_M, center_m[1] * CM_PER_M, center_m[2] * CM_PER_M)
+    rot = unreal.Rotator(0.0, 0.0, yaw_deg)
+    scale = unreal.Vector(size_m[0], size_m[1], size_m[2])
+    return unreal.Transform(loc, rot, scale)
+
+
+def _custom_part_entry(part_key):
+    entry = LOOKS.get(part_key, {})
+    model_path = entry.get("modell", "").strip() if isinstance(entry, dict) else ""
+    if not model_path:
+        return None, None
+    asset = unreal.load_asset(model_path)
+    return (asset, entry) if asset is not None else (None, None)
+
+
+def _custom_transform(item, entry):
+    offset_cm = entry.get("versatz_cm", [0, 0, 0])
+    rot_deg = entry.get("drehung_grad", [0, 0, 0])
+    scale_val = entry.get("skalierung", 1.0)
+    scale = [scale_val, scale_val, scale_val] if isinstance(scale_val, (int, float)) else list(scale_val)
+    loc = unreal.Vector(
+        item["x_m"] * CM_PER_M + offset_cm[0],
+        item["y_m"] * CM_PER_M + offset_cm[1],
+        item["z_m"] * CM_PER_M + offset_cm[2],
+    )
+    rot = unreal.Rotator(rot_deg[0], rot_deg[1], item["drehung_grad"] + rot_deg[2])
+    return unreal.Transform(loc, rot, unreal.Vector(*scale))
+
+
+def add_forest():
+    """Instanced pine trees, dead swamp/coastal trees, and non-colliding bushes from tools/gelaende.py."""
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    cube = unreal.load_asset(CUBE_MESH)
+    wood_mat = unreal.load_asset(WOOD_MATERIAL_PATH)
+    foliage_mat = unreal.load_asset(FOLIAGE_MATERIAL_PATH)
+    bush_cull_cm = int(terrain.design.get("wald", {}).get("busch_sichtweite_cm", 12000))
+
+    forest = terrain.generate_forest()
+    pine_trunks = []
+    pine_crowns = []
+    pine_custom = []
+    dead_trees = []
+    dead_custom = []
+    bushes = []
+    bush_custom = []
+    tree_points = []
+
+    pine_mesh, pine_entry = _custom_part_entry("bauteil.kiefer")
+    dead_mesh, dead_entry = _custom_part_entry("bauteil.baum_tot")
+    bush_mesh, bush_entry = _custom_part_entry("bauteil.busch")
+
+    for item in forest:
+        x, y, z = item["x_m"], item["y_m"], item["z_m"]
+        width = item["breite_m"]
+        height = item["hoehe_m"]
+        trunk_w = item["stamm_m"]
+        yaw = item["drehung_grad"]
+        art = item["art"]
+
+        if art == "kiefer":
+            tree_points.append((x, y))
+            if pine_mesh is not None:
+                pine_custom.append(_custom_transform(item, pine_entry))
+            else:
+                trunk_h = height * 0.78 + 1.0
+                pine_trunks.append(_make_transform((x, y, z - 1.0 + trunk_h * 0.5), (trunk_w, trunk_w, trunk_h), yaw))
+                low_bottom = z + 4.6
+                low_top = z + height * 0.78
+                low_h = max(1.8, low_top - low_bottom)
+                pine_crowns.append(_make_transform((x, y, low_bottom + low_h * 0.5), (width, width, low_h), yaw))
+                high_bottom = z + height * 0.72
+                high_top = z + height
+                high_h = max(1.6, high_top - high_bottom)
+                pine_crowns.append(_make_transform((x, y, high_bottom + high_h * 0.5), (width * 0.68, width * 0.68, high_h), yaw + 45.0))
+        elif art == "baum_tot":
+            tree_points.append((x, y))
+            if dead_mesh is not None:
+                dead_custom.append(_custom_transform(item, dead_entry))
+            else:
+                trunk_h = height + 1.0
+                dead_trees.append(_make_transform((x, y, z - 1.0 + trunk_h * 0.5), (trunk_w, trunk_w, trunk_h), yaw))
+                branch_z = z + height * 0.72
+                branch_w = trunk_w * 0.62
+                dead_trees.append(_make_transform((x, y, branch_z), (width, branch_w, branch_w), yaw + 30.0))
+        elif art == "busch":
+            if bush_mesh is not None:
+                bush_custom.append(_custom_transform(item, bush_entry))
+            else:
+                bush_h = height + 0.3
+                bushes.append(_make_transform((x, y, z - 0.3 + bush_h * 0.5), (width, width * 0.88, bush_h), yaw))
+
+    if pine_custom:
+        unreal.EIWorldTools.build_instanced_mesh(world, pine_mesh, None, pine_custom, True, 0, "Kiefer", GENERATED_TAG)
+    else:
+        if pine_trunks:
+            unreal.EIWorldTools.build_instanced_mesh(world, cube, wood_mat, pine_trunks, True, 0, "Kiefernstamm", GENERATED_TAG)
+        if pine_crowns:
+            unreal.EIWorldTools.build_instanced_mesh(world, cube, foliage_mat, pine_crowns, False, 0, "Kiefernkrone", GENERATED_TAG)
+
+    if dead_custom:
+        unreal.EIWorldTools.build_instanced_mesh(world, dead_mesh, None, dead_custom, True, 0, "Toter Baum", GENERATED_TAG)
+    elif dead_trees:
+        unreal.EIWorldTools.build_instanced_mesh(world, cube, wood_mat, dead_trees, True, 0, "Toter Baum", GENERATED_TAG)
+
+    if bush_custom:
+        unreal.EIWorldTools.build_instanced_mesh(world, bush_mesh, None, bush_custom, False, bush_cull_cm, "Busch", GENERATED_TAG)
+    elif bushes:
+        unreal.EIWorldTools.build_instanced_mesh(world, cube, foliage_mat, bushes, False, bush_cull_cm, "Busch", GENERATED_TAG)
+
+    return tree_points
+
+
 def add_dock(actors, dock):
     """The platform above the clouds where a run starts, with the barge moored at its long side."""
     x, y, height = dock["x_m"], dock["y_m"], dock["hoehe_m"]
@@ -464,7 +578,7 @@ def add_place(actors, place, index):
         add_box(actors, f"Ort {index + 1}", (center_x, center_y, floor_z + PLACE_WALL_HEIGHT_M / 2), size, rotation=(0, 0, math.degrees(yaw) + wall_yaw))
 
 
-def add_cover(actors, layout, extra_taken=()):
+def add_cover(actors, layout, extra_taken=(), tree_points=()):
     """Loose blocks that give cover and break the view. They keep clear of the places, the fires and the middle of the map."""
     rng = random.Random(layout["deckung_zufall"])
     half = layout["boden_m"] / 2 - COVER_CLEAR_M
@@ -479,6 +593,8 @@ def add_cover(actors, layout, extra_taken=()):
         if any(math.hypot(x - other_x, y - other_y) < COVER_CLEAR_M for other_x, other_y in taken):
             continue
         if any(math.hypot(x - other_x, y - other_y) < BOSS_CLEAR_M for other_x, other_y in bosses):
+            continue
+        if any(math.hypot(x - tx, y - ty) < 5.0 for tx, ty in tree_points):
             continue
         if not is_open_ground(x, y):
             continue
@@ -499,7 +615,7 @@ def add_camps(actors, layout):
         actor.set_editor_property("start_size", camp["groesse"])
 
 
-def add_chests(actors, layout, cover):
+def add_chests(actors, layout, cover, tree_points=()):
     """Out in the open, each with room for its fight. A run only uses some of them."""
     chest_class = unreal.load_class(None, "/Script/Eisenseelen.EIChest")
     # A random generator of its own, so that more chests do not move the cover around.
@@ -516,6 +632,8 @@ def add_chests(actors, layout, cover):
     while placed < layout["truhen"]:
         x, y = rng.uniform(-half, half), rng.uniform(-half, half)
         if any(math.hypot(x - other_x, y - other_y) < clear for (other_x, other_y), clear in keep_clear):
+            continue
+        if any(math.hypot(x - tx, y - ty) < 5.0 for tx, ty in tree_points):
             continue
         if not is_open_ground(x, y):
             continue
@@ -564,14 +682,15 @@ def main():
     add_bridges(actors)
     add_tunnel(actors)
     rock_points = add_rocks(actors)
+    tree_points = add_forest()
     add_sea_border(actors, floor_size)
     altar_class = unreal.load_class(None, "/Script/Eisenseelen.EIAltar")
     for index, place in enumerate(layout["orte"]):
         add_place(actors, place, index)
         spawn(actors, altar_class, location=on_ground(place["x_m"], place["y_m"]), label="Altar")
-    taken = add_cover(actors, layout, rock_points)
+    taken = add_cover(actors, layout, rock_points, tree_points)
     add_camps(actors, layout)
-    add_chests(actors, layout, taken)
+    add_chests(actors, layout, taken, tree_points)
     add_launch_pads(actors, layout["sprungfelder"])
 
     navigation_middle_cm = (NAVIGATION_BOTTOM_M + NAVIGATION_TOP_M) / 2 * CM_PER_M

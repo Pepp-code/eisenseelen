@@ -292,7 +292,40 @@
 			{ "name": "Felsmauer Südwald-Ost", "x_m": -82, "y_m": -18, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": -20 },
 			{ "name": "Felsmauer Osthang-Nord", "x_m": 5, "y_m": 198, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": 80 },
 			{ "name": "Felsmauer Hof-Süd", "x_m": 162, "y_m": 5, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 1.8, "drehung_grad": 0 },
-			{ "name": "Felsmauer Moor-Nord", "x_m": -55, "y_m": 112, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 1.8, "drehung_grad": 35 }
+			{ "name": "Felsmauer Moor-Nord", "x_m": -55, "y_m": 112, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 1.8, "drehung_grad": 35 },
+			{ "name": "Felsmauer Herzpfad-West", "x_m": 18, "y_m": -32, "laenge_m": 14, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": 82 },
+			{ "name": "Felsmauer Seelenforst-Ost", "x_m": 88, "y_m": 32, "laenge_m": 14, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": -25 }
+		]
+	},
+	"wald": {
+		"zufall_versatz": 99,
+		"raster_m": 8.5,
+		"streuung_m": 2.9,
+		"weg_puffer_m": 4.8,
+		"platz_puffer_m": 3.5,
+		"busch_sichtweite_cm": 12000,
+		"dichte": {
+			"kernwald": 0.85,
+			"uebergang": 0.36,
+			"offen": 0.08
+		},
+		"tote_baeume_gruppen": [
+			{ "name": "Bleiches Moor Nord", "x_m": -102, "y_m": 128, "radius_m": 22, "anzahl": 8 },
+			{ "name": "Bleiches Moor Südost", "x_m": -138, "y_m": 152, "radius_m": 26, "anzahl": 10 },
+			{ "name": "Nebelmarsch Ufer", "x_m": 118, "y_m": -135, "radius_m": 20, "anzahl": 6 },
+			{ "name": "Flachwasser Nordost", "x_m": 218, "y_m": 52, "radius_m": 18, "anzahl": 7 },
+			{ "name": "Flachwasser Leuchtturm", "x_m": -222, "y_m": -158, "radius_m": 18, "anzahl": 7 }
+		],
+		"freihalten_kreise": [
+			{ "name": "Brachhof", "x_m": 155, "y_m": -45, "radius_m": 26 },
+			{ "name": "Pfahlbucht-Dorf", "x_m": -185, "y_m": -30, "radius_m": 24 },
+			{ "name": "Leuchtturm-Kuppe", "x_m": -220, "y_m": -150, "radius_m": 16 },
+			{ "name": "Schiffswrack West", "x_m": -55, "y_m": -218, "radius_m": 20 },
+			{ "name": "Steinbruch", "x_m": 110, "y_m": 100, "radius_m": 30 },
+			{ "name": "Eisenturm", "x_m": 155, "y_m": 75, "radius_m": 16 },
+			{ "name": "Felsring-Feste", "x_m": 65, "y_m": -135, "radius_m": 24 },
+			{ "name": "Gerüstlager Nord", "x_m": 68, "y_m": 55, "radius_m": 18 },
+			{ "name": "Sumpftümpel-Testpunkt", "x_m": -120, "y_m": 165, "radius_m": 7 }
 		]
 	},
 	"wege": {

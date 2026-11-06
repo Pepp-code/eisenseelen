@@ -4,6 +4,7 @@
 
 #include "AIController.h"
 #include "Algo/Count.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "EIAltar.h"
 #include "EIChest.h"
 #include "EIEnemy.h"
@@ -18,6 +19,7 @@
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
 #include "EITestScript.h"
+#include "EIWorldTools.h"
 #include "Engine/DamageEvents.h"
 #include "EIVisuals.h"
 #include "Engine/StaticMeshActor.h"
@@ -1413,6 +1415,45 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 			const bool bHasRoof = Context.World->LineTraceSingleByObjectType(RoofHit, Spot + FVector(0.0, 0.0, 200.0), Spot + FVector(0.0, 0.0, 3000.0), StaticObjects);
 			Context.Test->TestTrue(TEXT("The tunnel has a solid rock roof overhead"), bHasRoof && RoofHit.ImpactPoint.Z >= 550.0);
 		}
+
+		// The forest (pines, dead swamp trees, and bushes) must be packed into a few instanced mesh actors and leave all roads clear.
+		int32 ForestActorCount = 0;
+		int32 CollidingTreeInstances = 0;
+		int32 NonCollidingFoliageInstances = 0;
+		bool bBushesHaveCullDistance = false;
+		for (TActorIterator<AEIInstancedMeshActor> It(Context.World); It; ++It)
+		{
+			++ForestActorCount;
+			const UHierarchicalInstancedStaticMeshComponent* Comp = It->Instances;
+			if (Comp == nullptr)
+			{
+				continue;
+			}
+			const int32 Count = Comp->GetInstanceCount();
+			if (It->GetActorEnableCollision() && Comp->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
+			{
+				CollidingTreeInstances += Count;
+			}
+			else
+			{
+				NonCollidingFoliageInstances += Count;
+				if (Comp->InstanceEndCullDistance > 0)
+				{
+					bBushesHaveCullDistance = true;
+				}
+			}
+		}
+		const double FrameMs = Context.World->GetDeltaSeconds() * 1000.0;
+		Context.Test->AddInfo(FString::Printf(
+			TEXT("Forest instancing: %d instanced actors holding %d colliding trunk/branch instances and %d non-colliding crown/bush instances (frame %.2f ms)"),
+			ForestActorCount,
+			CollidingTreeInstances,
+			NonCollidingFoliageInstances,
+			FrameMs));
+		Context.Test->TestTrue(TEXT("The forest is packed into a small number of instanced mesh actors"), ForestActorCount >= 3 && ForestActorCount <= 8);
+		Context.Test->TestTrue(TEXT("The island has hundreds of colliding tree instances"), CollidingTreeInstances >= 300);
+		Context.Test->TestTrue(TEXT("The island has hundreds of non-colliding foliage instances"), NonCollidingFoliageInstances >= 400);
+		Context.Test->TestTrue(TEXT("Bushes use a cull distance for performance"), bBushesHaveCullDistance);
 
 		// Measure the island travel distances and times across Aschenwerder (North to South arrival) and along Arrival -> Side Job -> Boss -> Signal Fire.
 		constexpr double WalkSpeedMetersPerSec = 5.5;
