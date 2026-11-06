@@ -9,7 +9,9 @@ enum class EEIBannbruchKind : uint8
 	/** Stones to hold, each one drops a chain. */
 	AnchorStones,
 	/** A kettle that fills with every enemy that falls in its circle. The boss sleeps in its grave until it is full. */
-	Kettle
+	Kettle,
+	/** Soul stones in guarded chests. Whoever sets them all into the hollow armor wakes the boss inside. */
+	SoulStones
 };
 
 /** The task before a boss. */

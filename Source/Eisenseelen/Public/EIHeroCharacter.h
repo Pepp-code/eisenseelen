@@ -93,6 +93,12 @@ public:
 	/** Server only: from now on this hero stands on the barge and rides it. */
 	void BoardBarge(AEISkyBarge* Barge);
 	bool IsAboard() const { return bAboard; }
+
+	/** A soul stone from a chest of a hollow armor. The HUD says so, and the boss work wants to know it. */
+	bool CarriesSoulStone() const { return bCarriesSoulStone; }
+
+	/** Server only. */
+	void SetCarriesSoulStone(bool bCarries) { bCarriesSoulStone = bCarries; }
 	const FVector& GetLocationBeforeBoarding() const { return LocationBeforeBoarding; }
 
 	/** Server only: this hero stands here now, off the barge if it was on it, and looks that way. */
@@ -200,4 +206,7 @@ private:
 
 	UPROPERTY(Replicated)
 	bool bAboard = false;
+
+	UPROPERTY(Replicated)
+	bool bCarriesSoulStone = false;
 };

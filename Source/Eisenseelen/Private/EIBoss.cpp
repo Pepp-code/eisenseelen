@@ -84,10 +84,11 @@ const FEIBossValues* AEIBoss::GetBossValues() const
 	return Table.Bosses.IsValidIndex(BossIndex) ? &Table.Bosses[BossIndex] : nullptr;
 }
 
-bool AEIBoss::SleepsInGrave() const
+bool AEIBoss::SleepsHidden() const
 {
 	const FEIBossValues* Boss = GetBossValues();
-	return bBound && Boss != nullptr && Boss->Bannbruch.Kind == EEIBannbruchKind::Kettle;
+	return bBound && Boss != nullptr
+		&& (Boss->Bannbruch.Kind == EEIBannbruchKind::Kettle || Boss->Bannbruch.Kind == EEIBannbruchKind::SoulStones);
 }
 
 bool AEIBoss::LoadEnemyValues(FEIEnemyValues& OutValues, FString& OutError)
@@ -115,15 +116,15 @@ TArray<FString> AEIBoss::GetLookKeys() const
 
 void AEIBoss::ApplyGraveLook()
 {
-	// Whoever sleeps in a grave is not there yet: nobody sees it, hits it or bumps into it.
-	const bool bInGrave = SleepsInGrave();
-	SetActorHiddenInGame(bInGrave);
-	SetActorEnableCollision(!bInGrave);
+	// Whoever sleeps hidden is not there yet — in its grave, or hollow inside its armor: nobody sees it, hits it or bumps into it.
+	const bool bGoneFromSight = SleepsHidden();
+	SetActorHiddenInGame(bGoneFromSight);
+	SetActorEnableCollision(!bGoneFromSight);
 	if (!HasAuthority())
 	{
 		return;
 	}
-	if (bInGrave)
+	if (bGoneFromSight)
 	{
 		GetCharacterMovement()->DisableMovement();
 	}

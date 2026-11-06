@@ -135,6 +135,60 @@
 					{ "name": "Herz des Seelenrufers", "chance": 0.03 }
 				]
 			}
+		},
+		{
+			"name": "Die Leere Wacht",
+			"auftritt": "Die Leere Wacht erwacht!",
+			"farbe": [0.42, 0.45, 0.55],
+			"bannbruch": {
+				"art": "seelensteine",
+				"name": "Leere Rüstung",
+				"teil": "Seelenstein",
+				"anleitung": "Öffne die bewachten Truhen und setze die Seelensteine in die leere Rüstung ein.",
+				"anzahl": 3,
+				"zone_m": 4,
+				"abstand_m": 40
+			},
+			"werte": {
+				"windfest": true,
+				"leben": 3600,
+				"bedrohung": 0,
+				"tempo_m_pro_s": 5,
+				"schaden": 30,
+				"angriff_ab_abstand_m": 5,
+				"ausholen_s": 0.9,
+				"ausholen_folgen_s": 0,
+				"trefferzone_m": 6,
+				"trefferbreite_m": 5,
+				"schlag_markiert": true,
+				"erholung_s": 1.4,
+				"taumeln_faktor_schwerer_hieb_0_bis_1": 0,
+				"sicht_m": 40,
+				"alarm_umkreis_m": 0,
+				"aufgeben_m": 70,
+				"wach_mindestens_s": 12,
+				"groesse_faktor": 2.8,
+				"drehtempo_grad_pro_s": 220,
+				"schild_schaden_faktor_0_bis_1": 0.35,
+				"schild_winkel_grad": 140,
+				"wurf_tempo_m_pro_s": 0,
+				"erfahrung": 50
+			},
+			"verschwinden": {
+				"alle_s": 16,
+				"ankuendigung_s": 1.2,
+				"weite_m": 18,
+				"mindestens_m": 9
+			},
+			"beute": {
+				"gold_von": 800,
+				"gold_bis": 1200,
+				"zutaten": [
+					{ "name": "Leerenkern", "chance": 0.4 },
+					{ "name": "Wachsplatte", "chance": 0.15 },
+					{ "name": "Herz der Leeren Wacht", "chance": 0.03 }
+				]
+			}
 		}
 	]
 }

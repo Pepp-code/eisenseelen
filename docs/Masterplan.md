@@ -566,7 +566,7 @@ Zum Start eines Laufs stehen 14 kleine und 4 mittlere Gruppen in den Lagern.
 
 ### Der Boss
 
-**Entschieden am 5. November 2026:** Der Boss steht ohne geschlossene Arena an einem festen Bossplatz auf der Karte. Jeder Boss hat einen eigenen Bannbruch, also einen eigenen Weg, wie er befreit, beschworen oder geweckt wird, und ein eigenes Beute-Set mit Chancen. Was er fallen lässt, siehst du erst, wenn er fällt. Nur nach dem Boss kannst du fliehen: Das Signalfeuer steht an einem festen Ort, und nur dort holt dich die Barke ab. Geplant sind zuerst drei graue Bosse: Der Gefesselte, Der Seelenrufer und Die Leere Wacht. Die Wandernde Feste bleibt die spätere, teure Fassung: eine laufende Burg mit zerstörbaren Türmen aus starren Teilen, die sich per Code bewegt. Die Einzelheiten stehen im Reiter Items und Builds. Gebaut sind seit dem 5. November Der Gefesselte und Der Seelenrufer.
+**Entschieden am 5. November 2026:** Der Boss steht ohne geschlossene Arena an einem festen Bossplatz auf der Karte. Jeder Boss hat einen eigenen Bannbruch, also einen eigenen Weg, wie er befreit, beschworen oder geweckt wird, und ein eigenes Beute-Set mit Chancen. Was er fallen lässt, siehst du erst, wenn er fällt. Nur nach dem Boss kannst du fliehen: Das Signalfeuer steht an einem festen Ort, und nur dort holt dich die Barke ab. Geplant sind zuerst drei graue Bosse: Der Gefesselte, Der Seelenrufer und Die Leere Wacht. Die Wandernde Feste bleibt die spätere, teure Fassung: eine laufende Burg mit zerstörbaren Türmen aus starren Teilen, die sich per Code bewegt. Die Einzelheiten stehen im Reiter Items und Builds. Gebaut sind bis zum 6. November Der Gefesselte, Der Seelenrufer und Die Leere Wacht.
 
 ### Die Karte
 

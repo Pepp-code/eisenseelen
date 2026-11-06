@@ -5,16 +5,19 @@
 #include "EIAnchorStone.h"
 #include "EIBoss.h"
 #include "EIBosses.h"
+#include "EIChest.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHealthComponent.h"
 #include "EIHordeDirector.h"
+#include "EIHollowArmor.h"
 #include "EIHuntBoard.h"
 #include "EIProfileComponent.h"
 #include "EIRunDirector.h"
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
 #include "EISoulKettle.h"
+#include "EISoulStoneChest.h"
 #include "EITestScript.h"
 #include "Engine/DamageEvents.h"
 #include "EngineUtils.h"
@@ -97,6 +100,8 @@ bool FEIBossDataTest::RunTest(const FString& Parameters)
 		return true;
 	}
 	TestTrue(TEXT("There is a boss"), !Table.Bosses.IsEmpty());
+	const FEIBossValues* WatcherFromFile = Table.Bosses.FindByPredicate([](const FEIBossValues& Boss) { return Boss.Bannbruch.Kind == EEIBannbruchKind::SoulStones; });
+	TestTrue(TEXT("Die Leere Wacht steht im File"), WatcherFromFile != nullptr);
 	for (const FEIBossValues& Boss : Table.Bosses)
 	{
 		TestTrue(TEXT("A boss has a loot set"), !Boss.Loot.IsEmpty());
@@ -172,6 +177,25 @@ bool FEIBossDataTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("The shield lasts at most so long"), Caller.Summon.MaxShieldSeconds, 20.0f);
 		TestTrue(TEXT("It vanishes"), Caller.Vanish.bHas);
 		TestEqual(TEXT("So far"), Caller.Vanish.RangeMeters, 20.0f);
+	}
+	else
+	{
+		AddError(Error);
+	}
+
+	// A hollow armor: soul stones from guarded chests, and nothing is held for a time.
+	const FString Stones = Valid
+		.Replace(TEXT("\"art\": \"ankersteine\""), TEXT("\"art\": \"seelensteine\""))
+		.Replace(TEXT("\"anzahl\": 2, \"halten_s\": 5,"), TEXT("\"anzahl\": 2,"));
+	FEIBossTable WithStones;
+	TestTrue(TEXT("A boss with soul stones loads"), FEIBossTable::LoadFromString(Stones, WithStones, Error));
+	if (!WithStones.Bosses.IsEmpty())
+	{
+		const FEIBossValues& Hollow = WithStones.Bosses[0];
+		TestEqual(TEXT("It waits in a hollow armor"), Hollow.Bannbruch.Kind, EEIBannbruchKind::SoulStones);
+		TestEqual(TEXT("The armor wants its stones"), Hollow.Bannbruch.Count, 2);
+		TestEqual(TEXT("So close you must stand to insert"), Hollow.Bannbruch.ZoneMeters, 3.0f);
+		TestEqual(TEXT("Its chests stand around it"), Hollow.Bannbruch.DistanceMeters, 9.0f);
 	}
 	else
 	{
@@ -684,6 +708,11 @@ namespace
 		return GetRun(Context)->GetBossTable().Bosses.IndexOfByPredicate([](const FEIBossValues& Boss) { return Boss.Bannbruch.Kind == EEIBannbruchKind::Kettle; });
 	}
 
+	int32 FindStoneBoss(const FEIPlayContext& Context)
+	{
+		return GetRun(Context)->GetBossTable().Bosses.IndexOfByPredicate([](const FEIBossValues& Boss) { return Boss.Bannbruch.Kind == EEIBannbruchKind::SoulStones; });
+	}
+
 	void KillAllButTheBoss(const FEIPlayContext& Context)
 	{
 		for (TActorIterator<AEIEnemy> It(Context.World); It; ++It)
@@ -764,7 +793,7 @@ bool FEISoulCallerTest::RunTest(const FString& Parameters)
 			Context.Test->AddError(TEXT("The boss or its kettle is missing"));
 			return;
 		}
-		Context.Test->TestTrue(TEXT("It sleeps in its grave"), Boss->SleepsInGrave());
+		Context.Test->TestTrue(TEXT("It sleeps in its grave"), Boss->SleepsHidden());
 		Context.Test->TestTrue(TEXT("Nobody sees it"), Boss->IsHidden());
 		Context.Test->TestFalse(TEXT("Nobody bumps into it"), Boss->GetActorEnableCollision());
 		const float Life = Boss->GetHealth()->GetHealth();
@@ -826,7 +855,7 @@ bool FEISoulCallerTest::RunTest(const FString& Parameters)
 		AEIBoss* Boss = GetBoss(Context);
 		Context.Test->TestTrue(TEXT("The kettle is full"), GetRun(Context)->GetKettle()->IsFull());
 		Context.Test->TestFalse(TEXT("The boss is free"), Boss->IsBound());
-		Context.Test->TestFalse(TEXT("It has left its grave"), Boss->SleepsInGrave());
+		Context.Test->TestFalse(TEXT("It has left its grave"), Boss->SleepsHidden());
 		Context.Test->TestFalse(TEXT("Now it is seen"), Boss->IsHidden());
 		Context.Test->TestTrue(TEXT("Now it stands in the way"), Boss->GetActorEnableCollision());
 		Context.Test->TestEqual(TEXT("The fight is on"), GetState(Context)->GetBossStage(), EEIBossStage::Awake);
@@ -898,6 +927,166 @@ bool FEISoulCallerTest::RunTest(const FString& Parameters)
 		{
 			Context.Test->TestTrue(TEXT("From its own set"), Profile->GetRunIngredients().Contains(Item.Name));
 		}
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEISoulStoneRunTest,
+	"Eisenseelen.Play.Run.SoulStones",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEISoulStoneRunTest::RunTest(const FString& Parameters)
+{
+	const auto Threat = [](const FEIPlayContext& Context) { return Context.World->GetAuthGameMode<AEIGameMode>()->GetHorde()->CountThreat(); };
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(WaitForPaths());
+
+	// Die Leere Wacht waits at the dock, chosen by force.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		const int32 Watcher = FindStoneBoss(Context);
+		if (Watcher == INDEX_NONE)
+		{
+			Context.Test->AddError(TEXT("No boss waits in a hollow armor"));
+			return;
+		}
+		PrepareBossRun(Context, Watcher);
+		UEIRunDirector* Run = GetRun(Context);
+		Context.Test->TestEqual(TEXT("It is the one that comes"), Run->GetBossIndex(), Watcher);
+		Run->BeginRunNow();
+		// The hero stands at the armor, away from every chest circle.
+		StandBeside(Context, Run->GetArmor(), 200.0f);
+	}));
+	Steps.Add(Wait(0.2));
+
+	// It sleeps hollow in its armor: nobody sees it or hurts it, and its stones lie in guarded chests in a ring.
+	Steps.Add(Do([Threat](const FEIPlayContext& Context)
+	{
+		UEIRunDirector* Run = GetRun(Context);
+		AEIBoss* Boss = GetBoss(Context);
+		AEIHollowArmor* Armor = Run->GetArmor();
+		if (Boss == nullptr || Armor == nullptr)
+		{
+			Context.Test->AddError(TEXT("The boss or its armor is missing"));
+			return;
+		}
+		Context.Test->TestTrue(TEXT("It sleeps hollow in its armor"), Boss->SleepsHidden());
+		Context.Test->TestTrue(TEXT("Nobody sees it"), Boss->IsHidden());
+		const float Life = Boss->GetHealth()->GetHealth();
+		Boss->TakeDamage(1000.0f, FDamageEvent(), nullptr, Context.Hero);
+		Context.Test->TestEqual(TEXT("Nobody hurts it"), Boss->GetHealth()->GetHealth(), Life);
+		Context.Test->TestEqual(TEXT("No stones hold it"), Run->GetAnchors().Num(), 0);
+		Context.Test->TestNull(TEXT("No kettle stands there"), Run->GetKettle());
+		Context.Test->TestEqual(TEXT("The armor wants its stones"), Armor->GetTotal(), Boss->GetBossValues()->Bannbruch.Count);
+		Context.Test->TestEqual(TEXT("None are in yet"), Armor->GetInserted(), 0);
+		Context.Test->TestEqual(TEXT("As many chests as stones"), Run->GetStoneChests().Num(), Armor->GetTotal());
+		for (const AEIChest* Chest : Run->GetStoneChests())
+		{
+			Context.Test->TestEqual(TEXT("A chest starts sealed"), Chest->GetState(), EEIChestState::Sealed);
+			Context.Test->TestNearlyEqual(TEXT("The chests stand in a ring around the armor"), static_cast<float>(FVector::Dist2D(Chest->GetActorLocation(), Run->GetBossPlace())), Boss->GetBossValues()->Bannbruch.DistanceMeters * CentimetersPerMeter, 200.0f);
+		}
+		Context.Test->TestEqual(TEXT("As long as nobody works at a chest no wave comes"), Threat(Context), 0.0f);
+	}));
+
+	// Whoever steps into a chest circle calls its guards.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		StandBeside(Context, GetRun(Context)->GetStoneChests()[0], 200.0f);
+	}));
+	Steps.Add(WaitUntil(TEXT("the guards of the chest come"), 5.0, [Threat](const FEIPlayContext& Context) { return Threat(Context) > 0.0f; }));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const AEIChest* Chest = GetRun(Context)->GetStoneChests()[0];
+		Context.Test->TestEqual(TEXT("The chest is guarded"), Chest->GetState(), EEIChestState::Guarded);
+		Context.Test->TestTrue(TEXT("Guards are there"), Chest->GetGuardsLeft() > 0);
+	}));
+
+	// The guards fall, and the chest is free but still closed.
+	Steps.Add(Do([](const FEIPlayContext& Context) { KillAllButTheBoss(Context); }));
+	Steps.Add(WaitUntil(TEXT("the chest is free"), 5.0, [](const FEIPlayContext& Context)
+	{
+		const TArray<TObjectPtr<AEIChest>>& Chests = GetRun(Context)->GetStoneChests();
+		return Chests.Num() > 0 && Chests[0] != nullptr && Chests[0]->GetState() == EEIChestState::Free;
+	}));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		const AEIChest* Chest = GetRun(Context)->GetStoneChests()[0];
+		Context.Test->TestFalse(TEXT("It is still closed"), Chest->IsOpen());
+	}));
+
+	// The use key takes the stone, and it goes into the armor.
+	AddTap(Steps, EKeys::F);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("The chest is open"), GetRun(Context)->GetStoneChests()[0]->IsOpen());
+		Context.Test->TestTrue(TEXT("The hero carries the stone"), Context.Hero->CarriesSoulStone());
+		StandBeside(Context, GetRun(Context)->GetArmor(), 200.0f);
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("The armor is in reach"), GetRun(Context)->GetArmor()->IsInReach(Context.Hero));
+	}));
+	AddTap(Steps, EKeys::F);
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIRunDirector* Run = GetRun(Context);
+		Context.Test->TestEqual(TEXT("One stone is in"), Run->GetArmor()->GetInserted(), 1);
+		Context.Test->TestFalse(TEXT("The hero carries nothing more"), Context.Hero->CarriesSoulStone());
+		Context.Test->TestEqual(TEXT("The screen counts it"), GetState(Context)->GetBannbruchDone(), 1);
+		Context.Test->TestTrue(TEXT("The boss still sleeps"), GetBoss(Context)->IsBound());
+
+		// The stone of a second chest goes in too.
+		AEIChest* Second = nullptr;
+		for (AEIChest* Chest : Run->GetStoneChests())
+		{
+			if (Chest != nullptr && !Chest->IsOpen())
+			{
+				Second = Chest;
+				break;
+			}
+		}
+		if (Second == nullptr)
+		{
+			Context.Test->AddError(TEXT("No second chest"));
+			return;
+		}
+		Run->GetArmor()->SetInserted(Run->GetArmor()->GetTotal() - 1);
+		Second->SetGuards(TArray<AEIEnemy*>());
+		Second->Open();
+		Context.Hero->SetCarriesSoulStone(true);
+	}));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIRunDirector* Run = GetRun(Context);
+		Context.Test->TestTrue(TEXT("The hero carries the second stone"), Context.Hero->CarriesSoulStone());
+		StandBeside(Context, Run->GetArmor(), 200.0f);
+	}));
+	Steps.Add(Wait(0.1));
+	AddTap(Steps, EKeys::F);
+	Steps.Add(Wait(0.1));
+
+	// The last stone wakes the boss, and armor and chests are gone.
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIRunDirector* Run = GetRun(Context);
+		AEIBoss* Boss = GetBoss(Context);
+		Context.Test->TestFalse(TEXT("The boss is free"), Boss->IsBound());
+		Context.Test->TestFalse(TEXT("It has left its armor"), Boss->SleepsHidden());
+		Context.Test->TestFalse(TEXT("Now it is seen"), Boss->IsHidden());
+		Context.Test->TestEqual(TEXT("The fight is on"), GetState(Context)->GetBossStage(), EEIBossStage::Awake);
+		Context.Test->TestNull(TEXT("The armor is gone"), Run->GetArmor());
+		Context.Test->TestEqual(TEXT("Its chests are gone"), Run->GetStoneChests().Num(), 0);
+		Context.Test->TestFalse(TEXT("Nobody carries a stone anymore"), Context.Hero->CarriesSoulStone());
+		KillAllButTheBoss(Context);
+		Boss->TakeDamage(100000000.0f, FDamageEvent(), nullptr, nullptr);
+		Context.Test->TestEqual(TEXT("The boss is down"), GetState(Context)->GetBossStage(), EEIBossStage::Down);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

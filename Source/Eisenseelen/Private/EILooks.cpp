@@ -317,7 +317,8 @@ const TArray<FString>& FEILookTable::GetPlaceNames()
 {
 	static const TArray<FString> Names = {
 		TEXT("schmiede"), TEXT("jagdbrett"), TEXT("altar"), TEXT("ankerstein"), TEXT("truhe"), TEXT("signalfeuer"),
-		TEXT("seelenkessel"), TEXT("grab"), TEXT("trainingspuppe"), TEXT("barke"), TEXT("sprungfeld"), TEXT("lager")};
+		TEXT("seelenkessel"), TEXT("grab"), TEXT("trainingspuppe"), TEXT("barke"), TEXT("sprungfeld"), TEXT("lager"),
+		TEXT("leere_wacht")};
 	return Names;
 }
 

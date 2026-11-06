@@ -30,9 +30,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
 	bool IsShielded() const { return bShielded; }
 
-	/** Whether it sleeps in a grave and nobody sees it until the kettle is full. */
+	/** Whether it sleeps hidden — in a grave, or hollow inside its armor — and nobody sees it until its Bannbruch is done. */
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
-	bool SleepsInGrave() const;
+	bool SleepsHidden() const;
 
 	/** Whether the ring of its stomp lies on the floor right now. */
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")

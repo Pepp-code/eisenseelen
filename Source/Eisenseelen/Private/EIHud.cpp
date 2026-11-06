@@ -11,6 +11,7 @@
 #include "EIHealthComponent.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
+#include "EIHollowArmor.h"
 #include "EIHuntBoard.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
@@ -18,6 +19,7 @@
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
 #include "EISoulKettle.h"
+#include "EISoulStoneChest.h"
 #include "EISwordComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -455,9 +457,9 @@ void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 	{
 		return;
 	}
-	// Close by, the bar says all of it, and the mark would lie on top of it. Whoever sleeps in a grave is found by its kettle.
+	// Close by, the bar says all of it, and the mark would lie on top of it. Whoever sleeps hidden is found by its kettle or its armor.
 	const double FromBoss = FVector::Dist(Hero->GetActorLocation(), Boss->GetActorLocation());
-	if (!Boss->IsDead() && !Boss->SleepsInGrave() && (Stage != EEIBossStage::Awake || FromBoss > BossMarkFromCm))
+	if (!Boss->IsDead() && !Boss->SleepsHidden() && (Stage != EEIBossStage::Awake || FromBoss > BossMarkFromCm))
 	{
 		const FVector Mark = Boss->GetActorLocation() + FVector(0.0f, 0.0f, BossMarkAboveCm);
 		DrawWorldMark(Mark, FString::Printf(TEXT("%s %.0f m"), *Values->Name, FVector::Dist(Hero->GetActorLocation(), Boss->GetActorLocation()) / CentimetersPerMeter), BossMarkColor);
@@ -475,6 +477,13 @@ void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 				}
 			}
 			for (TActorIterator<AEISoulKettle> It(GetWorld()); It; ++It)
+			{
+				if (It->IsInZone(Hero))
+				{
+					DrawLine(TEXT("Erf\u00FClle zuerst alle Nebenauftr\u00E4ge!"), CenterX - 180.0f, PromptY - 80.0f, AnchorMarkColor, 1.5f);
+				}
+			}
+			for (TActorIterator<AEISoulStoneChest> It(GetWorld()); It; ++It)
 			{
 				if (It->IsInZone(Hero))
 				{
@@ -507,6 +516,38 @@ void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 			{
 				DrawLine(FString::Printf(TEXT("Seelen: %d von %d. Besiege Gegner im Kreis"), It->GetSouls(), It->GetCount()), CenterX - 230.0f, PromptY - 80.0f, AnchorMarkColor, 1.5f);
 			}
+		}
+		for (TActorIterator<AEISoulStoneChest> It(GetWorld()); It; ++It)
+		{
+			if (It->IsOpen())
+			{
+				continue;
+			}
+			DrawWorldMark(It->GetMarkLocation(), FString::Printf(TEXT("%s %.0f m"), *Values->Bannbruch.PartName, FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), AnchorMarkColor);
+			if (It->IsInZone(Hero))
+			{
+				DrawLine(FString::Printf(TEXT("%s: noch %d Wachen"), *Values->Bannbruch.PartName, It->GetGuardsLeft()), CenterX - 150.0f, PromptY - 80.0f, AnchorMarkColor, 1.5f);
+			}
+			if (It->GetState() == EEIChestState::Free && !Hero->CarriesSoulStone() && It->IsInReach(Hero))
+			{
+				DrawLine(TEXT("F: Seelenstein nehmen"), CenterX - 110.0f, PromptY, AnchorMarkColor, 1.5f);
+			}
+		}
+		for (TActorIterator<AEIHollowArmor> It(GetWorld()); It; ++It)
+		{
+			if (It->IsFull())
+			{
+				continue;
+			}
+			DrawWorldMark(It->GetMarkLocation(), FString::Printf(TEXT("%s %.0f m"), *Values->Bannbruch.Name, FVector::Dist(Hero->GetActorLocation(), It->GetActorLocation()) / CentimetersPerMeter), AnchorMarkColor);
+			if (Hero->CarriesSoulStone() && It->IsInReach(Hero))
+			{
+				DrawLine(TEXT("F: Seelenstein einsetzen"), CenterX - 120.0f, PromptY, AnchorMarkColor, 1.5f);
+			}
+		}
+		if (Hero->CarriesSoulStone())
+		{
+			DrawLine(TEXT("Du tr\u00E4gst einen Seelenstein. Bring ihn zur leeren R\u00FCstung."), CenterX - 260.0f, PromptY - 104.0f, AnchorMarkColor, 1.5f);
 		}
 		return;
 	}

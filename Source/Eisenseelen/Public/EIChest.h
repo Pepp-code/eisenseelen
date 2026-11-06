@@ -51,6 +51,9 @@ public:
 	/** Server only. */
 	void Open();
 
+	/** Server only. A stone that its carrier dropped goes back in, so that another hero can take it. */
+	void CloseAgain();
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void Tick(float DeltaSeconds) override;
 

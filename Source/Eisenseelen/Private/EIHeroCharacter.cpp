@@ -131,6 +131,7 @@ void AEIHeroCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AEIHeroCharacter, HeroClass);
 	DOREPLIFETIME(AEIHeroCharacter, bAboard);
+	DOREPLIFETIME(AEIHeroCharacter, bCarriesSoulStone);
 }
 
 void AEIHeroCharacter::PossessedBy(AController* NewController)

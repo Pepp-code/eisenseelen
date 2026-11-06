@@ -11,6 +11,7 @@
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
+#include "EIHollowArmor.h"
 #include "EIHordeDirector.h"
 #include "EIForge.h"
 #include "EIHuntBoard.h"
@@ -19,6 +20,7 @@
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
 #include "EISoulKettle.h"
+#include "EISoulStoneChest.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 
@@ -323,7 +325,22 @@ void UEIRunDirector::PrepareBoss()
 		Kettle->Destroy();
 		Kettle = nullptr;
 	}
+	for (AEIChest* Chest : StoneChests)
+	{
+		if (Chest != nullptr)
+		{
+			Chest->Destroy();
+		}
+	}
+	StoneChests.Reset();
+	if (Armor != nullptr)
+	{
+		Armor->Destroy();
+		Armor = nullptr;
+	}
 	bKettleHeld = false;
+	bStoneWork = false;
+	CarriedStones.Reset();
 	if (Boss != nullptr)
 	{
 		Boss->Destroy();
@@ -424,6 +441,10 @@ void UEIRunDirector::SpawnBoss(int32 HeroCount)
 	{
 		SpawnKettle(Ground, Bannbruch);
 	}
+	else if (Bannbruch.Kind == EEIBannbruchKind::SoulStones)
+	{
+		SpawnSoulStones(Ground, Bannbruch);
+	}
 	else
 	{
 		SpawnAnchors(Ground, Bannbruch);
@@ -461,6 +482,33 @@ void UEIRunDirector::SpawnKettle(const FVector& Ground, const FEIBannbruch& Bann
 	{
 		Kettle->Setup(Ground, Bannbruch.ZoneMeters, Bannbruch.Count);
 		Kettle->FinishSpawning(KettleSpawn);
+	}
+}
+
+void UEIRunDirector::SpawnSoulStones(const FVector& Ground, const FEIBannbruch& Bannbruch)
+{
+	// The hollow armor stands where the boss will stand, and its soul stones lie in guarded chests in a ring around it.
+	const FTransform ArmorSpawn(Ground);
+	Armor = GetWorld()->SpawnActorDeferred<AEIHollowArmor>(AEIHollowArmor::StaticClass(), ArmorSpawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Armor != nullptr)
+	{
+		Armor->Setup(Bannbruch.ZoneMeters, Bannbruch.Count);
+		Armor->FinishSpawning(ArmorSpawn);
+	}
+	const float Turn = FMath::FRandRange(0.0f, 360.0f);
+	for (int32 Index = 0; Index < Bannbruch.Count; ++Index)
+	{
+		const FVector Direction = FVector::ForwardVector.RotateAngleAxis(Turn + Index * 360.0f / Bannbruch.Count, FVector::UpVector);
+		const FVector Wanted = Ground + Direction * Bannbruch.DistanceMeters * CentimetersPerMeter;
+		FVector ChestGround = Wanted;
+		FindGround(Wanted, ChestGround);
+		const FTransform ChestSpawn(ChestGround);
+		if (AEISoulStoneChest* Chest = GetWorld()->SpawnActorDeferred<AEISoulStoneChest>(AEISoulStoneChest::StaticClass(), ChestSpawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+		{
+			Chest->FinishSpawning(ChestSpawn);
+			Chest->PrepareForRun(true);
+			StoneChests.Add(Chest);
+		}
 	}
 }
 
@@ -518,6 +566,11 @@ void UEIRunDirector::UpdateBannbruch(const TArray<AEIHeroCharacter*>& LivingHero
 		bKettleHeld = LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return Kettle->IsInZone(Hero); });
 		return;
 	}
+	if (Armor != nullptr)
+	{
+		UpdateStoneChests(LivingHeroes);
+		return;
+	}
 	int32 Broken = 0;
 	for (AEIAnchorStone* Anchor : Anchors)
 	{
@@ -531,11 +584,70 @@ void UEIRunDirector::UpdateBannbruch(const TArray<AEIHeroCharacter*>& LivingHero
 	}
 }
 
+void UEIRunDirector::UpdateStoneChests(const TArray<AEIHeroCharacter*>& LivingHeroes)
+{
+	// The guards of a stone chest come when a hero steps into its circle, like the chests of the side jobs.
+	for (AEIChest* Chest : StoneChests)
+	{
+		UpdateChest(Chest, LivingHeroes);
+	}
+	// A stone of a fallen hero goes back into its chest, so that no Bannbruch gets stuck.
+	for (auto It = CarriedStones.CreateIterator(); It; ++It)
+	{
+		AEIHeroCharacter* Carrier = It->Key.Get();
+		AEIChest* Chest = It->Value.Get();
+		if (Chest == nullptr || Carrier == nullptr || Carrier->IsDead())
+		{
+			if (Carrier != nullptr)
+			{
+				Carrier->SetCarriesSoulStone(false);
+			}
+			if (Chest != nullptr)
+			{
+				Chest->CloseAgain();
+			}
+			It.RemoveCurrent();
+		}
+	}
+	bStoneWork = !CarriedStones.IsEmpty()
+		|| LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero)
+		{
+			return StoneChests.ContainsByPredicate([Hero](const TObjectPtr<AEIChest>& Chest) { return Chest != nullptr && Chest->IsInZone(Hero); });
+		});
+	if (Armor != nullptr)
+	{
+		GetWorld()->GetGameState<AEIGameState>()->SetBannbruchProgress(Armor->GetInserted(), Armor->GetTotal());
+	}
+}
+
 void UEIRunDirector::BreakBossFree(int32 HeroCount)
 {
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	State->SetBossStage(EEIBossStage::Awake);
 	WaveLeft = 0.0f;
+	// The armor breaks with its Bannbruch, and every stone still on the way goes back to nobody.
+	if (Armor != nullptr)
+	{
+		Armor->Destroy();
+		Armor = nullptr;
+	}
+	for (AEIChest* Chest : StoneChests)
+	{
+		if (Chest != nullptr)
+		{
+			Chest->Destroy();
+		}
+	}
+	StoneChests.Reset();
+	for (TPair<TWeakObjectPtr<AEIHeroCharacter>, TWeakObjectPtr<AEIChest>>& Pair : CarriedStones)
+	{
+		if (AEIHeroCharacter* Carrier = Pair.Key.Get())
+		{
+			Carrier->SetCarriesSoulStone(false);
+		}
+	}
+	CarriedStones.Reset();
+	bStoneWork = false;
 	Boss->BreakFree(HeroCount);
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -556,6 +668,10 @@ void UEIRunDirector::SkipBannbruch()
 	if (Kettle != nullptr)
 	{
 		Kettle->SetSouls(Kettle->GetCount());
+	}
+	if (Armor != nullptr)
+	{
+		Armor->SetInserted(Armor->GetTotal());
 	}
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	if (Boss != nullptr && State->GetBossStage() == EEIBossStage::Sealed)
@@ -891,6 +1007,44 @@ bool UEIRunDirector::OpenChest(AEIHeroCharacter* Hero)
 	return false;
 }
 
+bool UEIRunDirector::TakeSoulStone(AEIHeroCharacter* Hero)
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (State->GetBossStage() != EEIBossStage::Sealed || !State->AreContractsDone() || Hero->CarriesSoulStone())
+	{
+		return false;
+	}
+	for (AEIChest* Chest : StoneChests)
+	{
+		if (Chest != nullptr && Chest->GetState() == EEIChestState::Free && !Chest->IsOpen() && Chest->IsInReach(Hero))
+		{
+			Chest->Open();
+			Hero->SetCarriesSoulStone(true);
+			CarriedStones.Add(Hero, Chest);
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UEIRunDirector::InsertSoulStone(AEIHeroCharacter* Hero)
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	if (Armor == nullptr || State->GetBossStage() != EEIBossStage::Sealed || !State->AreContractsDone() || !Hero->CarriesSoulStone() || !Armor->IsInReach(Hero))
+	{
+		return false;
+	}
+	Armor->InsertStone();
+	Hero->SetCarriesSoulStone(false);
+	CarriedStones.Remove(Hero);
+	State->SetBannbruchProgress(Armor->GetInserted(), Armor->GetTotal());
+	if (Armor->IsFull())
+	{
+		BreakBossFree(CountLivingHeroes());
+	}
+	return true;
+}
+
 void UEIRunDirector::NoteEnemyDied(const AEIEnemy& Enemy)
 {
 	// In the test arena nothing counts.
@@ -957,6 +1111,14 @@ void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 		return;
 	}
 	const bool bRunning = Phase == EEIRunPhase::Exploring || Phase == EEIRunPhase::SignalLit || Phase == EEIRunPhase::BargeWaiting;
+	if (bRunning && InsertSoulStone(Hero))
+	{
+		return;
+	}
+	if (bRunning && TakeSoulStone(Hero))
+	{
+		return;
+	}
 	if (bRunning && OpenChest(Hero))
 	{
 		return;
@@ -1040,6 +1202,10 @@ const FEIWaveRule* UEIRunDirector::FindCurrentWave(EEIRunPhase Phase) const
 	if (bKettleHeld)
 	{
 		return &Groups.KettleWave;
+	}
+	if (bStoneWork)
+	{
+		return &Groups.SoulStoneWave;
 	}
 	return State->IsContractHeld() ? &Groups.AltarWave : nullptr;
 }

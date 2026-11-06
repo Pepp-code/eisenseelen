@@ -10,6 +10,7 @@
 class AEIAnchorStone;
 class AEIBoss;
 class AEIChest;
+class AEIHollowArmor;
 class AEIEnemy;
 class AEIEnemyCamp;
 class AEIForge;
@@ -87,6 +88,8 @@ public:
 	const FVector& GetBossPlace() const { return BossPlace; }
 	const TArray<TObjectPtr<AEIAnchorStone>>& GetAnchors() const { return Anchors; }
 	AEISoulKettle* GetKettle() const { return Kettle; }
+	const TArray<TObjectPtr<AEIChest>>& GetStoneChests() const { return StoneChests; }
+	AEIHollowArmor* GetArmor() const { return Armor; }
 	AEIHuntBoard* GetHuntBoard() const { return HuntBoard; }
 	AEIForge* GetForge() const { return Forge; }
 
@@ -139,9 +142,11 @@ private:
 	void SpawnBoss(int32 HeroCount);
 	void SpawnAnchors(const FVector& Ground, const FEIBannbruch& Bannbruch);
 	void SpawnKettle(const FVector& Ground, const FEIBannbruch& Bannbruch);
+	void SpawnSoulStones(const FVector& Ground, const FEIBannbruch& Bannbruch);
 	void FeedKettle(const AEIEnemy& Enemy);
 	int32 CountLivingHeroes() const;
 	void UpdateBannbruch(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
+	void UpdateStoneChests(const TArray<AEIHeroCharacter*>& LivingHeroes);
 	void BreakBossFree(int32 HeroCount);
 	void BossFell();
 	bool IsAnchorHeld() const;
@@ -150,6 +155,8 @@ private:
 	void UpdateChest(AEIChest* Chest, const TArray<AEIHeroCharacter*>& LivingHeroes);
 	void CompleteContract(int32 Index);
 	bool OpenChest(AEIHeroCharacter* Hero);
+	bool TakeSoulStone(AEIHeroCharacter* Hero);
+	bool InsertSoulStone(AEIHeroCharacter* Hero);
 	bool FindGround(const FVector& Location, FVector& OutGround) const;
 	void LightSignal();
 	void HoldSignal(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime);
@@ -176,6 +183,13 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<AEISoulKettle> Kettle;
 
+	/** The guarded chests that hold the soul stones of the hollow armor. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AEIChest>> StoneChests;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AEIHollowArmor> Armor;
+
 	UPROPERTY(Transient)
 	TObjectPtr<AEIHuntBoard> HuntBoard;
 
@@ -189,6 +203,10 @@ private:
 	FVector ForgePlace = FVector::ZeroVector;
 	bool bHasDock = false;
 	bool bKettleHeld = false;
+	/** Whether a hero carries a soul stone or stands at a stone chest right now. */
+	bool bStoneWork = false;
+	/** Which hero carries the stone of which chest, so that a fallen hero gives it back. */
+	TMap<TWeakObjectPtr<AEIHeroCharacter>, TWeakObjectPtr<AEIChest>> CarriedStones;
 	TArray<FVector> BossPlaces;
 	int32 BossIndex = INDEX_NONE;
 	FVector BossPlace = FVector::ZeroVector;

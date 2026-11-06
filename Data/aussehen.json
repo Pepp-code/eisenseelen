@@ -55,6 +55,9 @@
 		"boss.Der Seelenrufer": {
 			"modell": ""
 		},
+		"boss.Die Leere Wacht": {
+			"modell": ""
+		},
 		"_waffen": "Eine Waffe mit eigenem item.-Eintrag nutzt diesen, sonst gilt das Modell ihrer Grundform (form.).",
 		"form.langschwert": {
 			"modell": "",
@@ -252,6 +255,9 @@
 			"modell": ""
 		},
 		"ort.grab": {
+			"modell": ""
+		},
+		"ort.leere_wacht": {
 			"modell": ""
 		},
 		"ort.trainingspuppe": {

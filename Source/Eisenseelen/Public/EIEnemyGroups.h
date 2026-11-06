@@ -32,6 +32,8 @@ struct EISENSEELEN_API FEIEnemyGroups
 	FEIWaveRule StoneWave;
 	/** While somebody stands at the soul kettle of a boss. */
 	FEIWaveRule KettleWave;
+	/** While somebody carries a soul stone or stands at a stone chest of a boss. */
+	FEIWaveRule SoulStoneWave;
 	FEIWaveRule FightWave;
 	FEIWaveRule PursuitWave;
 	FEIWaveRule FireWave;

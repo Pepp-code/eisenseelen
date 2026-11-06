@@ -182,6 +182,12 @@ void AEIChest::Open()
 	OnRep_Look();
 }
 
+void AEIChest::CloseAgain()
+{
+	bOpened = false;
+	OnRep_Look();
+}
+
 void AEIChest::OnRep_Look()
 {
 	SetActorHiddenInGame(!bInUse);

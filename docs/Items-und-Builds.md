@@ -3,7 +3,7 @@
 
 # Items und Builds
 
-**Stand: 5. November 2026.** Der Ablauf wurde am 5. November noch einmal geändert und folgt jetzt enger dem Vorbild. Die Schritte A bis D sind gebaut: Anlegestelle, Überfahrt, 3 Nebenaufträge, das Signalfeuer, die Jagdbriefe, die zwei Bosse Der Gefesselte und Der Seelenrufer mit je einem Beute-Set, das Beutebuch und die Schmiede. Attribute, die drei Qualitäten und Items von Gegnern sind raus. Seit dem 6. November sind auch die Gravuren für Langschwert und Stab gebaut (Schritt E). Noch nicht gebaut ist alles danach. Alle Zahlen sind erste Annahmen. Was schon gebaut ist, steht in Textdateien, die du selbst ändern kannst.
+**Stand: 5. November 2026.** Der Ablauf wurde am 5. November noch einmal geändert und folgt jetzt enger dem Vorbild. Die Schritte A bis D sind gebaut: Anlegestelle, Überfahrt, 3 Nebenaufträge, das Signalfeuer, die Jagdbriefe, die zwei Bosse Der Gefesselte und Der Seelenrufer mit je einem Beute-Set, das Beutebuch und die Schmiede. Attribute, die drei Qualitäten und Items von Gegnern sind raus. Seit dem 6. November sind auch die Gravuren für Langschwert und Stab gebaut (Schritt E) und aus Schritt F die Leere Wacht mit Seelenstein-Bannbruch. Noch nicht gebaut ist alles danach, auch die zwei weiteren grauen Gebiete aus Schritt F nicht. Alle Zahlen sind erste Annahmen. Was schon gebaut ist, steht in Textdateien, die du selbst ändern kannst.
 
 ## Kurzfassung
 
@@ -338,7 +338,7 @@ Eine Runde ist wie im Masterplan etwa 2 Stunden deiner Zeit. Alles bleibt zuerst
 | C | Der Seelenrufer, Jagdbriefe, Beutebuch | gebaut. Wen jagst du? | 4–6 |
 | D | Schmiede: Waffen und Rüstung kaufen, Item-Belohnungen raus | gebaut. Worauf sparst du? | 2 |
 | E | Gravuren für Langschwert und Stab (gebaut am 6. November) | Spürt man die Gravuren wirklich? | 3–4 |
-| F | Die Leere Wacht, 2 weitere graue Gebiete | Bleibt der Lauf abwechslungsreich? | 5–7 |
+| F | Die Leere Wacht, 2 weitere graue Gebiete | Leere Wacht gebaut (6. November), Gebiete warten auf die neue Karte. Bleibt der Lauf abwechslungsreich? | 5–7 |
 | G | Meisterstücke, Rüstungs-Gravuren und 4-Teile-Regeln, weitere Waffen, Wind | Eigene Builds bauen | 12–17 |
 
 Das sind noch 20 bis 28 Runden, also 40 bis 56 Stunden deiner Zeit. Wie alle Zeiten im Plan kann das um die Hälfte danebenliegen. Nach Schritt B spielst du den ganzen Lauf, bevor Schmiede und Gravuren darauf aufbauen. Wird es dir zu viel, lassen sich die Leere Wacht und die weiteren Gebiete nach hinten schieben.

@@ -31,7 +31,7 @@ bool FEIEnemyGroupsTest::RunTest(const FString& Parameters)
 	{
 		AddError(Error);
 	}
-	for (const FString& Size : { FString(TEXT("klein")), FString(TEXT("mittel")), Table.ChestGuards, Table.AltarWave.Size, Table.StoneWave.Size, Table.KettleWave.Size, Table.FightWave.Size, Table.PursuitWave.Size, Table.FireWave.Size })
+	for (const FString& Size : { FString(TEXT("klein")), FString(TEXT("mittel")), Table.ChestGuards, Table.AltarWave.Size, Table.StoneWave.Size, Table.KettleWave.Size, Table.SoulStoneWave.Size, Table.FightWave.Size, Table.PursuitWave.Size, Table.FireWave.Size })
 	{
 		TestNotNull(*FString::Printf(TEXT("There is a group of the size %s"), *Size), Table.Pick(Size));
 	}
@@ -52,7 +52,7 @@ bool FEIEnemyGroupsTest::RunTest(const FString& Parameters)
 
 	// A small table, to see that the rules are kept.
 	const FString Valid = TEXT("{\"truhe\": \"klein\", \"obergrenze\": 9, \"blutmond_nachlauf_s\": 4, ")
-		TEXT("\"blutmond\": {\"altar\": {\"groesse\": \"klein\", \"alle_s\": 5}, \"ankerstein\": {\"groesse\": \"klein\", \"alle_s\": 6}, \"kessel\": {\"groesse\": \"klein\", \"alle_s\": 6}, ")
+		TEXT("\"blutmond\": {\"altar\": {\"groesse\": \"klein\", \"alle_s\": 5}, \"ankerstein\": {\"groesse\": \"klein\", \"alle_s\": 6}, \"kessel\": {\"groesse\": \"klein\", \"alle_s\": 6}, \"seelensteine\": {\"groesse\": \"klein\", \"alle_s\": 6}, ")
 		TEXT("\"bosskampf\": {\"groesse\": \"klein\", \"alle_s\": 7}, \"flucht\": {\"groesse\": \"klein\", \"alle_s\": 8}, \"signalfeuer\": {\"groesse\": \"gross\", \"alle_s\": 9}}, ")
 		TEXT("\"gruppen\": [{\"name\": \"Probe\", \"groesse\": \"klein\", \"knochenlaeufer\": 3, \"schildtraeger\": 1}]}");
 	FEIEnemyGroups Small;

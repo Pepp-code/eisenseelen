@@ -18,9 +18,13 @@ namespace
 		{
 			Out.Kind = EEIBannbruchKind::Kettle;
 		}
+		else if (Kind == TEXT("seelensteine"))
+		{
+			Out.Kind = EEIBannbruchKind::SoulStones;
+		}
 		else
 		{
-			OutError = FString::Printf(TEXT("Den Bannbruch mit der Art %s gibt es nicht. Es gibt ankersteine und kessel."), *Kind);
+			OutError = FString::Printf(TEXT("Den Bannbruch mit der Art %s gibt es nicht. Es gibt ankersteine, kessel und seelensteine."), *Kind);
 			return false;
 		}
 		if (!Line.TryGetStringField(TEXT("name"), Out.Name)
@@ -30,10 +34,11 @@ namespace
 			OutError = TEXT("Einem Bannbruch fehlt name, teil oder anleitung.");
 			return false;
 		}
+		// Only the anchor stones are held for a time. The kettle fills itself, and the stones of the armor go in one by one.
 		const bool bKettle = Out.Kind == EEIBannbruchKind::Kettle;
 		float Count = 0.0f;
 		if (!FEIDataFile::ReadNumber(Line, TEXT("anzahl"), 1.0, bKettle ? 500.0 : 20.0, Count, OutError)
-			|| (!bKettle && !FEIDataFile::ReadNumber(Line, TEXT("halten_s"), 0.1, 3600.0, Out.HoldSeconds, OutError))
+			|| (Out.Kind == EEIBannbruchKind::AnchorStones && !FEIDataFile::ReadNumber(Line, TEXT("halten_s"), 0.1, 3600.0, Out.HoldSeconds, OutError))
 			|| !FEIDataFile::ReadNumber(Line, TEXT("zone_m"), 1.0, 100.0, Out.ZoneMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Line, TEXT("abstand_m"), 1.0, 200.0, Out.DistanceMeters, OutError))
 		{

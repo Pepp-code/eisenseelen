@@ -6,6 +6,7 @@
 		"altar": { "groesse": "klein", "alle_s": 12 },
 		"ankerstein": { "groesse": "mittel", "alle_s": 15 },
 		"kessel": { "groesse": "mittel", "alle_s": 12 },
+		"seelensteine": { "groesse": "mittel", "alle_s": 15 },
 		"bosskampf": { "groesse": "mittel", "alle_s": 20 },
 		"flucht": { "groesse": "gross", "alle_s": 15 },
 		"signalfeuer": { "groesse": "elite", "alle_s": 20 }
