@@ -28,6 +28,12 @@ TERRAIN_DARK_CELL = 0.82
 TERRAIN_ROCK_BELOW_UP = 0.88
 TERRAIN_ROCK_SHARPNESS = 6.0
 TERRAIN_ROUGHNESS = 0.95
+WATER_COLOR = unreal.LinearColor(0.03, 0.13, 0.19, 1)
+WATER_DARK_CELL = 0.90
+WATER_ROUGHNESS = 0.15
+WOOD_COLOR = unreal.LinearColor(0.24, 0.15, 0.08, 1)
+WOOD_DARK_CELL = 0.84
+WOOD_ROUGHNESS = 0.85
 
 library = unreal.MaterialEditingLibrary
 
@@ -147,13 +153,13 @@ def make_terrain():
         unreal.MaterialExpressionLinearInterpolate,
         ("A", sea_or_mud),
         ("B", graph.color_parameter("Strand", TERRAIN_SAND)),
-        ("Alpha", height_band(graph, world_z, -25.0, 5.0)),
+        ("Alpha", height_band(graph, world_z, -25.0, -4.0)),
     )
     with_grass = graph.node(
         unreal.MaterialExpressionLinearInterpolate,
         ("A", with_sand),
         ("B", graph.color_parameter("Gras", TERRAIN_GRASS)),
-        ("Alpha", height_band(graph, world_z, 12.0, 45.0)),
+        ("Alpha", height_band(graph, world_z, 12.0, 34.0)),
     )
 
     slope_rock = graph.node(
@@ -173,6 +179,37 @@ def make_terrain():
     )
     graph.output(graph.multiply(surface, cell_shade), unreal.MaterialProperty.MP_BASE_COLOR)
     graph.output(graph.number(TERRAIN_ROUGHNESS), unreal.MaterialProperty.MP_ROUGHNESS)
+    graph.finish()
+
+
+def make_water():
+    """The sea, streams, and swamp water surface at Z = -0.15 m."""
+    graph = Graph("M_Wasser")
+    cell_shade = graph.node(
+        unreal.MaterialExpressionLinearInterpolate,
+        ("A", graph.number(1.0)),
+        ("B", graph.number(WATER_DARK_CELL)),
+        ("Alpha", checker_is_odd(graph)),
+    )
+    color = graph.color_parameter("Farbe", WATER_COLOR)
+    graph.output(graph.multiply(color, cell_shade), unreal.MaterialProperty.MP_BASE_COLOR)
+    graph.output(graph.number(WATER_ROUGHNESS), unreal.MaterialProperty.MP_ROUGHNESS)
+    graph.output(graph.number(0.7), unreal.MaterialProperty.MP_SPECULAR)
+    graph.finish()
+
+
+def make_wood():
+    """Wooden planks and posts for bridges, piers, and scaffolds."""
+    graph = Graph("M_Holz")
+    cell_shade = graph.node(
+        unreal.MaterialExpressionLinearInterpolate,
+        ("A", graph.number(1.0)),
+        ("B", graph.number(WOOD_DARK_CELL)),
+        ("Alpha", checker_is_odd(graph)),
+    )
+    color = graph.color_parameter("Farbe", WOOD_COLOR)
+    graph.output(graph.multiply(color, cell_shade), unreal.MaterialProperty.MP_BASE_COLOR)
+    graph.output(graph.number(WOOD_ROUGHNESS), unreal.MaterialProperty.MP_ROUGHNESS)
     graph.finish()
 
 
@@ -240,6 +277,8 @@ def import_sounds():
 def main():
     make_checker()
     make_terrain()
+    make_water()
+    make_wood()
     make_color()
     make_glow()
     make_overlay()

@@ -35,7 +35,7 @@
 		{ "x_m": 82, "y_m": 45, "turm_hoehe_m": 6 },
 		{ "x_m": -45, "y_m": 25, "turm_hoehe_m": 6 },
 		{ "x_m": 20, "y_m": -95, "turm_hoehe_m": 6 },
-		{ "x_m": 40, "y_m": -100, "turm_hoehe_m": 5 },
+		{ "x_m": 32, "y_m": -85, "turm_hoehe_m": 5 },
 		{ "x_m": -15, "y_m": 185, "turm_hoehe_m": 6 }
 	],
 	"lager": [
@@ -51,7 +51,7 @@
 		{ "x_m": -145, "y_m": -85, "groesse": "klein" },
 		{ "x_m": -85, "y_m": -175, "groesse": "klein" },
 		{ "x_m": -15, "y_m": -185, "groesse": "klein" },
-		{ "x_m": 120, "y_m": -115, "groesse": "klein" },
+		{ "x_m": 135, "y_m": -80, "groesse": "klein" },
 		{ "x_m": 65, "y_m": -135, "groesse": "mittel" },
 		{ "x_m": 75, "y_m": 65, "groesse": "mittel" },
 		{ "x_m": 14, "y_m": 58, "groesse": "mittel" },

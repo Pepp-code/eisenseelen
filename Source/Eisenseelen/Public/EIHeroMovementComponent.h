@@ -22,6 +22,7 @@ public:
 	void SetWantsToSprint(bool bWants) { bWantsToSprint = bWants; }
 	void SetWantsToBlock(bool bWants) { bWantsToBlock = bWants; }
 	bool IsBlocking() const { return bWantsToBlock; }
+	bool IsInShallowWater() const;
 
 	/** How long the block has been up. It only counts on the server, which decides about every hit. */
 	float GetBlockHeldSeconds() const { return BlockHeldSeconds; }
@@ -41,6 +42,7 @@ private:
 	float SprintSpeedCm = 0.0f;
 	float BlockSpeedCm = 0.0f;
 	float AirTurnDegreesPerSecond = 0.0f;
+	float WaterSpeedFactor = 0.85f;
 
 	// The predicted state. FEIHeroSavedMove saves it, so a replayed move starts from the same values.
 	bool bWantsToSprint = false;

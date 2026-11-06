@@ -115,7 +115,7 @@ class Gelaende:
         return best
 
     def road_weight(self, x, y):
-        """1.0 auf einem Weg oder im Tunnel-Einschnitt, 0.0 abseits davon."""
+        """1.0 auf einem Weg, einer Brücke oder im Tunnel-Einschnitt, 0.0 abseits davon."""
         best = 0.0
         for road in self.design.get("wege", {}).get("polylinien", []):
             half_w = road["breite_m"] * 0.5
@@ -124,6 +124,33 @@ class Gelaende:
                 best = max(best, 1.0 - _smooth(half_w, half_w + 4.0, d))
                 if best >= 1.0:
                     return 1.0
+        for b in self.design.get("bruecken", []):
+            ang = math.radians(b["drehung_grad"])
+            hl = b["laenge_m"] * 0.5 + 3.0
+            p0 = (b["x_m"] - hl * math.cos(ang), b["y_m"] - hl * math.sin(ang))
+            p1 = (b["x_m"] + hl * math.cos(ang), b["y_m"] + hl * math.sin(ang))
+            half_w = b["breite_m"] * 0.5 + 2.0
+            d = _segment_distance(x, y, p0[0], p0[1], p1[0], p1[1])
+            if d < half_w + 6.0:
+                best = max(best, 1.0 - _smooth(half_w, half_w + 6.0, d))
+                if best >= 1.0:
+                    return 1.0
+        return best
+
+    def bridge_bank_weight(self, x, y):
+        """Hält die beiden Ufer-Aufgänge jeder Brücke auf Höhe 0, während unter der Brückenmitte das Wasser fließt."""
+        best = 0.0
+        for b in self.design.get("bruecken", []):
+            ang = math.radians(b["drehung_grad"])
+            hl = b["laenge_m"] * 0.5
+            for sign in (-1.0, 1.0):
+                bx = b["x_m"] + sign * (hl + 1.0) * math.cos(ang)
+                by = b["y_m"] + sign * (hl + 1.0) * math.sin(ang)
+                if math.hypot(bx, by) > self.coast_radius(bx, by):
+                    continue
+                d = math.hypot(x - bx, y - by)
+                if d < 6.5:
+                    best = max(best, 1.0 - _smooth(3.5, 6.5, d))
         return best
 
     def tunnel_cut_weight(self, x, y):
@@ -220,16 +247,16 @@ class Gelaende:
             t = _smooth(16.0, 52.0, over)
             return heights_cfg["flachwasser"] * (1.0 - t) + heights_cfg["meeresboden"] * t
 
-        # Auf der Insel: Wellen liegen über 0 m (+0.15 bis +2.2 m), damit nur echte Bäche, Senken und das Meer unter 0 m liegen
+        # Auf der Insel: Wiesen und Wälder liegen ab +0.38 m (+38 cm), Wege und Plätze auf 0.0 m (Sandschicht)
         coast_blend = _smooth(coast_r - 18.0, coast_r, r)
-        waves = 0.15 + self.wave_scale * sum(w * (1.0 + math.sin(kx * x + ky * y + phase)) for kx, ky, phase, w in self.waves)
+        waves = 0.38 + self.wave_scale * sum(w * (1.0 + math.sin(kx * x + ky * y + phase)) for kx, ky, phase, w in self.waves)
 
         # Berge weichen um Spielorte, Wege und den Tunnel-Einschnitt sanft zurück
-        hill_Blend = self.design["eben_um"].get("uebergang_berg_m", 45.0)
+        hill_Blend = self.design["eben_um"].get("uebergang_berg_m", 16.0)
         hill_suppress = max(
             self.flat_weight(x, y, blend_override=hill_Blend),
             self.tunnel_cut_weight(x, y),
-            self.road_weight(x, y) * 0.85,
+            self.road_weight(x, y),
         )
         hills = self.elevation_hills(x, y) * (1.0 - hill_suppress)
 
@@ -240,14 +267,15 @@ class Gelaende:
                 sinks += s["tiefe_m"] * (1.0 - _smooth(s["radius_m"] * 0.65, s["radius_m"] + 10.0, d))
 
         streams = self.stream_depth(x, y)
-        flat = max(self.flat_weight(x, y), self.tunnel_cut_weight(x, y))
+        flat = max(self.flat_weight(x, y), self.tunnel_cut_weight(x, y), self.bridge_bank_weight(x, y))
         road = self.road_weight(x, y)
+        pave = max(flat, road)
 
-        # Spielorte bleiben exakt auf Höhe 0, Wege fast eben
-        land_h = (waves + hills - sinks) * (1.0 - max(flat, road * 0.85)) - streams * (1.0 - max(flat, road * 0.9))
+        # Spielorte und Wege liegen auf Höhe 0 (Sandschicht in M_Gelaende); Bäche fließen unter den Brücken durch
+        dry_h = (waves + hills - sinks) * (1.0 - pave)
         beach_h = heights_cfg["strand"] * (1.0 - coast_blend)
-        raw_h = land_h * (1.0 - coast_blend) + beach_h * coast_blend
-        return raw_h * (1.0 - flat)
+        land_h = dry_h * (1.0 - coast_blend) + beach_h * coast_blend
+        return land_h * (1.0 - pave) - streams * (1.0 - flat)
 
     def resolution(self):
         res = self.design["aufloesung"]
@@ -336,6 +364,12 @@ def draw_preview(path):
     for x_m, y_m, radius in terrain.flat_spots:
         px, py = to_pixel(x_m, y_m)
         draw.ellipse([px - radius * scale, py - radius * scale, px + radius * scale, py + radius * scale], outline=(255, 255, 255), width=1)
+    for b in terrain.design.get("bruecken", []):
+        ang = math.radians(b["drehung_grad"])
+        hl = b["laenge_m"] * 0.5
+        p0 = to_pixel(b["x_m"] - hl * math.cos(ang), b["y_m"] - hl * math.sin(ang))
+        p1 = to_pixel(b["x_m"] + hl * math.cos(ang), b["y_m"] + hl * math.sin(ang))
+        draw.line([p0, p1], fill=(165, 110, 55), width=int(b["breite_m"] * scale))
     for reg in terrain.design.get("regionen", []):
         px, py = to_pixel(reg["x_m"], reg["y_m"])
         draw.rectangle([px - 52, py - 8, px + 52, py + 8], fill=(20, 25, 30))

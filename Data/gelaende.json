@@ -217,7 +217,25 @@
 			"sohle_m": 5,
 			"ufer_m": 5,
 			"tiefe_m": 0.7
+		},
+		{
+			"name": "Ostklamm-Rinne",
+			"punkte": [[5, 205], [-15, 220], [-25, 245]],
+			"sohle_m": 6,
+			"ufer_m": 4,
+			"tiefe_m": 0.8
 		}
+	],
+	"bruecken": [
+		{ "name": "Brücke Marsch-Nord", "x_m": 125, "y_m": -102, "laenge_m": 16, "breite_m": 4.5, "drehung_grad": 90 },
+		{ "name": "Brücke Schlucht-Ost", "x_m": 45, "y_m": -112, "laenge_m": 16, "breite_m": 4.5, "drehung_grad": 55 },
+		{ "name": "Brücke Schlucht-Nordwest", "x_m": 95, "y_m": -168, "laenge_m": 16, "breite_m": 4.5, "drehung_grad": 80 },
+		{ "name": "Brücke Westbach", "x_m": 20, "y_m": -145, "laenge_m": 16, "breite_m": 4.5, "drehung_grad": 90 },
+		{ "name": "Brücke Ostklamm", "x_m": -15, "y_m": 220, "laenge_m": 16, "breite_m": 4.5, "drehung_grad": 20 },
+		{ "name": "Steg Moor-West", "x_m": -110, "y_m": 115, "laenge_m": 22, "breite_m": 4.0, "drehung_grad": 45 },
+		{ "name": "Steg Moor-Ost", "x_m": -130, "y_m": 145, "laenge_m": 24, "breite_m": 4.0, "drehung_grad": -30 },
+		{ "name": "Steg Pfahlbucht-See", "x_m": -206, "y_m": -32, "laenge_m": 20, "breite_m": 4.5, "drehung_grad": 0 },
+		{ "name": "Steg Pfahlbucht-Ufer", "x_m": -188, "y_m": -68, "laenge_m": 22, "breite_m": 4.0, "drehung_grad": 80 }
 	],
 	"sumpf_tuempel": [
 		[-110, 115, 11],
@@ -225,7 +243,8 @@
 		[-150, 120, 10],
 		[-120, 165, 12],
 		[-160, 150, 9],
-		[-95, 140, 10]
+		[-95, 140, 10],
+		[-188, -68, 9]
 	],
 	"tunnel": {
 		"eingang_nord": { "x_m": 58, "y_m": 65, "hoehe_m": 0.0 },

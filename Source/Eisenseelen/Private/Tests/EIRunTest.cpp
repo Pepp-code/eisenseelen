@@ -1339,9 +1339,34 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 		}
 		Context.Test->TestEqual(TEXT("Every place lies flat at height 0"), NotFlat, 0);
 
-		// Everything a team has to reach can be reached on foot from where the barge sets it down.
+		// Everything a team has to reach can be reached on foot from where the barge sets it down, and no place stands in water.
 		TArray<TPair<FString, FVector>> Goals = Places;
 		for (TActorIterator<AEIChest> It(Context.World); It; ++It) { Goals.Emplace(TEXT("chest"), It->GetActorLocation()); }
+		int32 InWater = 0;
+		for (const TPair<FString, FVector>& Goal : Goals)
+		{
+			double Height = 0.0;
+			if (!GroundAt(Goal.Value, Height) || Height < -10.0)
+			{
+				Context.Test->AddError(FString::Printf(TEXT("The %s at %.0f, %.0f m stands in water (%.0f cm)"), *Goal.Key, Goal.Value.X / CentimetersPerMeter, Goal.Value.Y / CentimetersPerMeter, Height));
+				++InWater;
+			}
+		}
+		Context.Test->TestEqual(TEXT("No gameplay place or chest stands in water"), InWater, 0);
+
+		int32 BridgeDecks = 0;
+		for (TActorIterator<AStaticMeshActor> It(Context.World); It; ++It)
+		{
+			const FVector Scale = It->GetActorScale3D();
+			const UMaterialInterface* Mat = It->GetStaticMeshComponent()->GetMaterial(0);
+			if (Mat != nullptr && Mat->GetName().Contains(TEXT("M_Holz")) && Scale.X >= 10.0)
+			{
+				++BridgeDecks;
+				Goals.Emplace(TEXT("bridge"), It->GetActorLocation() + FVector(0.0, 0.0, Scale.Z * 50.0));
+			}
+		}
+		Context.Test->TestEqual(TEXT("All 9 bridges and boardwalks stand on the island"), BridgeDecks, 9);
+
 		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
 		const FVector Start = Arrivals[0].Location;
 		Goals.RemoveAt(0);
@@ -1356,8 +1381,8 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 				++Unreachable;
 			}
 		}
-		Context.Test->AddInfo(FString::Printf(TEXT("%d goals checked for a way on foot"), Goals.Num()));
-		Context.Test->TestEqual(TEXT("Every goal can be reached on foot"), Unreachable, 0);
+		Context.Test->AddInfo(FString::Printf(TEXT("%d goals (including %d bridges) checked for a way on foot"), Goals.Num(), BridgeDecks));
+		Context.Test->TestEqual(TEXT("Every goal and bridge can be reached on foot"), Unreachable, 0);
 
 		// Measure the island travel distances and times across Aschenwerder (North to South arrival) and along Arrival -> Side Job -> Boss -> Signal Fire.
 		constexpr double WalkSpeedMetersPerSec = 5.5;
@@ -1387,6 +1412,21 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 				Context.Test->AddInfo(FString::Printf(TEXT("Direct route Arrival -> Boss -> Fire: %.0f m (%.1f min walking)"), RouteMeters, (RouteMeters / WalkSpeedMetersPerSec) / 60.0));
 			}
 		}
+		Teleport(Context, OnGround(Context, FVector(2000.0f, -14500.0f, 0.0f)), 0.0f);
+	}));
+	Steps.Add(Wait(0.15));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("The hero stands on the wooden bridge over the stream"), Context.Movement->IsMovingOnGround() && Context.Hero->GetActorLocation().Z > HeroHeight);
+		Context.Test->TestFalse(TEXT("On a bridge the hero does not wade in water"), Context.Movement->IsInShallowWater());
+		Context.Test->TestNearlyEqual(TEXT("On a bridge the hero walks at full speed"), Context.Movement->GetMaxSpeed(), 550.0f, 1.0f);
+		Teleport(Context, OnGround(Context, FVector(-12000.0f, 16500.0f, 0.0f)), 0.0f);
+	}));
+	Steps.Add(Wait(0.15));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("In the swamp pond the hero wades in shallow water"), Context.Movement->IsInShallowWater());
+		Context.Test->TestNearlyEqual(TEXT("Shallow water slows the hero to 85 percent"), Context.Movement->GetMaxSpeed(), 550.0f * 0.85f, 1.0f);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

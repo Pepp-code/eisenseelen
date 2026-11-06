@@ -18,9 +18,18 @@ from gelaende import Gelaende  # noqa: E402
 MAP_PATH = "/Game/Maps/L_ErsterLauf"
 MATERIAL_PATH = "/Game/Materials/M_Schachbrett"
 TERRAIN_MATERIAL_PATH = "/Game/Materials/M_Gelaende"
+WATER_MATERIAL_PATH = "/Game/Materials/M_Wasser"
+WOOD_MATERIAL_PATH = "/Game/Materials/M_Holz"
 CUBE_MESH = "/Engine/BasicShapes/Cube.Cube"
 
 CM_PER_M = 100
+WATER_SURFACE_M = -0.15
+WATER_THICKNESS_M = 0.20
+COAST_BORDER_OUTSET_M = 24.0
+BRIDGE_TOP_M = 0.14
+BRIDGE_THICKNESS_M = 0.24
+BRIDGE_POST_SIZE_M = 0.35
+BRIDGE_POST_HEIGHT_M = 0.85
 EDGE_THICKNESS_M = 2
 # High enough that nobody leaves the map from a launch pad.
 EDGE_BLOCKER_HEIGHT_M = 300
@@ -71,8 +80,8 @@ def ground_m(x, y):
 
 
 def is_open_ground(x, y):
-    """Level enough and on the dry island plain, so a block or chest belongs there."""
-    if not terrain.is_dry_land(x, y):
+    """Level enough, off the roads, and on the dry island plain, so a block or chest belongs there."""
+    if not terrain.is_dry_land(x, y) or terrain.road_weight(x, y) > 0.05:
         return False
     height = ground_m(x, y)
     step = 1.0
@@ -102,12 +111,12 @@ def clear_generated(actors):
         actors.destroy_actor(actor)
 
 
-def add_box(actors, label, center_m, size_m, rotation=(0, 0, 0)):
+def add_box(actors, label, center_m, size_m, rotation=(0, 0, 0), material_path=MATERIAL_PATH):
     """The engine's cube is 1 m wide, so its scale is its size in metres."""
     location = [value * CM_PER_M for value in center_m]
     box = spawn(actors, unreal.StaticMeshActor, location=location, rotation=rotation, label=label)
     box.static_mesh_component.set_static_mesh(unreal.load_asset(CUBE_MESH))
-    box.static_mesh_component.set_material(0, unreal.load_asset(MATERIAL_PATH))
+    box.static_mesh_component.set_material(0, unreal.load_asset(material_path))
     box.set_actor_scale3d(unreal.Vector(*size_m))
     return box
 
@@ -129,7 +138,7 @@ def add_walls(actors, label, center, length, width, floor_z, height, thickness, 
 
 
 def add_sea_border(actors, floor_size):
-    """Invisible boundary around the sea at the outer edge of the landscape."""
+    """Invisible boundary around the sea at the outer edge of the landscape and along the deep-water coast."""
     half = floor_size / 2
     floor_z = -6.0
     sides = [
@@ -141,6 +150,69 @@ def add_sea_border(actors, floor_size):
     for (x, y), (size_x, size_y) in sides:
         blocker = add_box(actors, "Randsperre", (x, y, floor_z + EDGE_BLOCKER_HEIGHT_M / 2), (size_x, size_y, EDGE_BLOCKER_HEIGHT_M))
         blocker.set_actor_hidden_in_game(True)
+
+    coast_pts = terrain.design.get("kueste_punkte", [])
+    ring = []
+    for x, y in coast_pts:
+        r = math.hypot(x, y)
+        scale = (r + COAST_BORDER_OUTSET_M) / max(1.0, r)
+        ring.append((x * scale, y * scale))
+    for i in range(len(ring)):
+        x0, y0 = ring[i]
+        x1, y1 = ring[(i + 1) % len(ring)]
+        mx, my = (x0 + x1) * 0.5, (y0 + y1) * 0.5
+        seg_len = math.hypot(x1 - x0, y1 - y0) + EDGE_THICKNESS_M
+        yaw = math.degrees(math.atan2(y1 - y0, x1 - x0))
+        blocker = add_box(
+            actors,
+            "Kuestensperre",
+            (mx, my, floor_z + EDGE_BLOCKER_HEIGHT_M / 2),
+            (seg_len, EDGE_THICKNESS_M, EDGE_BLOCKER_HEIGHT_M),
+            rotation=(0, 0, yaw),
+        )
+        blocker.set_actor_hidden_in_game(True)
+
+
+def add_water(actors, floor_size):
+    """Visible water surface at Z = -0.15 m across sea, streams, and swamp ponds. Walkable ground stays on the terrain underneath."""
+    center_z = WATER_SURFACE_M - WATER_THICKNESS_M * 0.5
+    water = add_box(actors, "Wasser", (0, 0, center_z), (floor_size, floor_size, WATER_THICKNESS_M), material_path=WATER_MATERIAL_PATH)
+    water.set_actor_enable_collision(False)
+    water.static_mesh_component.set_collision_profile_name("NoCollision")
+    water.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    water.static_mesh_component.set_cast_shadow(False)
+
+
+def add_bridges(actors):
+    """Wooden bridges and boardwalks over streams, gorges, and swamp ponds."""
+    deck_center_z = BRIDGE_TOP_M - BRIDGE_THICKNESS_M * 0.5
+    for index, bridge in enumerate(terrain.design.get("bruecken", [])):
+        x, y = bridge["x_m"], bridge["y_m"]
+        length, width = bridge["laenge_m"], bridge["breite_m"]
+        yaw_deg = bridge["drehung_grad"]
+        add_box(
+            actors,
+            f"Bruecke {index + 1}",
+            (x, y, deck_center_z),
+            (length, width, BRIDGE_THICKNESS_M),
+            rotation=(0, 0, yaw_deg),
+            material_path=WOOD_MATERIAL_PATH,
+        )
+        yaw = math.radians(yaw_deg)
+        for sx in (-1.0, 1.0):
+            for sy in (-1.0, 1.0):
+                ox = sx * (length * 0.5 - BRIDGE_POST_SIZE_M * 0.5)
+                oy = sy * (width * 0.5 + BRIDGE_POST_SIZE_M * 0.35)
+                px = x + ox * math.cos(yaw) - oy * math.sin(yaw)
+                py = y + ox * math.sin(yaw) + oy * math.cos(yaw)
+                add_box(
+                    actors,
+                    f"Brueckenpfosten {index + 1}",
+                    (px, py, BRIDGE_TOP_M + BRIDGE_POST_HEIGHT_M * 0.5 - 0.15),
+                    (BRIDGE_POST_SIZE_M, BRIDGE_POST_SIZE_M, BRIDGE_POST_HEIGHT_M),
+                    rotation=(0, 0, yaw_deg),
+                    material_path=WOOD_MATERIAL_PATH,
+                )
 
 
 def add_dock(actors, dock):
@@ -175,6 +247,7 @@ def add_cover(actors, layout):
     rng = random.Random(layout["deckung_zufall"])
     half = layout["boden_m"] / 2 - COVER_CLEAR_M
     taken = [(p["x_m"], p["y_m"]) for p in layout["orte"] + layout["signalfeuer"] + layout["ankunft"] + layout["sprungfelder"]]
+    taken += [(b["x_m"], b["y_m"]) for b in terrain.design.get("bruecken", [])]
     taken.append((0, 0))
     bosses = [(p["x_m"], p["y_m"]) for p in layout["bossplaetze"]]
     placed = 0
@@ -212,6 +285,7 @@ def add_chests(actors, layout, cover):
     keep_clear = [(point, CHEST_CLEAR_COVER_M) for point in cover]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PLACE_M) for p in layout["orte"] + layout["signalfeuer"] + layout["ankunft"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_PAD_M) for p in layout["sprungfelder"]]
+    keep_clear += [((b["x_m"], b["y_m"]), CHEST_CLEAR_PAD_M) for b in terrain.design.get("bruecken", [])]
     keep_clear += [((p["x_m"], p["y_m"]), BOSS_CLEAR_M) for p in layout["bossplaetze"]]
     keep_clear += [((p["x_m"], p["y_m"]), CHEST_CLEAR_CAMP_M) for p in layout["lager"]]
     keep_clear.append(((0, 0), CHEST_CLEAR_PLACE_M))
@@ -263,6 +337,8 @@ def main():
 
     floor_size = layout["boden_m"]
     add_terrain()
+    add_water(actors, floor_size)
+    add_bridges(actors)
     add_sea_border(actors, floor_size)
     altar_class = unreal.load_class(None, "/Script/Eisenseelen.EIAltar")
     for index, place in enumerate(layout["orte"]):
