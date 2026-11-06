@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "EIGearMenu.h"
 #include "EIHeroCharacter.h"
+#include "EIPauseMenu.h"
+#include "EISettings.h"
 #include "GameFramework/PlayerController.h"
 #include "EIPlayerController.generated.h"
 
@@ -30,6 +32,21 @@ public:
 	bool IsMenuOpen() const { return bMenuOpen; }
 	FEIGearMenu& GetMenu() { return Menu; }
 	void SetMenuOpen(bool bOpen);
+
+	/** The pause menu on Esc. While it is open the hero stands still and the mouse is a pointer. */
+	bool IsPauseOpen() const { return bPauseOpen; }
+	FEIPauseMenu& GetPauseMenu() { return PauseMenu; }
+	void SetPauseOpen(bool bOpen);
+
+	/** The settings of this player. Changes go through the pause menu and land in Saved/Einstellungen.json. */
+	FEISettings& GetSettings() { return Settings; }
+
+	/** Applies what a changed setting changes, and writes it to the file, as far as there is one. */
+	void OnSettingsChanged();
+
+	/** What the pause menu calls: a fresh run, or leaving the run as failed. */
+	void RequestRestartRun();
+	void RequestLeaveRun();
 
 	/** The overview of the contracts. The hero stays in the player's hands while it is open. */
 	bool IsMapOpen() const { return bMapOpen; }
@@ -112,9 +129,10 @@ public:
 	/** X turns right, Y looks up. Takes the mouse factor from the hero's values. */
 	void ApplyLookInput(const FVector2D& Input);
 
-	virtual void PlayerTick(float DeltaTime) override;
+	void PlayerTick(float DeltaTime) override;
 
 protected:
+	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 
 private:
@@ -136,6 +154,7 @@ private:
 	void HandleClass();
 	void HandleMenu();
 	void HandleMap();
+	void HandlePause();
 
 	UFUNCTION(Server, Reliable)
 	void ServerInteract();
@@ -148,6 +167,9 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerRestartRun();
+
+	UFUNCTION(Server, Reliable)
+	void ServerLeaveRun();
 
 	AEIHeroCharacter* GetLivingHero() const;
 
@@ -202,8 +224,14 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> MapAction;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> PauseAction;
+
 	EEIHeroClass SelectedClass = EEIHeroClass::Bladewarden;
 	FEIGearMenu Menu;
+	FEIPauseMenu PauseMenu;
+	FEISettings Settings;
 	bool bMenuOpen = false;
+	bool bPauseOpen = false;
 	bool bMapOpen = false;
 };

@@ -15,6 +15,9 @@
 
 namespace
 {
+	/** How loud every effect is in total, set from the player's settings. */
+	float EffectsVolume = 1.0f;
+
 	USoundBase* FindSound(const TCHAR* Name)
 	{
 		// Null entries remember missing sounds, so each one only warns once.
@@ -115,11 +118,16 @@ void EIVisuals::ApplyBloodMoonLook(UWorld* World, float Share)
 	}
 }
 
+void EIVisuals::SetEffectsVolume(float Volume)
+{
+	EffectsVolume = FMath::Clamp(Volume, 0.0f, 1.0f);
+}
+
 void EIVisuals::PlaySound2D(const UObject* WorldContext, const TCHAR* Name, float Volume)
 {
 	if (USoundBase* Sound = FindSound(Name))
 	{
-		UGameplayStatics::PlaySound2D(WorldContext, Sound, Volume);
+		UGameplayStatics::PlaySound2D(WorldContext, Sound, Volume * EffectsVolume);
 	}
 }
 
@@ -127,6 +135,6 @@ void EIVisuals::PlaySoundAt(const UObject* WorldContext, const TCHAR* Name, cons
 {
 	if (USoundBase* Sound = FindSound(Name))
 	{
-		UGameplayStatics::PlaySoundAtLocation(WorldContext, Sound, Location, Volume);
+		UGameplayStatics::PlaySoundAtLocation(WorldContext, Sound, Location, Volume * EffectsVolume);
 	}
 }

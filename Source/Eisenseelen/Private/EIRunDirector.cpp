@@ -1210,6 +1210,19 @@ void UEIRunDirector::EndRunForAll(bool bEscaped)
 	}
 }
 
+void UEIRunDirector::AbortRun()
+{
+	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	const EEIRunPhase Phase = State->GetRunPhase();
+	if (Phase != EEIRunPhase::Crossing && Phase != EEIRunPhase::Exploring && Phase != EEIRunPhase::SignalLit && Phase != EEIRunPhase::BargeWaiting)
+	{
+		return;
+	}
+	State->StopRunClock();
+	State->SetRunPhase(EEIRunPhase::Failed);
+	EndRunForAll(false);
+}
+
 void UEIRunDirector::Interact(AEIHeroCharacter* Hero)
 {
 	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();

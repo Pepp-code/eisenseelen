@@ -50,7 +50,7 @@ FFW ist Western: Holz, Leder, Seile, Sepia, Sonnenglut. Eisenseelen ist düstere
 - Akzente wie heute, aber als festes System: Leben rot, Erholung grün, Mana blau, Runen hellblau, Aufladung orange, Feuer orange, Frost eisblau, Gold/Beute warmes Gelb (RewardColor).
 - EIN Leucht-Akzent pro Anzeige: Was wichtig ist, bekommt einen kalten Runen-Schein (später als Glow-Asset), alles andere bleibt matt. Das ist unser Gegenstück zu FFWs Sonnen-Glut und beugt dem Chaos-Eindruck vor, den FFW-Kritiker erwähnen.
 
-**Typografie:** Solange alles Code-gezeichnet ist, bleibt die Engine-Schrift (GetMediumFont). Der Wechsel auf eine lizenzierte Gravur-Schrift ist Teil der Optik-Schicht (U8): eine Schrift, zwei Größen (grob „Überschrift" ×1.6 und „Text" ×1.0), mehr nicht. Eine kostenlose Slab-Serif mit ruhigen Formen (kein Cartoon) ist das Ziel — Phillip sucht sie aus, wir bereiten einen einzelnen Font-Ladeplatz vor.
+**Typografie:** Solange alles Code-gezeichnet ist, bleibt die Engine-Schrift (GetMediumFont). Der Wechsel auf eine lizenzierte Gravur-Schrift ist Teil der Optik-Schicht (U8): eine Schrift, zwei Größen (grob „Überschrift" ×1.6 und „Text" ×1.0), mehr nicht. **Vorgemerkt am 6. November 2026: Cinzel** (OFL, Google Fonts) — eine ruhige, breite Kapitalis-Schrift mit gemeißeltem Charakter, die zum „geritzten Eisen" passt und trotzdem gut lesbar bleibt. Sie wird erst mit ST7 geladen, nicht früher.
 
 ## 3. Layout-Grundsätze: Bildschirm-Anker
 
@@ -151,6 +151,6 @@ Jeder Schritt endet mit grünen Tests; die Animationen selbst sind visuell (nich
 
 ## 8. Offene Fragen
 
-1. **Schrift:** Soll Phillip eine konkrete freie Schrift aussuchen (z. B. eine ruhige Slab-Serif), oder bleiben wir solange bei der Engine-Schrift, bis die Asset-Schicht kommt?
-2. **Titelbild-Timing:** (bleibt offen aus `docs/UI-und-HUD.md`) früh oder erst mit Koop?
+1. ~~**Schrift:**~~ Entschieden am 6. November 2026: Cinzel (OFL), Einbau mit ST7.
+2. ~~**Titelbild-Timing:**~~ Entschieden am 6. November 2026: früh (U7), nicht erst mit Koop.
 3. **Tastensteuerung der Menüs:** (bleibt offen) — beeinflusst, ob die „Niet-Platten"-Optik der Knöpfe von Anfang an Tastatur-freundlich gebaut wird.

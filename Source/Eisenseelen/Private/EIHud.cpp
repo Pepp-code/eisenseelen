@@ -13,6 +13,7 @@
 #include "EIHeroMovementComponent.h"
 #include "EIHollowArmor.h"
 #include "EIHuntBoard.h"
+#include "EIPauseMenu.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
@@ -147,13 +148,32 @@ void AEIHud::DrawScreen()
 	const FString RuneKey = Rune != nullptr ? FString::Printf(TEXT("E %s   "), *Rune->SpellName) : FString();
 	const FString SpellName = Hero != nullptr ? Hero->GetCaster()->GetSpell().Name : FString();
 	AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner);
+	if (Player != nullptr && Player->IsPauseOpen())
+	{
+		DrawPauseMenu(Player);
+		return;
+	}
+	// Without the HUD the settlement still says what a run brought.
+	if (Player != nullptr && !Player->GetSettings().bHudOn)
+	{
+		const EEIRunPhase Phase = State != nullptr ? State->GetRunPhase() : EEIRunPhase::None;
+		if (Hero != nullptr && (Phase == EEIRunPhase::Failed || Phase == EEIRunPhase::Escaped))
+		{
+			const int32 Seconds = FMath::Max(0, FMath::FloorToInt(State->GetRunSeconds()));
+			DrawSettlement(Hero, State, FString::Printf(TEXT("%d:%02d"), Seconds / 60, Seconds % 60));
+		}
+		return;
+	}
 	if (Hero != nullptr && Player != nullptr && Player->IsMenuOpen())
 	{
 		DrawMenu(Player, *Hero);
 		return;
 	}
 	const TCHAR* GearKey = Player != nullptr && Player->GetProfile()->CanChangeGear() ? TEXT("I Ausr\u00FCstung   ") : TEXT("");
-	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   Q %s   %sF benutzen   C Klasse   %s%sR Neustart"), *SpellName, *RuneKey, GearKey, bHasRun ? TEXT("M Karte   ") : TEXT("H Horde   ")), Margin, Margin, TextColor);
+	const EEIRunPhase Phase = State != nullptr ? State->GetRunPhase() : EEIRunPhase::None;
+	// During a run R only opens the pause menu, so it does not say Neustart there.
+	const TCHAR* RestartKey = Phase == EEIRunPhase::None || Phase == EEIRunPhase::Failed || Phase == EEIRunPhase::Escaped ? TEXT("R Neustart   ") : TEXT("");
+	DrawLine(FString::Printf(TEXT("WASD laufen   Shift sprinten   Leertaste springen   Q %s   %sF benutzen   C Klasse   %s%s%sEsc Men\u00FC"), *SpellName, *RuneKey, GearKey, bHasRun ? TEXT("M Karte   ") : TEXT("H Horde   "), RestartKey), Margin, Margin, TextColor);
 	if (Hero == nullptr)
 	{
 		return;
@@ -189,7 +209,7 @@ void AEIHud::DrawScreen()
 		// Once all have fallen the settlement says what happened.
 		if (State == nullptr || State->GetRunPhase() != EEIRunPhase::Failed)
 		{
-			DrawLine(TEXT("Gefallen. R startet neu."), Width / 2.0f - 170.0f, Height / 2.0f - 20.0f, TextColor, 2.0f);
+			DrawLine(TEXT("Gefallen. Esc \u00F6ffnet das Men\u00FC."), Width / 2.0f - 170.0f, Height / 2.0f - 20.0f, TextColor, 2.0f);
 		}
 		return;
 	}
@@ -261,6 +281,27 @@ void AEIHud::DrawMenu(AEIPlayerController* Player, const AEIHeroCharacter& Hero)
 	Player->GetMousePosition(MouseX, MouseY);
 	FEIGearMenu& Menu = Player->GetMenu();
 	Menu.Build(*Player->GetProfile(), Hero, Canvas->SizeX, Canvas->SizeY, MouseX, MouseY);
+	for (const FEIMenuElement& Element : Menu.GetElements())
+	{
+		if (Element.Width > 0.0f)
+		{
+			DrawRect(Element.BoxColor, Element.X, Element.Y, Element.Width, Element.Height);
+		}
+		if (!Element.Text.IsEmpty())
+		{
+			const bool bRow = Element.Width > 0.0f;
+			DrawLine(Element.Text, Element.X + (bRow ? MenuTextInset : 0.0f), Element.Y + (bRow ? MenuTextDrop : 0.0f), Element.TextColor, Element.TextScale);
+		}
+	}
+}
+
+void AEIHud::DrawPauseMenu(AEIPlayerController* Player)
+{
+	float MouseX = -1.0f;
+	float MouseY = -1.0f;
+	Player->GetMousePosition(MouseX, MouseY);
+	FEIPauseMenu& Menu = Player->GetPauseMenu();
+	Menu.Build(*Player, Canvas->SizeX, Canvas->SizeY, MouseX, MouseY);
 	for (const FEIMenuElement& Element : Menu.GetElements())
 	{
 		if (Element.Width > 0.0f)

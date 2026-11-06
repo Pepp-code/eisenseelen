@@ -31,6 +31,9 @@ private:
 	/** The gear page, over everything else. */
 	void DrawMenu(class AEIPlayerController* Player, const class AEIHeroCharacter& Hero);
 
+	/** The pause menu, over everything else, even the gear page. */
+	void DrawPauseMenu(class AEIPlayerController* Player);
+
 	/** What a run has brought, once it is over. */
 	void DrawSettlement(const class AEIHeroCharacter* Hero, const class AEIGameState* State, const FString& Clock);
 

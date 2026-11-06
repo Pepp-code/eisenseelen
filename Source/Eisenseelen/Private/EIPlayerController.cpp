@@ -8,14 +8,17 @@
 #include "EIHordeDirector.h"
 #include "EIProfileComponent.h"
 #include "EIRuneComponent.h"
+#include "EISettings.h"
 #include "EISkyBarge.h"
 #include "EISoulKettle.h"
+#include "EIVisuals.h"
 #include "Engine/DamageEvents.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIRunDirector.h"
+#include "EIDataFile.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -24,6 +27,7 @@
 #include "InputKeyEventArgs.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
+#include "Misc/FileHelper.h"
 
 namespace
 {
@@ -52,6 +56,84 @@ namespace
 AEIPlayerController::AEIPlayerController()
 {
 	Profile = CreateDefaultSubobject<UEIProfileComponent>(TEXT("Profile"));
+}
+
+void AEIPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	FString Error;
+	if (!FEISettings::LoadFromProjectFile(Settings, Error))
+	{
+		FEIDataFile::ReportError(TEXT("einstellungen.json"), Error);
+	}
+	// What the player chose overwrites the defaults, but only while a real player plays.
+	if (FEISettings::UsesDisk())
+	{
+		FString Json;
+		if (FFileHelper::LoadFileToString(Json, *FEISettings::GetPath()))
+		{
+			if (!Settings.FromJson(Json, Error))
+			{
+				FEIDataFile::ReportError(TEXT("Einstellungen.json"), Error);
+			}
+		}
+	}
+	EIVisuals::SetEffectsVolume(Settings.EffectsVolume);
+}
+
+void AEIPlayerController::SetPauseOpen(bool bOpen)
+{
+	if (bOpen == bPauseOpen)
+	{
+		return;
+	}
+	bPauseOpen = bOpen;
+	// The pause menu lies over the gear page, so that one closes first.
+	if (bOpen)
+	{
+		SetMenuOpen(false);
+	}
+	bShowMouseCursor = bOpen;
+	if (bOpen)
+	{
+		FInputModeGameAndUI Mode;
+		Mode.SetHideCursorDuringCapture(false);
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(Mode);
+	}
+	else
+	{
+		SetInputMode(FInputModeGameOnly());
+	}
+	if (AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>())
+	{
+		// What was held down when the menu opened would never get its release.
+		Hero->SetSprintKey(false);
+		Hero->ReleasePrimary();
+		Hero->ReleaseSecondary();
+	}
+}
+
+void AEIPlayerController::OnSettingsChanged()
+{
+	EIVisuals::SetEffectsVolume(Settings.EffectsVolume);
+	if (FEISettings::UsesDisk())
+	{
+		Settings.SaveToFile(FEISettings::GetPath());
+	}
+}
+
+void AEIPlayerController::RequestRestartRun()
+{
+	SetPauseOpen(false);
+	SetMenuOpen(false);
+	ServerRestartRun();
+}
+
+void AEIPlayerController::RequestLeaveRun()
+{
+	SetPauseOpen(false);
+	ServerLeaveRun();
 }
 
 void AEIPlayerController::SetMenuOpen(bool bOpen)
@@ -95,12 +177,32 @@ void AEIPlayerController::PlayerTick(float DeltaTime)
 
 void AEIPlayerController::HandleMenu()
 {
+	if (bPauseOpen)
+	{
+		// The pause menu lies over the gear page and stays there.
+		return;
+	}
 	SetMenuOpen(!bMenuOpen);
 }
 
 void AEIPlayerController::HandleMap()
 {
+	if (bPauseOpen)
+	{
+		return;
+	}
 	bMapOpen = !bMapOpen;
+}
+
+void AEIPlayerController::HandlePause()
+{
+	if (bMenuOpen)
+	{
+		// First Esc closes the gear page, the next one opens the pause menu.
+		SetMenuOpen(false);
+		return;
+	}
+	SetPauseOpen(!bPauseOpen);
 }
 
 void AEIPlayerController::PreviewMenuSlot(int32 Slot)
@@ -301,6 +403,7 @@ void AEIPlayerController::SetupInputComponent()
 	ClassAction = MakeAction(this, EInputActionValueType::Boolean);
 	MenuAction = MakeAction(this, EInputActionValueType::Boolean);
 	MapAction = MakeAction(this, EInputActionValueType::Boolean);
+	PauseAction = MakeAction(this, EInputActionValueType::Boolean);
 
 	Mapping = NewObject<UInputMappingContext>(this);
 	MapMoveKey(Mapping, MoveAction, EKeys::W, true, false);
@@ -320,6 +423,7 @@ void AEIPlayerController::SetupInputComponent()
 	Mapping->MapKey(ClassAction, EKeys::C);
 	Mapping->MapKey(MenuAction, EKeys::I);
 	Mapping->MapKey(MapAction, EKeys::M);
+	Mapping->MapKey(PauseAction, EKeys::Escape);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AEIPlayerController::HandleMove);
@@ -340,6 +444,7 @@ void AEIPlayerController::SetupInputComponent()
 	Input->BindAction(ClassAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleClass);
 	Input->BindAction(MenuAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleMenu);
 	Input->BindAction(MapAction, ETriggerEvent::Started, this, &AEIPlayerController::HandleMap);
+	Input->BindAction(PauseAction, ETriggerEvent::Started, this, &AEIPlayerController::HandlePause);
 
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 	Subsystem->AddMappingContext(Mapping, 0);
@@ -353,7 +458,7 @@ AEIHeroCharacter* AEIPlayerController::GetLivingHero() const
 
 AEIHeroCharacter* AEIPlayerController::GetHeroForControls() const
 {
-	return bMenuOpen ? nullptr : GetLivingHero();
+	return bMenuOpen || bPauseOpen ? nullptr : GetLivingHero();
 }
 
 void AEIPlayerController::HandleMove(const FInputActionValue& Value)
@@ -368,7 +473,7 @@ void AEIPlayerController::HandleMove(const FInputActionValue& Value)
 
 void AEIPlayerController::HandleLook(const FInputActionValue& Value)
 {
-	if (!bMenuOpen)
+	if (!bMenuOpen && !bPauseOpen)
 	{
 		ApplyLookInput(Value.Get<FVector2D>());
 	}
@@ -377,10 +482,11 @@ void AEIPlayerController::HandleLook(const FInputActionValue& Value)
 void AEIPlayerController::ApplyLookInput(const FVector2D& Input)
 {
 	const AEIHeroCharacter* Hero = GetPawn<AEIHeroCharacter>();
-	const float MouseFactor = Hero != nullptr ? Hero->GetValues().MouseFactor : 1.0f;
+	const float MouseFactor = (Hero != nullptr ? Hero->GetValues().MouseFactor : 1.0f) * Settings.MouseFactor;
 	AddYawInput(Input.X * MouseFactor);
-	// The engine's pitch scale is negative, so the sign flips here to make mouse up look up.
-	AddPitchInput(-Input.Y * MouseFactor);
+	// The engine's pitch scale is negative, so the sign flips here to make mouse up look up. Inverting flips it back.
+	const float PitchFactor = Settings.bInvertLook ? -1.0f : 1.0f;
+	AddPitchInput(-Input.Y * MouseFactor * PitchFactor);
 }
 
 void AEIPlayerController::HandleJumpStarted()
@@ -419,7 +525,11 @@ void AEIPlayerController::HandlePrimaryPressed()
 {
 	float MouseX = 0.0f;
 	float MouseY = 0.0f;
-	if (bMenuOpen && GetMousePosition(MouseX, MouseY))
+	if (bPauseOpen && GetMousePosition(MouseX, MouseY))
+	{
+		PauseMenu.Click(MouseX, MouseY);
+	}
+	else if (bMenuOpen && GetMousePosition(MouseX, MouseY))
 	{
 		Menu.Click(MouseX, MouseY);
 	}
@@ -455,7 +565,7 @@ void AEIPlayerController::HandleSecondaryReleased()
 
 void AEIPlayerController::HandleInteract()
 {
-	if (bMenuOpen)
+	if (bMenuOpen || bPauseOpen)
 	{
 		return;
 	}
@@ -489,8 +599,18 @@ void AEIPlayerController::HandleHorde()
 
 void AEIPlayerController::HandleRestart()
 {
-	SetMenuOpen(false);
-	ServerRestartRun();
+	const AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
+	const EEIRunPhase Phase = State != nullptr ? State->GetRunPhase() : EEIRunPhase::None;
+	// In the arena, and after the settlement, R keeps its old meaning: everything anew.
+	if (Phase == EEIRunPhase::None || Phase == EEIRunPhase::Failed || Phase == EEIRunPhase::Escaped)
+	{
+		SetMenuOpen(false);
+		SetPauseOpen(false);
+		ServerRestartRun();
+		return;
+	}
+	// During a run one wrong press of R must not throw everything away. It only opens the pause menu.
+	SetPauseOpen(true);
 }
 
 void AEIPlayerController::ServerToggleHorde_Implementation()
@@ -506,6 +626,14 @@ void AEIPlayerController::ServerRestartRun_Implementation()
 	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
 	{
 		GameMode->RestartRun();
+	}
+}
+
+void AEIPlayerController::ServerLeaveRun_Implementation()
+{
+	if (AEIGameMode* GameMode = GetWorld()->GetAuthGameMode<AEIGameMode>())
+	{
+		GameMode->LeaveRun();
 	}
 }
 

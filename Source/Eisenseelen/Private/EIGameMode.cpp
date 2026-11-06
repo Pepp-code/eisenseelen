@@ -42,6 +42,13 @@ void AEIGameMode::ToggleHorde()
 	}
 }
 
+void AEIGameMode::LeaveRun()
+{
+	Horde->SetRemovingLeftBehind(false);
+	Horde->RemoveAllEnemies();
+	Run->AbortRun();
+}
+
 void AEIGameMode::RestartRun()
 {
 	Horde->SetHordeActive(false);

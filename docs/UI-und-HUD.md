@@ -96,7 +96,7 @@ Das genaue Design („geschmiedetes Eisen" statt Western-Holz, Bildschirm-Anker,
 
 Jeder Schritt ist ein eigener Auftrag mit grünen Tests am Ende. Reihenfolge nach Nutzen:
 
-- **U1 — Pause und Einstellungen (D2, D3, A10, C4):** Esc-Menü, Einstellungen in einer json, Steuerungsseite. Fundament für alles Weitere; ohne Esc landet man heute beim harten Neustart.
+- **U1 — Pause und Einstellungen (D2, D3, A10, C4): Erledigt am 6. November 2026.** Esc-Menü mit Fortsetzen, Steuerung, Einstellungen, Neustart und „Lauf verlassen"; Einstellungen in `Data/einstellungen.json` (Defaults) und `Saved/Einstellungen.json` (Wahl des Spielers). R startet nur noch in der Testarena und nach dem Lauf neu, im Lauf öffnet es das Menü. Noch ohne Wirkung: HUD-Größe (kommt mit ST7), Musik-Lautstärke (keine Musik) und Schadenszahlen (kommen mit U3) — sie werden aber schon gespeichert.
 - **U2 — Mitspieler-Rahmen (A1):** Der GameState kennt bald alle Helden; die Leisten zeichnen davon ab. Erster Koop-Baustein.
 - **U3 — Schadenszahlen und Meldungen (A2, A3, A8, A9):** Zahlen und Beutezeilen als kurze Einblendungen; ein „Meldungs-Dienst" im GameState sammelt sie, das HUD zeigt sie an. Auch als Test prüfbar (Liste statt Fenster).
 - **U4 — Run-Anzeigen verdichten (A4, A5, A6):** Blutmond-Countdown, Vertragszeilen, Boss-Leiste.
@@ -110,6 +110,9 @@ Tests: Menü-Inhalte nach dem Elementlisten-Muster (Knöpfe klicken, Zustand pr�
 ## Entscheidungen vom 6. November 2026
 
 - **Schadenszahlen:** Es werden nur eigene Treffer angezeigt, in den Einstellungen abschaltbar (A2).
+- **Titelbild:** kommt früh, nicht erst mit den Freunden (U7).
+- **Schrift:** Cinzel (OFL, Google Fonts) als ruhige, breite Gravur-Schrift für Überschriften vorgemerkt — Einbau mit der Optik-Schicht, Details in `docs/UI-Stil.md`.
+- **„Lauf verlassen" im Pause-Menü:** wertet den Lauf als gescheitert aus (30-%-Regel), der Held bleibt leben.
 - **Karte:** Sie zeigt nur entdeckte Lager, nicht alle (B2).
 - **Rüstungs-Gravuren** (siehe `docs/Ruestungs-Gravuren.md`): ein Baum je Platz, 2 bis 3 zur Wahl je Stufe, Meisterstücke für Waffe, Brust und Handschuhe, Kosten bleiben hoch.
 

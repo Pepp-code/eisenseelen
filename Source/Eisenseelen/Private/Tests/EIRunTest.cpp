@@ -130,6 +130,12 @@ namespace
 		const FVector Location = GetGameMode(Context)->GetRun()->GetActiveFire()->GetActorLocation();
 		Teleport(Context, FVector(Location.X + DistanceCm, Location.Y, HeroHeight), 180.0f);
 	}
+
+	/** A fresh dock at once. The R key itself opens the pause menu during a run, so the tests call the restart directly. */
+	FEIPlayStep RestartNow()
+	{
+		return Do([](const FEIPlayContext& Context) { GetGameMode(Context)->RestartRun(); });
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -359,7 +365,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	}));
 
 	// R starts over, at the dock.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitUntil(TEXT("a fresh run starts"), 3.0, [](const FEIPlayContext& Context)
 	{
 		return GetState(Context)->GetRunPhase() == EEIRunPhase::AtDock && Context.Movement->IsMovingOnGround();
@@ -445,7 +451,7 @@ bool FEIDockTest::RunTest(const FString& Parameters)
 	}));
 
 	// R takes everything back.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitUntil(TEXT("a fresh dock"), 3.0, [](const FEIPlayContext& Context) { return !Context.Hero->IsAboard() && !GetState(Context)->IsCastingOff(); }));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -515,7 +521,7 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	}));
 
 	// Whoever holds an altar calls the blood moon: a small group comes at once, and more follow up to a limit.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -583,7 +589,7 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	}));
 
 	// A fresh run starts without the blood moon.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("another fresh run starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -592,7 +598,7 @@ bool FEIRunDirectorTest::RunTest(const FString& Parameters)
 	}));
 
 	// At the fire too.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("one more fresh run starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -790,7 +796,7 @@ bool FEICampsTest::RunTest(const FString& Parameters)
 	}));
 
 	// R clears the map, and the camps fill up with the next jump.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -957,7 +963,7 @@ bool FEIChestTest::RunTest(const FString& Parameters)
 	}));
 
 	// R: the guards are gone, and the chests are closed and sealed again.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([ChestsInUse](const FEIPlayContext& Context)
 	{
@@ -1076,7 +1082,7 @@ bool FEIContractsTest::RunTest(const FString& Parameters)
 	}));
 
 	// A run of leaders: the fall counts for the contract, but only whoever stood near is paid.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("a run of leaders starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -1119,7 +1125,7 @@ bool FEIContractsTest::RunTest(const FString& Parameters)
 	}));
 
 	// A run of shrines: the time runs in the zone and only there, and every shrine pays the same.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("a run of shrines starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([StandAt](const FEIPlayContext& Context)
 	{
@@ -1185,7 +1191,7 @@ bool FEIContractsTest::RunTest(const FString& Parameters)
 	}));
 
 	// However often it is rolled: with a big distance the two contracts lie far apart.
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("a last run starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
@@ -1534,7 +1540,7 @@ bool FEIRunFailedTest::RunTest(const FString& Parameters)
 		Context.Test->TestEqual(TEXT("The settlement can say so"), Profile->GetSecured(100), 30);
 		Context.Test->TestTrue(TEXT("The experience stays"), Profile->GetSave().Experience > 0);
 	}));
-	AddTap(Steps, EKeys::R);
+	Steps.Add(RestartNow());
 	Steps.Add(WaitForPhase(TEXT("a fresh run starts"), 3.0, EEIRunPhase::AtDock));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{

@@ -24,6 +24,9 @@ public:
 	/** Removes all enemies and starts every hero fresh. All Data files are read again. */
 	void RestartRun();
 
+	/** Ends the run at once, as failed: what is not secured is mostly lost. The heroes stay where they are. */
+	void LeaveRun();
+
 protected:
 	virtual void BeginPlay() override;
 

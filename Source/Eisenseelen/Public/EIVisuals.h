@@ -25,6 +25,9 @@ namespace EIVisuals
 	/** Turns the sky, the sun and the fog of the map towards the blood moon, from 0 for a clear day to 1. */
 	EISENSEELEN_API void ApplyBloodMoonLook(UWorld* World, float Share);
 
+	/** How loud effects are played in total, from the settings. Every sound is scaled with it. */
+	EISENSEELEN_API void SetEffectsVolume(float Volume);
+
 	/** Plays S_<Name> from /Game/Audio. A missing sound stays silent and logs a warning once. */
 	EISENSEELEN_API void PlaySound2D(const UObject* WorldContext, const TCHAR* Name, float Volume = 1.0f);
 	EISENSEELEN_API void PlaySoundAt(const UObject* WorldContext, const TCHAR* Name, const FVector& Location, float Volume = 1.0f);

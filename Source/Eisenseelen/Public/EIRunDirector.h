@@ -110,6 +110,9 @@ public:
 	/** Puts everything back to the dock, with new contracts and new hunt letters. */
 	void ResetRun();
 
+	/** Ends the run as failed, as if every hero had fallen. Only during a run. */
+	void AbortRun();
+
 	/** At the dock the team takes one of the hunt letters, and its boss waits in the run. False if it cannot be taken now. */
 	bool ChooseLetter(int32 Index);
 
