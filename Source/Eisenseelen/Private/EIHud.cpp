@@ -130,7 +130,9 @@ void AEIHud::DrawCrossing(const AEIGameState* State)
 	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, CrossingFade), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
 	if (bCrossing && CrossingFade >= 1.0f)
 	{
-		DrawLine(TEXT("Die Barke bringt euch ins Gebiet ..."), Canvas->SizeX / 2.0f - 220.0f, Canvas->SizeY / 2.0f - 20.0f, TextColor, 2.0f);
+		const FEIHuntLetter* Letter = State->GetChosenHuntLetter();
+		const FString Area = Letter != nullptr ? Letter->Area : FString();
+		DrawLine(FString::Printf(TEXT("Die Barke bringt euch nach %s ..."), *Area), Canvas->SizeX / 2.0f - 220.0f, Canvas->SizeY / 2.0f - 20.0f, TextColor, 2.0f);
 	}
 }
 

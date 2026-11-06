@@ -8,6 +8,7 @@
 #include "EIChest.h"
 #include "EIGameMode.h"
 #include "EIGameState.h"
+#include "EIDataFile.h"
 #include "EIHealthComponent.h"
 #include "EIHordeDirector.h"
 #include "EIHollowArmor.h"
@@ -102,6 +103,32 @@ bool FEIBossDataTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("There is a boss"), !Table.Bosses.IsEmpty());
 	const FEIBossValues* WatcherFromFile = Table.Bosses.FindByPredicate([](const FEIBossValues& Boss) { return Boss.Bannbruch.Kind == EEIBannbruchKind::SoulStones; });
 	TestTrue(TEXT("Die Leere Wacht steht im File"), WatcherFromFile != nullptr);
+	// Every boss lives in an area that really is on the map.
+	{
+		FString MapError;
+		const TSharedPtr<FJsonObject> RunMapFile = FEIDataFile::Load(TEXT("laufkarte.json"), MapError);
+		const TArray<TSharedPtr<FJsonValue>>* AreaLines = nullptr;
+		if (!RunMapFile.IsValid() || !RunMapFile->TryGetArrayField(TEXT("gebiete"), AreaLines))
+		{
+			AddError(MapError.IsEmpty() ? TEXT("In laufkarte.json fehlt die Liste gebiete.") : MapError);
+		}
+		else
+		{
+			TArray<FString> KnownAreas;
+			for (const TSharedPtr<FJsonValue>& AreaLine : *AreaLines)
+			{
+				if (AreaLine.IsValid() && AreaLine->AsObject().IsValid())
+				{
+					KnownAreas.Add(AreaLine->AsObject()->GetStringField(TEXT("name")));
+				}
+			}
+			for (const FEIBossValues& Named : Table.Bosses)
+			{
+				TestTrue(FString::Printf(TEXT("%s names its area"), *Named.Name), !Named.Area.IsEmpty());
+				TestTrue(FString::Printf(TEXT("The map knows the area of %s"), *Named.Name), KnownAreas.Contains(Named.Area));
+			}
+		}
+	}
 	for (const FEIBossValues& Boss : Table.Bosses)
 	{
 		TestTrue(TEXT("A boss has a loot set"), !Boss.Loot.IsEmpty());
@@ -647,6 +674,10 @@ bool FEIHuntLetterTest::RunTest(const FString& Parameters)
 			Context.Test->TestEqual(TEXT("A letter names its boss"), Letter.Boss, Table.Bosses[Letter.BossIndex].Name);
 			Context.Test->TestEqual(TEXT("And how it is freed"), Letter.Bannbruch, Table.Bosses[Letter.BossIndex].Bannbruch.Name);
 			Context.Test->TestFalse(TEXT("And where it waits"), Letter.Area.IsEmpty());
+			// Where the letter waits is a real area of the map, or the map itself.
+			const bool bKnownArea = Letter.Area == Run->GetMapName()
+				|| Run->GetAreas().ContainsByPredicate([&Letter](const FEIPlaceArea& Area) { return Area.Name == Letter.Area; });
+			Context.Test->TestTrue(TEXT("And where it waits is on the map"), bKnownArea);
 		}
 		Context.Test->TestEqual(TEXT("Every letter names another boss"), Named.Num(), Letters.Num());
 		Context.Test->TestEqual(TEXT("The first letter is taken"), GetState(Context)->GetChosenLetter(), 0);

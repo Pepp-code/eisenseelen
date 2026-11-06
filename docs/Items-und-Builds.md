@@ -250,7 +250,7 @@ Die neue Regel ersetzt, was früher die Omen konnten: einen Effekt, der wirklich
 | Frostwacht | Frost | Wer dich trifft, wird verlangsamt |
 | Quellwächter | Blitz | Ein besiegter Gegner gibt Mana zurück |
 
-**Gravuren für die Rüstung:** Auch Rüstung bekommt Gravuren, nach demselben Prinzip wie die Waffen. Jeder der 4 Plätze hat eine eigene Liste mit 3 Stufen und je 2 Gravuren zur Wahl, zusammen also 24 Zeilen, die für alle Arten gelten. Bei den Handschuhen wäre das zum Beispiel +5 % Angriffstempo oder +5 % Blockstärke. Gekauft wird für jedes Teil einzeln, mit Gold und den Punkten seiner Fraktion, und die dritte Stufe kostet zusätzlich eine seltene Zutat.
+**Gravuren für die Rüstung:** Auch Rüstung bekommt Gravuren, nach demselben Prinzip wie die Waffen (5 Stufen, je 2 zur Wahl, eine aktiv). Der vollständige Plan mit allen Stufen, Kosten und dem Meisterstück für die Brust steht in `docs/Ruestungs-Gravuren.md`.
 
 ## Herzkristalle
 
@@ -339,7 +339,7 @@ Eine Runde ist wie im Masterplan etwa 2 Stunden deiner Zeit. Alles bleibt zuerst
 | D | Schmiede: Waffen und Rüstung kaufen, Item-Belohnungen raus | gebaut. Worauf sparst du? | 2 |
 | E | Gravuren für Langschwert und Stab (gebaut am 6. November) | Spürt man die Gravuren wirklich? | 3–4 |
 | F | Die Leere Wacht, 2 weitere graue Gebiete | Leere Wacht gebaut (6. November), Gebiete warten auf die neue Karte. Bleibt der Lauf abwechslungsreich? | 5–7 |
-| G | Meisterstücke, Rüstungs-Gravuren und 4-Teile-Regeln, weitere Waffen, Wind | Eigene Builds bauen | 12–17 |
+| G | Meisterstücke, Rüstungs-Gravuren und 4-Teile-Regeln, weitere Waffen, Wind | Rüstungs-Gravuren geplant (`docs/Ruestungs-Gravuren.md`). Eigene Builds bauen | 12–17 |
 
 Das sind noch 20 bis 28 Runden, also 40 bis 56 Stunden deiner Zeit. Wie alle Zeiten im Plan kann das um die Hälfte danebenliegen. Nach Schritt B spielst du den ganzen Lauf, bevor Schmiede und Gravuren darauf aufbauen. Wird es dir zu viel, lassen sich die Leere Wacht und die weiteren Gebiete nach hinten schieben.
 

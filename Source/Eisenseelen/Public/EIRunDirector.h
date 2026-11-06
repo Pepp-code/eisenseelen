@@ -55,6 +55,14 @@ struct EISENSEELEN_API FEIArrivalPoint
 	float YawDegrees = 0.0f;
 };
 
+/** One named area of the map, from the gebiete list in Data/laufkarte.json. Places inside the radius belong to it. */
+struct EISENSEELEN_API FEIPlaceArea
+{
+	FString Name;
+	FVector Center = FVector::ZeroVector;
+	double Radius = 0.0;
+};
+
 /**
  * Leads a run from the dock to the flight home. Lives on the game mode, so only the server has it, and only does anything
  * on a map with a barge. What the players need to know goes through the game state.
@@ -79,6 +87,12 @@ public:
 
 	const TArray<FEIArrivalPoint>& GetArrivals() const { return Arrivals; }
 
+	/** The named areas of the map. A letter picks its boss's area, and the run then only uses places inside it. */
+	const TArray<FEIPlaceArea>& GetAreas() const { return Areas; }
+
+	/** The name of the whole map, for letters whose boss lives everywhere. */
+	const FString& GetMapName() const { return AreaName; }
+
 	/** Which bosses there are. Tests may change it, and it counts from the next reset on. With an empty table a run has no boss. */
 	FEIBossTable& GetBossTable() { return BossTable; }
 	AEIBoss* GetBoss() const { return Boss; }
@@ -98,6 +112,12 @@ public:
 
 	/** At the dock the team takes one of the hunt letters, and its boss waits in the run. False if it cannot be taken now. */
 	bool ChooseLetter(int32 Index);
+
+	/** The area of the current boss, or null if it lives on the whole map. */
+	const FEIPlaceArea* GetCurrentArea() const;
+
+	/** A boss place inside the area of the letter the team took. */
+	FVector PickBossPlace() const;
 
 	/** At the dock: the next hunt letter, after the last one the first again. */
 	void ChooseNextLetter();
@@ -198,6 +218,7 @@ private:
 
 	FEIBossTable BossTable;
 	FString AreaName;
+	TArray<FEIPlaceArea> Areas;
 	FVector DockCenter = FVector::ZeroVector;
 	FVector HuntBoardPlace = FVector::ZeroVector;
 	FVector ForgePlace = FVector::ZeroVector;

@@ -301,6 +301,8 @@ Länger bleiben ist damit nicht gefährlicher, aber jede weitere Aufgabe kostet 
 
 **Entschieden am 5. November 2026:** An der Anlegestelle wählst du einen von 3 Jagdbriefen. Er zeigt Gebiet, Boss und Bannbruch. Die Belohnung bleibt geheim, auch welche Fraktionspunkte es auf der Karte gibt. Das Spiel würfelt dafür 3 kleine Nebenaufträge, jeder von einer zufälligen Fraktion: Feuer, Frost, Blitz und später Wind. Sie stehen ab der Ankunft auf der Karte und sind freiwillig. Die Aufgaben sind Anführer jagen, Schrein halten, bewachte Truhe erobern und Altar halten, und jede dauert etwa 1 bis 2 Minuten. Ein Nebenauftrag bringt Gold und Fraktionspunkte.
 
+**Gebaut am 6. November 2026:** Die Gebiete auf den Briefen sind echt: Jeder Boss trägt sein Gebiet in `Data/bosse.json`, die Gebietskreise stehen in `Data/laufkarte.json` unter `gebiete`. Brief, Ankunftsplatz und Signalfeuer wählen danach, und die Überfahrt nennt das Ziel beim Namen. Solange es nur ein Gebiet gibt, ändert sich am Spiel nichts.
+
 ### Tod und Wiederkehr
 
 | Fall | Regel |

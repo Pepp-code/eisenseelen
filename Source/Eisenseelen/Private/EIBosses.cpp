@@ -97,6 +97,12 @@ namespace
 			OutError = TEXT("Einem Boss fehlt name oder auftritt.");
 			return false;
 		}
+		// Where a boss lives is up to it. But a gebiet that is there must also say something.
+		if (Line.TryGetStringField(TEXT("gebiet"), Out.Area) && Out.Area.IsEmpty())
+		{
+			OutError = FString::Printf(TEXT("Beim Boss %s ist gebiet leer."), *Out.Name);
+			return false;
+		}
 		const TArray<TSharedPtr<FJsonValue>>* Color = nullptr;
 		const TSharedPtr<FJsonObject>* Bannbruch = nullptr;
 		const TSharedPtr<FJsonObject>* Fight = nullptr;

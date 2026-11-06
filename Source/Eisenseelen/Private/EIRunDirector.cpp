@@ -99,6 +99,45 @@ namespace
 		return true;
 	}
 
+	bool LoadAreas(TArray<FEIPlaceArea>& OutAreas, FString& OutError)
+	{
+		const TSharedPtr<FJsonObject> Root = FEIDataFile::Load(TEXT("laufkarte.json"), OutError);
+		const TArray<TSharedPtr<FJsonValue>>* Lines = nullptr;
+		if (!Root.IsValid())
+		{
+			return false;
+		}
+		// Without the list every place belongs to the whole map, so old data keeps working.
+		if (!Root->TryGetArrayField(TEXT("gebiete"), Lines))
+		{
+			return true;
+		}
+		for (const TSharedPtr<FJsonValue>& Line : *Lines)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			float X = 0.0f;
+			float Y = 0.0f;
+			float Radius = 0.0f;
+			FEIPlaceArea Area;
+			if (!Line->TryGetObject(Object)
+				|| !(*Object)->TryGetStringField(TEXT("name"), Area.Name) || Area.Name.IsEmpty()
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("mitte_x_m"), -100000.0, 100000.0, X, OutError)
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("mitte_y_m"), -100000.0, 100000.0, Y, OutError)
+				|| !FEIDataFile::ReadNumber(**Object, TEXT("radius_m"), 1.0, 100000.0, Radius, OutError))
+			{
+				if (OutError.IsEmpty())
+				{
+					OutError = TEXT("Einem Gebiet fehlt name, mitte oder radius.");
+				}
+				return false;
+			}
+			Area.Center = FVector(X, Y, 0.0) * CentimetersPerMeter;
+			Area.Radius = Radius * CentimetersPerMeter;
+			OutAreas.Add(Area);
+		}
+		return true;
+	}
+
 	/** The name of the area and where the dock, the hunt board and the forge stand. */
 	bool LoadDock(FString& OutArea, FVector& OutCenter, FVector& OutBoardPlace, FVector& OutForgePlace, FString& OutError)
 	{
@@ -228,7 +267,7 @@ void UEIRunDirector::LoadValues()
 	{
 		FEIDataFile::ReportError(TEXT("nebenauftraege.json"), Error);
 	}
-	if (!LoadArrivals(Arrivals, Error) || !LoadPlaces(TEXT("bossplaetze"), BossPlaces, Error))
+	if (!LoadArrivals(Arrivals, Error) || !LoadPlaces(TEXT("bossplaetze"), BossPlaces, Error) || !LoadAreas(Areas, Error))
 	{
 		FEIDataFile::ReportError(TEXT("laufkarte.json"), Error);
 	}
@@ -240,6 +279,14 @@ void UEIRunDirector::LoadValues()
 	if (!FEIBossTable::LoadFromProjectFile(BossTable, Error))
 	{
 		FEIDataFile::ReportError(TEXT("bosse.json"), Error);
+	}
+	// A boss that names an area must also find it on the map.
+	for (const FEIBossValues& Named : BossTable.Bosses)
+	{
+		if (!Named.Area.IsEmpty() && !Areas.ContainsByPredicate([&Named](const FEIPlaceArea& Area) { return Area.Name == Named.Area; }))
+		{
+			FEIDataFile::ReportError(TEXT("bosse.json"), FString::Printf(TEXT("Das Gebiet %s von %s steht nicht in laufkarte.json."), *Named.Area, *Named.Name));
+		}
 	}
 }
 
@@ -348,7 +395,7 @@ void UEIRunDirector::PrepareBoss()
 	}
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
 	const bool bHasBoss = Barge != nullptr && !BossTable.Bosses.IsEmpty() && !BossPlaces.IsEmpty();
-	BossPlace = bHasBoss ? BossPlaces[FMath::RandRange(0, BossPlaces.Num() - 1)] : FVector::ZeroVector;
+	BossPlace = FVector::ZeroVector;
 	State->SetBossStage(bHasBoss ? EEIBossStage::Sealed : EEIBossStage::None);
 	if (!bHasBoss)
 	{
@@ -372,20 +419,68 @@ void UEIRunDirector::PrepareBoss()
 	{
 		const FEIBossValues& Named = BossTable.Bosses[Order[Index]];
 		FEIHuntLetter& Letter = Letters.AddDefaulted_GetRef();
-		Letter.Area = AreaName;
+		// The letter says where the boss lives: in its own area, or on the whole map.
+		Letter.Area = Named.Area.IsEmpty() ? AreaName : Named.Area;
 		Letter.Boss = Named.Name;
 		Letter.Bannbruch = Named.Bannbruch.Name;
 		Letter.Color = Named.Color;
 		Letter.BossIndex = Order[Index];
 	}
 	State->SetHuntLetters(Letters, 0);
+	// The boss of the first letter waits, in its area. Taking another letter at the board picks a new place.
 	SetBossIndex(Letters[0].BossIndex);
 }
 
 void UEIRunDirector::SetBossIndex(int32 NewBossIndex)
 {
 	BossIndex = NewBossIndex;
+	if (NewBossIndex != INDEX_NONE && !BossPlaces.IsEmpty())
+	{
+		BossPlace = PickBossPlace();
+		// A new place also needs a fire that keeps its distance from it.
+		PrepareSignalFire();
+	}
 	GetWorld()->GetGameState<AEIGameState>()->SetBannbruchProgress(0, BossIndex != INDEX_NONE ? BossTable.Bosses[BossIndex].Bannbruch.Count : 0);
+}
+
+const FEIPlaceArea* UEIRunDirector::GetCurrentArea() const
+{
+	if (BossIndex == INDEX_NONE || !BossTable.Bosses.IsValidIndex(BossIndex))
+	{
+		return nullptr;
+	}
+	const FString& Named = BossTable.Bosses[BossIndex].Area;
+	if (Named.IsEmpty())
+	{
+		return nullptr;
+	}
+	return Areas.FindByPredicate([&Named](const FEIPlaceArea& Area) { return Area.Name == Named; });
+}
+
+FVector UEIRunDirector::PickBossPlace() const
+{
+	if (BossPlaces.IsEmpty())
+	{
+		return FVector::ZeroVector;
+	}
+	// Inside the area of the taken letter. If it has no place after all, the whole map is the fallback.
+	const FEIPlaceArea* Area = GetCurrentArea();
+	TArray<const FVector*> Choice;
+	for (const FVector& Place : BossPlaces)
+	{
+		if (Area == nullptr || FVector::Dist2D(Place, Area->Center) <= Area->Radius)
+		{
+			Choice.Add(&Place);
+		}
+	}
+	if (Choice.IsEmpty())
+	{
+		for (const FVector& Place : BossPlaces)
+		{
+			Choice.Add(&Place);
+		}
+	}
+	return *Choice[FMath::RandRange(0, Choice.Num() - 1)];
 }
 
 bool UEIRunDirector::ChooseLetter(int32 Index)
@@ -707,19 +802,27 @@ void UEIRunDirector::PrepareSignalFire()
 {
 	TArray<AEISignalFire*> Fires;
 	TArray<AEISignalFire*> FarFires;
+	TArray<AEISignalFire*> AllFires;
 	const double MinDistance = BossTable.FireMinDistanceMeters * CentimetersPerMeter;
+	// Only the fires of the taken letter's area count, so the run never points far out of it.
+	const FEIPlaceArea* Area = GetCurrentArea();
 	for (TActorIterator<AEISignalFire> It(GetWorld()); It; ++It)
 	{
 		It->SetLit(false);
 		It->SetInUse(false);
+		AllFires.Add(*It);
+		if (Area != nullptr && FVector::Dist2D(It->GetActorLocation(), Area->Center) > Area->Radius)
+		{
+			continue;
+		}
 		Fires.Add(*It);
 		if (BossIndex == INDEX_NONE || FVector::Dist2D(It->GetActorLocation(), BossPlace) >= MinDistance)
 		{
 			FarFires.Add(*It);
 		}
 	}
-	// After the boss there should be a way to run.
-	const TArray<AEISignalFire*>& Choice = !FarFires.IsEmpty() ? FarFires : Fires;
+	// After the boss there should be a way to run. Without fires in the area, any fire is better than none.
+	const TArray<AEISignalFire*>& Choice = !FarFires.IsEmpty() ? FarFires : (!Fires.IsEmpty() ? Fires : AllFires);
 	ActiveFire = Barge != nullptr && !Choice.IsEmpty() ? Choice[FMath::RandRange(0, Choice.Num() - 1)] : nullptr;
 	if (ActiveFire != nullptr)
 	{
@@ -767,7 +870,24 @@ void UEIRunDirector::BeginRunNow()
 			LivingHeroes.Add(*It);
 		}
 	}
-	const FEIArrivalPoint& Arrival = Arrivals[FMath::RandRange(0, Arrivals.Num() - 1)];
+	// The barge sets the team down inside the area of the taken letter.
+	const FEIPlaceArea* Area = GetCurrentArea();
+	TArray<int32> ArrivalChoice;
+	for (int32 Index = 0; Index < Arrivals.Num(); ++Index)
+	{
+		if (Area == nullptr || FVector::Dist2D(Arrivals[Index].Location, Area->Center) <= Area->Radius)
+		{
+			ArrivalChoice.Add(Index);
+		}
+	}
+	if (ArrivalChoice.IsEmpty())
+	{
+		for (int32 Index = 0; Index < Arrivals.Num(); ++Index)
+		{
+			ArrivalChoice.Add(Index);
+		}
+	}
+	const FEIArrivalPoint& Arrival = Arrivals[ArrivalChoice[FMath::RandRange(0, ArrivalChoice.Num() - 1)]];
 	FVector Ground = Arrival.Location;
 	FindGround(Arrival.Location, Ground);
 	const FRotator Facing(0.0f, Arrival.YawDegrees, 0.0f);

@@ -13,6 +13,7 @@
 		{
 			"name": "Der Gefesselte",
 			"auftritt": "Der Gefesselte reißt sich los!",
+			"gebiet": "Aschenwerder",
 			"farbe": [0.3, 0.26, 0.3],
 			"bannbruch": {
 				"art": "ankersteine",
@@ -78,6 +79,7 @@
 		{
 			"name": "Der Seelenrufer",
 			"auftritt": "Der Seelenrufer steigt aus seinem Grab!",
+			"gebiet": "Aschenwerder",
 			"farbe": [0.35, 0.55, 0.6],
 			"bannbruch": {
 				"art": "kessel",
@@ -139,6 +141,7 @@
 		{
 			"name": "Die Leere Wacht",
 			"auftritt": "Die Leere Wacht erwacht!",
+			"gebiet": "Aschenwerder",
 			"farbe": [0.42, 0.45, 0.55],
 			"bannbruch": {
 				"art": "seelensteine",

@@ -5,7 +5,7 @@ Hobbyprojekt: ein Fantasy-Koop-Extraction-Shooter mit beseelten Rüstungen als H
 Der Masterplan ist ein Claude Doc: https://claude.ai/artifact/Syfr3Y3xcV8i1Rhfn2XXty
 Der Entwickler bearbeitet ihn auch selbst. Lies ihn, bevor du etwas darin änderst.
 
-Eine Kopie des Plans liegt in `docs/Masterplan.md` und `docs/Items-und-Builds.md`, bekannte Fallen und frühere Entscheidungen stehen in `docs/Arbeitsnotizen.md`, die Regeln für 3D-Modelle in `docs/Kunst-Leitfaden.md`. So kann auch ein anderes Werkzeug weiterarbeiten. Halte die Kopie und die Notizen aktuell, wenn sich Plan oder Stand ändern, und sichere am Ende eines Arbeitsblocks mit `git push origin main`.
+Eine Kopie des Plans liegt in `docs/Masterplan.md` und `docs/Items-und-Builds.md`, bekannte Fallen und frühere Entscheidungen stehen in `docs/Arbeitsnotizen.md`, die Regeln für 3D-Modelle in `docs/Kunst-Leitfaden.md`, der Plan für Rüstungs-Gravuren in `docs/Ruestungs-Gravuren.md` und der Plan für UI und HUD in `docs/UI-und-HUD.md`. So kann auch ein anderes Werkzeug weiterarbeiten. Halte die Kopie und die Notizen aktuell, wenn sich Plan oder Stand ändern, und sichere am Ende eines Arbeitsblocks mit `git push origin main`.
 
 ## So arbeiten wir
 
@@ -85,7 +85,7 @@ Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestan
 
 Die Sprunghöhe von 1 m ist vom Entwickler bestätigt, das schnellere Fallen war ein Wunsch nach dem ersten Spielen. Alles andere wurde noch nicht selbst gespielt.
 
-**Als Nächstes:** Der Umbau nach dem Plan-Reiter „Items und Builds“ läuft, die Schritte heißen dort A bis G. Die Schritte A (Anlegestelle, Überfahrt, Signalfeuer), B (der erste Boss) C (Seelenrufer, Jagdbriefe, Beutebuch) D (Schmiede) und E (Gravuren für Langschwert und Stab, `Data/gravuren.json`, Reiter „Gravuren“ im Menü) sind gebaut. Aus Schritt F ist Die Leere Wacht gebaut, ihre Seelenstein-Welle steht in `Data/gruppen.json` unter `seelensteine`. Jetzt spielt der Entwickler alles zusammen. Die zwei weiteren grauen Gebiete aus Schritt F warten auf die neue Karte.
+**Als Nächstes:** Der Umbau nach dem Plan-Reiter „Items und Builds“ läuft, die Schritte heißen dort A bis G. Die Schritte A (Anlegestelle, Überfahrt, Signalfeuer), B (der erste Boss) C (Seelenrufer, Jagdbriefe, Beutebuch) D (Schmiede) und E (Gravuren für Langschwert und Stab, `Data/gravuren.json`, Reiter „Gravuren“ im Menü) sind gebaut. Aus Schritt F ist Die Leere Wacht gebaut, ihre Seelenstein-Welle steht in `Data/gruppen.json` unter `seelensteine`. Die Jagdbriefe sind seit dem 6. November gebietsgebunden: Jeder Boss hat ein `gebiet` in `Data/bosse.json`, die Gebiete stehen in `Data/laufkarte.json` unter `gebiete`, und Brief, Ankunft und Signalfeuer wählen danach ihre Plätze. Rüstungs-Gravuren (Schritt G) sind in `docs/Ruestungs-Gravuren.md` geplant, UI und HUD in `docs/UI-und-HUD.md` mit den Schritten U1 bis U8. Jetzt spielt der Entwickler alles zusammen. Die zwei weiteren grauen Gebiete aus Schritt F warten auf die neue Karte.
 
 **Bewusst noch nicht dabei:** Echte Modelle und Niagara-Effekte (nur die Anschlüsse sind gebaut), weitere Bosse und die zwei grauen Gebiete aus Schritt F, Meisterstücke, Gravuren für andere Waffen und für Rüstung (Schritt G im Plan), Herzkristalle (der Platz ist da, er bleibt leer), die Rute, vier weitere Rüstungsarten, der Auftrag Ruine säubern, Schlachtruf (auf Wunsch vorerst herausgenommen, die Taste E bleibt für den Runenzauber frei), Sprung-Schlag, Hieb-Vorschub, Sturmlauf, Blinzeln, Wurfäxte, Blitzrute, Totenrufer, Klassen-Passive.
 

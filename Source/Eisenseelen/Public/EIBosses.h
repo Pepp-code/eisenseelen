@@ -73,6 +73,8 @@ struct EISENSEELEN_API FEIBossValues
 {
 	FString Name;
 	FString Entrance;
+	/** Which area of the map the boss lives in, from Data/laufkarte.json. Empty means the whole map. */
+	FString Area;
 	FLinearColor Color = FLinearColor::Gray;
 	FEIBannbruch Bannbruch;
 	FEIEnemyValues Fight;

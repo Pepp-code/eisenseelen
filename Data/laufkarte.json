@@ -2,6 +2,9 @@
 	"boden_m": 600,
 	"rand_hoehe_m": 3,
 	"gebiet": "Aschenwerder",
+	"gebiete": [
+		{ "name": "Aschenwerder", "mitte_x_m": 0, "mitte_y_m": 0, "radius_m": 300 }
+	],
 	"anlegestelle": { "x_m": 0, "y_m": -6000, "hoehe_m": 150, "laenge_m": 40, "breite_m": 24, "jagdbrett_x_m": -14, "jagdbrett_y_m": -4, "schmiede_x_m": 14, "schmiede_y_m": -4 },
 	"signalfeuer": [
 		{ "x_m": 185, "y_m": 95 },
