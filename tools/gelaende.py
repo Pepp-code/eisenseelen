@@ -1,8 +1,9 @@
-"""Höhen der Aschesteppe aus Data/gelaende.json und Data/laufkarte.json.
+"""Höhen und Grundform der Waldinsel Aschenwerder aus Data/gelaende.json und Data/laufkarte.json.
 
-Reines Python ohne Unreal: make_runmap.py baut damit die Landschaft, und
-`py -3.12 tools/gelaende.py [bild.png]` zeichnet eine Draufsicht zum Prüfen.
-Jeder Spielort aus laufkarte.json bleibt eben auf Höhe 0.
+Reines Python ohne Unreal: make_runmap.py baut damit die Landschaft (600 x 600 m),
+und `py -3.12 tools/gelaende.py [bild.png]` zeichnet eine Draufsicht zum Prüfen.
+Achsen: +X ist Norden (oben), -X ist Süden (unten), +Y ist Osten (rechts), -Y ist Westen (links).
+Jeder Spielort aus laufkarte.json und jeder große Sandplatz bleibt eben auf Höhe 0.
 """
 
 import json
@@ -12,7 +13,6 @@ import random
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KARTE_HALB_M = 150.0
 
 
 def _load(name):
@@ -34,86 +34,220 @@ def _segment_distance(px, py, ax, ay, bx, by):
     return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 
 
+def _polyline_distance(px, py, points):
+    return min(_segment_distance(px, py, *points[i], *points[i + 1]) for i in range(len(points) - 1))
+
+
 class Gelaende:
     def __init__(self, design=None, karte=None):
         self.design = design or _load("gelaende.json")
         self.karte = karte or _load("laufkarte.json")
-        rng = random.Random(self.design.get("zufall", 7))
-        wave_length = self.design.get("wellen_laenge_m", 55.0)
+        self.size_m = float(self.design.get("boden_m", 600.0))
+        self.half_m = self.size_m * 0.5
+        rng = random.Random(self.design.get("zufall", 13))
+        heights_cfg = self.design.get("hoehen_m", {})
+        wave_length = heights_cfg.get("wellen_laenge", 65.0)
         self.waves = []
         for factor in (1.0, 0.61, 1.73):
             angle = rng.uniform(0, math.pi)
             k = 2 * math.pi / (wave_length * factor)
             self.waves.append((math.cos(angle) * k, math.sin(angle) * k, rng.uniform(0, 2 * math.pi), 1.0 / factor))
         weight_sum = sum(w[3] for w in self.waves)
-        self.wave_scale = self.design.get("wellen_hoehe_m", 3.0) * 0.5 / weight_sum
+        self.wave_scale = heights_cfg.get("wellen_hoehe", 2.2) * 0.5 / weight_sum
+        self.coast_angles = self._prepare_coast()
         self.flat_spots = self._collect_flat_spots()
+
+    def _prepare_coast(self):
+        pts = self.design.get("kueste_punkte", [])
+        samples = []
+        for x, y in pts:
+            ang = math.atan2(y, x)
+            r = math.hypot(x, y)
+            samples.append((ang, r))
+        samples.sort(key=lambda item: item[0])
+        return samples
+
+    def coast_radius(self, x, y):
+        """Küstenradius in Richtung (x, y), weich zwischen den Stützpunkten interpoliert."""
+        if x == 0 and y == 0:
+            return self.design.get("insel_radius_m", 255.0)
+        ang = math.atan2(y, x)
+        samples = self.coast_angles
+        n = len(samples)
+        for i in range(n):
+            a0, r0 = samples[i]
+            a1, r1 = samples[(i + 1) % n]
+            if i == n - 1:
+                a1 += 2 * math.pi
+                if ang < a0:
+                    ang += 2 * math.pi
+            if a0 <= ang <= a1:
+                t = (ang - a0) / max(1e-6, a1 - a0)
+                t_smooth = t * t * (3.0 - 2.0 * t)
+                return r0 + (r1 - r0) * t_smooth
+        return self.design.get("insel_radius_m", 255.0)
 
     def _collect_flat_spots(self):
         radii = self.design["eben_um"]
-        spots = [(0.0, 0.0, radii["mitte_m"])]
+        spots = [(0.0, 0.0, radii.get("mitte_m", 16.0))]
+        for s in self.design.get("sandplaetze", []):
+            spots.append((s["x_m"], s["y_m"], s.get("radius_m", radii["sandplaetze_m"])))
+        tun = self.design.get("tunnel")
+        if tun and "halle_mitte" in tun:
+            hm = tun["halle_mitte"]
+            spots.append((hm["x_m"], hm["y_m"], hm.get("radius_m", 18.0)))
         for key in ("orte", "bossplaetze", "signalfeuer", "ankunft", "lager", "sprungfelder"):
-            radius = radii[key + "_m"]
+            radius = radii.get(key + "_m", 10.0)
             for spot in self.karte.get(key, []):
                 spots.append((spot["x_m"], spot["y_m"], radius))
         return spots
 
-    def flat_weight(self, x, y):
-        """1 auf einem Spielort, 0 im freien Gelände, dazwischen weich."""
-        blend = self.design["eben_um"]["uebergang_m"]
+    def flat_weight(self, x, y, blend_override=None):
+        """1.0 auf einem Spielort oder Sandplatz, 0.0 im freien Gelände, dazwischen weich."""
+        blend = blend_override if blend_override is not None else self.design["eben_um"]["uebergang_m"]
         best = 0.0
         for sx, sy, radius in self.flat_spots:
-            distance = math.hypot(x - sx, y - sy)
-            if distance < radius + blend:
-                best = max(best, 1.0 - _smooth(radius, radius + blend, distance))
+            d = math.hypot(x - sx, y - sy)
+            if d < radius + blend:
+                best = max(best, 1.0 - _smooth(radius, radius + blend, d))
                 if best >= 1.0:
                     return 1.0
         return best
 
-    def _waves(self, x, y):
-        return self.wave_scale * sum(w * math.sin(kx * x + ky * y + phase) for kx, ky, phase, w in self.waves)
+    def road_weight(self, x, y):
+        """1.0 auf einem Weg oder im Tunnel-Einschnitt, 0.0 abseits davon."""
+        best = 0.0
+        for road in self.design.get("wege", {}).get("polylinien", []):
+            half_w = road["breite_m"] * 0.5
+            d = _polyline_distance(x, y, road["punkte"])
+            if d < half_w + 4.0:
+                best = max(best, 1.0 - _smooth(half_w, half_w + 4.0, d))
+                if best >= 1.0:
+                    return 1.0
+        return best
 
-    def _mesas(self, x, y):
-        ramp = self.design.get("rampe", {})
-        ramp_half = ramp.get("breite_m", 6.0) * 0.5
-        ramp_slope = math.tan(math.radians(ramp.get("steigung_grad", 22.0)))
+    def tunnel_cut_weight(self, x, y):
+        """Hält die eingeschnittene Schlucht des Tunnels durch das Felsmassiv auf Höhe 0."""
+        tun = self.design.get("tunnel")
+        if not tun:
+            return 0.0
+        hm = tun["halle_mitte"]
+        d_hall = math.hypot(x - hm["x_m"], y - hm["y_m"])
+        best = 1.0 - _smooth(hm["radius_m"], hm["radius_m"] + 16.0, d_hall)
+        half_w = tun.get("gang_breite_m", 10.0) * 0.5
+        for key in ("eingang_nord", "eingang_sued", "eingang_west"):
+            ep = tun[key]
+            d_seg = _segment_distance(x, y, ep["x_m"], ep["y_m"], hm["x_m"], hm["y_m"])
+            if d_seg < half_w + 16.0:
+                best = max(best, 1.0 - _smooth(half_w, half_w + 16.0, d_seg))
+        return best
+
+    def stream_depth(self, x, y):
+        """Positive Tiefe (in m) für Bäche und Sumpftümpel."""
+        depth = 0.0
+        for stream in self.design.get("baeche", []):
+            half_w = stream["sohle_m"] * 0.5
+            bank = stream["ufer_m"]
+            d = _polyline_distance(x, y, stream["punkte"])
+            if d < half_w + bank:
+                depth = max(depth, stream["tiefe_m"] * (1.0 - _smooth(half_w, half_w + bank, d)))
+        for px, py, pr in self.design.get("sumpf_tuempel", []):
+            d = math.hypot(x - px, y - py)
+            if d < pr + 4.0:
+                depth = max(depth, 0.55 * (1.0 - _smooth(pr * 0.6, pr + 4.0, d)))
+        return depth
+
+    def elevation_hills(self, x, y):
+        """Felsmassiv (Eisenjoch), Westberg (Wächterkuppe), Nordwest-Kap, Ostgrat und Schluchtring."""
         top = 0.0
-        for mesa in self.design.get("tafelberge", []):
-            dx, dy = x - mesa["x_m"], y - mesa["y_m"]
-            radius, height = mesa["radius_m"], mesa["hoehe_m"]
-            cliff = max(1.5, height * 0.35)
-            distance = math.hypot(dx, dy)
-            if distance > radius + height / ramp_slope + cliff + 2:
+        for h in self.design.get("erhebungen", []):
+            if "innen_radius_m" in h:
+                dx, dy = x - h["x_m"], y - h["y_m"]
+                d = math.hypot(dx, dy)
+                r_in, r_out = h["innen_radius_m"], h["aussen_radius_m"]
+                if r_in - 6.0 < d < r_out + 12.0:
+                    ring_val = (1.0 - _smooth(r_out, r_out + 10.0, d)) * _smooth(r_in - 4.0, r_in + 4.0, d)
+                    ang_deg = math.degrees(math.atan2(dy, dx)) % 360.0
+                    for gap_deg in h.get("luecke_grad", []):
+                        diff = abs((ang_deg - gap_deg + 180.0) % 360.0 - 180.0)
+                        if diff < 28.0:
+                            ring_val *= _smooth(12.0, 28.0, diff)
+                    top = max(top, h["hoehe_m"] * ring_val)
                 continue
-            value = height * (1.0 - _smooth(radius, radius + cliff, distance))
-            if "rampe_grad" in mesa:
-                angle = math.radians(mesa["rampe_grad"])
-                along = dx * math.cos(angle) + dy * math.sin(angle)
-                side = abs(-dx * math.sin(angle) + dy * math.cos(angle))
-                if along > 0 and side < ramp_half + 1.5:
-                    ramp_height = height - max(0.0, along - radius) * ramp_slope
-                    edge = 1.0 - _smooth(ramp_half, ramp_half + 1.5, side)
-                    value = max(value, max(0.0, ramp_height) * edge)
-            top = max(top, value)
+
+            dx, dy = x - h["x_m"], y - h["y_m"]
+            rx, ry = h["radius_x_m"], h["radius_y_m"]
+            norm_d = math.hypot(dx / rx, dy / ry)
+            if norm_d < 1.65:
+                falloff = 1.0 - _smooth(0.45, 1.45, norm_d)
+                val = h["hoehe_m"] * falloff
+                if "rampe_grad" in h:
+                    ang = math.radians(h["rampe_grad"])
+                    along = dx * math.cos(ang) + dy * math.sin(ang)
+                    side = abs(-dx * math.sin(ang) + dy * math.cos(ang))
+                    if along > 0 and side < 14.0:
+                        ramp_len = max(rx, ry) * 1.45
+                        ramp_h = h["hoehe_m"] * (1.0 - _smooth(0.0, ramp_len, along))
+                        edge = 1.0 - _smooth(8.0, 14.0, side)
+                        val = max(val, ramp_h * edge)
+                top = max(top, val)
         return top
 
-    def _riverbed(self, x, y):
-        river = self.design.get("flussbett")
-        if not river:
-            return 0.0
-        points = river["punkte"]
-        distance = min(_segment_distance(x, y, *points[i], *points[i + 1]) for i in range(len(points) - 1))
-        bottom_half = river["sohle_m"] * 0.5
-        return -river["tiefe_m"] * (1.0 - _smooth(bottom_half, bottom_half + river["ufer_m"], distance))
-
-    def _rim(self, x, y):
-        rim = self.design["rand"]
-        to_edge = KARTE_HALB_M - max(abs(x), abs(y))
-        return rim["hoehe_m"] * (1.0 - _smooth(0.0, rim["breite_m"], to_edge))
+    def is_dry_land(self, x, y):
+        """True, wenn der Punkt sicher auf dem trockenen Inselinneren liegt (für Truhen und Deckung)."""
+        r = math.hypot(x, y)
+        if r > self.coast_radius(x, y) - 18.0:
+            return False
+        if self.stream_depth(x, y) > 0.1:
+            return False
+        for s in self.design.get("senken", []):
+            if math.hypot(x - s["x_m"], y - s["y_m"]) < s["radius_m"] + 8.0:
+                return False
+        return True
 
     def height_m(self, x, y):
-        raw = self._waves(x, y) + self._mesas(x, y) + self._riverbed(x, y) + self._rim(x, y)
-        return raw * (1.0 - self.flat_weight(x, y))
+        """Geländehöhe in Metern an der Stelle (x = Nord, y = Ost)."""
+        r = math.hypot(x, y)
+        coast_r = self.coast_radius(x, y)
+        heights_cfg = self.design["hoehen_m"]
+
+        # Außerhalb der Küstenlinie: Strand -> Flachwasser -> Meeresboden (-4 m)
+        if r > coast_r:
+            over = r - coast_r
+            if over < 16.0:
+                t = _smooth(0.0, 16.0, over)
+                return heights_cfg["strand"] * (1.0 - t) + heights_cfg["flachwasser"] * t
+            t = _smooth(16.0, 52.0, over)
+            return heights_cfg["flachwasser"] * (1.0 - t) + heights_cfg["meeresboden"] * t
+
+        # Auf der Insel: Wellen liegen über 0 m (+0.15 bis +2.2 m), damit nur echte Bäche, Senken und das Meer unter 0 m liegen
+        coast_blend = _smooth(coast_r - 18.0, coast_r, r)
+        waves = 0.15 + self.wave_scale * sum(w * (1.0 + math.sin(kx * x + ky * y + phase)) for kx, ky, phase, w in self.waves)
+
+        # Berge weichen um Spielorte, Wege und den Tunnel-Einschnitt sanft zurück
+        hill_Blend = self.design["eben_um"].get("uebergang_berg_m", 45.0)
+        hill_suppress = max(
+            self.flat_weight(x, y, blend_override=hill_Blend),
+            self.tunnel_cut_weight(x, y),
+            self.road_weight(x, y) * 0.85,
+        )
+        hills = self.elevation_hills(x, y) * (1.0 - hill_suppress)
+
+        sinks = 0.0
+        for s in self.design.get("senken", []):
+            d = math.hypot(x - s["x_m"], y - s["y_m"])
+            if d < s["radius_m"] + 12.0:
+                sinks += s["tiefe_m"] * (1.0 - _smooth(s["radius_m"] * 0.65, s["radius_m"] + 10.0, d))
+
+        streams = self.stream_depth(x, y)
+        flat = max(self.flat_weight(x, y), self.tunnel_cut_weight(x, y))
+        road = self.road_weight(x, y)
+
+        # Spielorte bleiben exakt auf Höhe 0, Wege fast eben
+        land_h = (waves + hills - sinks) * (1.0 - max(flat, road * 0.85)) - streams * (1.0 - max(flat, road * 0.9))
+        beach_h = heights_cfg["strand"] * (1.0 - coast_blend)
+        raw_h = land_h * (1.0 - coast_blend) + beach_h * coast_blend
+        return raw_h * (1.0 - flat)
 
     def resolution(self):
         res = self.design["aufloesung"]
@@ -121,7 +255,7 @@ class Gelaende:
         return res["teile_pro_seite"], res["quadrate_pro_teil"], res["quadrat_cm"], side
 
     def grid_cm(self):
-        """Höhen aller Eckpunkte in Zentimetern, Zeile für Zeile, X läuft am schnellsten."""
+        """Höhen aller Eckpunkte in Zentimetern, Zeile für Zeile (Y außen, X innen für Unreal Landscape)."""
         _, _, quad_cm, side = self.resolution()
         half_m = (side - 1) * quad_cm / 200.0
         step_m = quad_cm / 100.0
@@ -129,7 +263,8 @@ class Gelaende:
         for row in range(side):
             y = -half_m + row * step_m
             for column in range(side):
-                heights.append(self.height_m(-half_m + column * step_m, y) * 100.0)
+                x = -half_m + column * step_m
+                heights.append(self.height_m(x, y) * 100.0)
         return heights
 
 
@@ -140,37 +275,72 @@ def draw_preview(path):
     _, _, quad_cm, side = terrain.resolution()
     heights = terrain.grid_cm()
     low, high = min(heights), max(heights)
-    scale = 3
+    scale = 2
     image = Image.new("RGB", (side, side))
     pixels = image.load()
-    for row in range(side):
-        for column in range(side):
-            h = heights[row * side + column]
-            right = heights[row * side + min(column + 1, side - 1)]
-            up = heights[min(row + 1, side - 1) * side + column]
-            slope = math.degrees(math.atan(math.hypot(right - h, up - h) / quad_cm))
-            light = 0.55 + 0.45 * max(-1.0, min(1.0, ((h - right) + (up - h)) / quad_cm * 1.5))
-            level = (h - low) / max(1.0, high - low)
-            color = (120 + 110 * level, 95 + 80 * level, 70 + 40 * level)
-            if h < -150:
-                color = (95, 80, 110)
-            if slope > 45:
-                color = (200, 60, 50)
-            pixels[column, side - 1 - row] = tuple(int(max(0, min(255, c * light))) for c in color)
+    half_m = (side - 1) * quad_cm / 200.0
+    step_m = quad_cm / 100.0
+
+    # In der Draufsicht zeigt +X nach Norden (oben) und +Y nach Osten (rechts),
+    # passend zur Auftragskarte im Spiel (AEIHud::DrawContractBoard).
+    for row_y in range(side):
+        y_m = -half_m + row_y * step_m
+        for col_x in range(side):
+            x_m = -half_m + col_x * step_m
+            h = heights[row_y * side + col_x]
+            h_east = heights[min(row_y + 1, side - 1) * side + col_x]
+            h_north = heights[row_y * side + min(col_x + 1, side - 1)]
+            slope = math.degrees(math.atan(math.hypot(h_east - h, h_north - h) / quad_cm))
+            light = 0.65 + 0.35 * max(-1.0, min(1.0, ((h - h_east) + (h_north - h)) / quad_cm * 1.2))
+
+            if h < -120.0:
+                color = (34, 64, 96)
+                light = 1.0
+            elif h < -10.0:
+                t = max(0.0, min(1.0, (h + 120.0) / 110.0))
+                color = (55 + 45 * t, 88 + 45 * t, 115 + 30 * t)
+                light = 0.95
+            else:
+                rw = terrain.road_weight(x_m, y_m)
+                if h < 40.0 and terrain.stream_depth(x_m, y_m) < 0.05:
+                    rw = max(rw, 1.0 - _smooth(10.0, 40.0, h))
+                grass = (88, 102, 56)
+                sand = (188, 175, 145)
+                color = (
+                    grass[0] * (1.0 - rw) + sand[0] * rw,
+                    grass[1] * (1.0 - rw) + sand[1] * rw,
+                    grass[2] * (1.0 - rw) + sand[2] * rw,
+                )
+                if slope > 22.0 or h > 450.0:
+                    rk = min(1.0, max((slope - 22.0) / 16.0, (h - 450.0) / 600.0))
+                    rock = (185, 190, 196)
+                    color = (
+                        color[0] * (1.0 - rk) + rock[0] * rk,
+                        color[1] * (1.0 - rk) + rock[1] * rk,
+                        color[2] * (1.0 - rk) + rock[2] * rk,
+                    )
+                if slope > 45.0:
+                    color = (210, 65, 55)
+
+            px = row_y
+            py = side - 1 - col_x
+            pixels[px, py] = tuple(int(max(0, min(255, c * light))) for c in color)
+
     image = image.resize((side * scale, side * scale), Image.NEAREST)
     draw = ImageDraw.Draw(image)
     half = (side - 1) / 2.0
 
-    def to_pixel(x, y):
-        return ((x + half) * scale, (half - y) * scale)
+    def to_pixel(x_m, y_m):
+        return ((y_m + half) * scale, (half - x_m) * scale)
 
-    for x, y, radius in terrain.flat_spots:
-        px, py = to_pixel(x, y)
+    for x_m, y_m, radius in terrain.flat_spots:
+        px, py = to_pixel(x_m, y_m)
         draw.ellipse([px - radius * scale, py - radius * scale, px + radius * scale, py + radius * scale], outline=(255, 255, 255), width=1)
-    for mesa in terrain.design.get("tafelberge", []):
-        px, py = to_pixel(mesa["x_m"], mesa["y_m"])
-        draw.text((px - 20, py - 5), mesa["name"], fill=(255, 255, 255))
-    draw.text((8, 8), f"Höhe {low / 100:.1f} bis {high / 100:.1f} m, rot = zu steil zum Gehen", fill=(255, 255, 255))
+    for reg in terrain.design.get("regionen", []):
+        px, py = to_pixel(reg["x_m"], reg["y_m"])
+        draw.rectangle([px - 52, py - 8, px + 52, py + 8], fill=(20, 25, 30))
+        draw.text((px - 48, py - 6), reg["name"], fill=(255, 245, 200))
+    draw.text((12, 12), f"Aschenwerder ({int(terrain.size_m)}x{int(terrain.size_m)} m): Höhe {low / 100:.1f} bis {high / 100:.1f} m (+X = Nord oben, +Y = Ost rechts)", fill=(255, 255, 255))
     image.save(path)
     return path
 

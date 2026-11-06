@@ -24,7 +24,7 @@ bool FEIContractDataTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Three side jobs in a run"), FMath::RoundToInt32(Table.ContractsPerRun), 3);
 	TestEqual(TEXT("Four kinds of task"), Table.Tasks.Num(), 4);
 	TestEqual(TEXT("A failed run keeps 30 percent"), Table.KeptOnFailure, 0.3f);
-	TestEqual(TEXT("The overview knows the map"), Table.MapMeters, 300.0f);
+	TestEqual(TEXT("The overview knows the map"), Table.MapMeters, 600.0f);
 
 	// A small table, to see that the rules are kept.
 	const FString Valid = TEXT("{\"auftraege_pro_lauf\": 3, \"mindestabstand_m\": 40, \"gold\": 100, \"punkte\": 10, ")

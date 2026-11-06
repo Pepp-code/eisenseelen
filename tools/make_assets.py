@@ -18,11 +18,14 @@ CHECKER_DARK = 0.13
 CHECKER_ROUGHNESS = 0.85
 # The shimmer over a model is this strong in its middle and grows towards its edges, so the shape stays readable.
 OVERLAY_MIDDLE = 0.35
-# The terrain: dusty steppe on flat ground, dark rock where it is too steep to walk.
-TERRAIN_ASH = unreal.LinearColor(0.32, 0.22, 0.13, 1)
-TERRAIN_ROCK = unreal.LinearColor(0.11, 0.075, 0.06, 1)
-TERRAIN_DARK_CELL = 0.8
-TERRAIN_ROCK_BELOW_UP = 0.8
+# The island landscape layers: deep sea, mud/shallows, sand/clearings, forest grass, and granite rock on slopes/peaks.
+TERRAIN_SEA = unreal.LinearColor(0.04, 0.10, 0.16, 1)
+TERRAIN_MUD = unreal.LinearColor(0.12, 0.11, 0.08, 1)
+TERRAIN_SAND = unreal.LinearColor(0.42, 0.36, 0.24, 1)
+TERRAIN_GRASS = unreal.LinearColor(0.14, 0.21, 0.09, 1)
+TERRAIN_ROCK = unreal.LinearColor(0.28, 0.30, 0.32, 1)
+TERRAIN_DARK_CELL = 0.82
+TERRAIN_ROCK_BELOW_UP = 0.88
 TERRAIN_ROCK_SHARPNESS = 6.0
 TERRAIN_ROUGHNESS = 0.95
 
@@ -107,8 +110,15 @@ def make_checker():
     graph.finish()
 
 
+def height_band(graph, z_cm, low_cm, high_cm):
+    """0 below low_cm, 1 above high_cm, linear between."""
+    shifted = graph.node(unreal.MaterialExpressionSubtract, ("A", z_cm), ("B", graph.number(low_cm)))
+    scaled = graph.multiply(shifted, graph.number(1.0 / (high_cm - low_cm)))
+    return graph.node(unreal.MaterialExpressionSaturate, ("", scaled))
+
+
 def make_terrain():
-    """The stand-in for the landscape until painted layers come: steppe colour with 1 m cells, rock on steep slopes."""
+    """The layered stand-in for the island landscape: sea, mud, sand/clearings, forest grass, and rock on slopes/peaks."""
     graph = Graph("M_Gelaende")
     cell_shade = graph.node(
         unreal.MaterialExpressionLinearInterpolate,
@@ -116,23 +126,50 @@ def make_terrain():
         ("B", graph.number(TERRAIN_DARK_CELL)),
         ("Alpha", checker_is_odd(graph)),
     )
+    world_z = graph.node(
+        unreal.MaterialExpressionComponentMask,
+        ("", graph.node(unreal.MaterialExpressionWorldPosition)),
+        r=False, g=False, b=True, a=False,
+    )
     up = graph.node(
         unreal.MaterialExpressionComponentMask,
         ("", graph.node(unreal.MaterialExpressionVertexNormalWS)),
         r=False, g=False, b=True, a=False,
     )
-    flatness = graph.node(
+
+    sea_or_mud = graph.node(
+        unreal.MaterialExpressionLinearInterpolate,
+        ("A", graph.color_parameter("Meer", TERRAIN_SEA)),
+        ("B", graph.color_parameter("Schlamm", TERRAIN_MUD)),
+        ("Alpha", height_band(graph, world_z, -160.0, -80.0)),
+    )
+    with_sand = graph.node(
+        unreal.MaterialExpressionLinearInterpolate,
+        ("A", sea_or_mud),
+        ("B", graph.color_parameter("Strand", TERRAIN_SAND)),
+        ("Alpha", height_band(graph, world_z, -25.0, 5.0)),
+    )
+    with_grass = graph.node(
+        unreal.MaterialExpressionLinearInterpolate,
+        ("A", with_sand),
+        ("B", graph.color_parameter("Gras", TERRAIN_GRASS)),
+        ("Alpha", height_band(graph, world_z, 12.0, 45.0)),
+    )
+
+    slope_rock = graph.node(
         unreal.MaterialExpressionSaturate,
         ("", graph.multiply(
-            graph.node(unreal.MaterialExpressionSubtract, ("A", up), ("B", graph.number(TERRAIN_ROCK_BELOW_UP))),
+            graph.node(unreal.MaterialExpressionSubtract, ("A", graph.number(TERRAIN_ROCK_BELOW_UP)), ("B", up)),
             graph.number(TERRAIN_ROCK_SHARPNESS),
         )),
     )
+    peak_rock = height_band(graph, world_z, 450.0, 750.0)
+    rock_alpha = graph.node(unreal.MaterialExpressionMax, ("A", slope_rock), ("B", peak_rock))
     surface = graph.node(
         unreal.MaterialExpressionLinearInterpolate,
-        ("A", graph.color_parameter("Fels", TERRAIN_ROCK)),
-        ("B", graph.color_parameter("Steppe", TERRAIN_ASH)),
-        ("Alpha", flatness),
+        ("A", with_grass),
+        ("B", graph.color_parameter("Fels", TERRAIN_ROCK)),
+        ("Alpha", rock_alpha),
     )
     graph.output(graph.multiply(surface, cell_shade), unreal.MaterialProperty.MP_BASE_COLOR)
     graph.output(graph.number(TERRAIN_ROUGHNESS), unreal.MaterialProperty.MP_ROUGHNESS)

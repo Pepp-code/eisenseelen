@@ -57,9 +57,9 @@ CHEST_CLEAR_CAMP_M = 26
 CHEST_CLEAR_CHEST_M = 35
 # A new volume's brush is a cube of this size. Paths are only needed near the floor.
 VOLUME_BRUSH_M = 2
-# Paths are needed from the riverbed up to the mesa tops.
+# Paths are needed from the shallow water and quarry up to the mountain tops.
 NAVIGATION_BOTTOM_M = -10
-NAVIGATION_TOP_M = 30
+NAVIGATION_TOP_M = 35
 # Everything the script builds carries this tag. A rebuild removes only these, so art placed by hand stays.
 GENERATED_TAG = "EI_Generiert"
 
@@ -71,11 +71,13 @@ def ground_m(x, y):
 
 
 def is_open_ground(x, y):
-    """Level enough and at the height of the plain, so a block or chest belongs there."""
+    """Level enough and on the dry island plain, so a block or chest belongs there."""
+    if not terrain.is_dry_land(x, y):
+        return False
     height = ground_m(x, y)
     step = 1.0
     rise = max(abs(ground_m(x + step, y) - height), abs(ground_m(x, y + step) - height)) / step
-    return abs(height) <= OPEN_GROUND_MAX_HEIGHT_M and math.degrees(math.atan(rise)) <= OPEN_GROUND_MAX_SLOPE_DEG
+    return 0.0 <= height <= OPEN_GROUND_MAX_HEIGHT_M and math.degrees(math.atan(rise)) <= OPEN_GROUND_MAX_SLOPE_DEG
 
 
 def on_ground(x_m, y_m):
@@ -123,6 +125,21 @@ def add_walls(actors, label, center, length, width, floor_z, height, thickness, 
     for (x, y), (size_x, size_y) in sides:
         add_box(actors, label, (x, y, floor_z + height / 2), (size_x, size_y, height))
         blocker = add_box(actors, f"{label}sperre", (x, y, floor_z + blocker_height / 2), (size_x, size_y, blocker_height))
+        blocker.set_actor_hidden_in_game(True)
+
+
+def add_sea_border(actors, floor_size):
+    """Invisible boundary around the sea at the outer edge of the landscape."""
+    half = floor_size / 2
+    floor_z = -6.0
+    sides = [
+        ((0, half), (floor_size + EDGE_THICKNESS_M, EDGE_THICKNESS_M)),
+        ((0, -half), (floor_size + EDGE_THICKNESS_M, EDGE_THICKNESS_M)),
+        ((half, 0), (EDGE_THICKNESS_M, floor_size + EDGE_THICKNESS_M)),
+        ((-half, 0), (EDGE_THICKNESS_M, floor_size + EDGE_THICKNESS_M)),
+    ]
+    for (x, y), (size_x, size_y) in sides:
+        blocker = add_box(actors, "Randsperre", (x, y, floor_z + EDGE_BLOCKER_HEIGHT_M / 2), (size_x, size_y, EDGE_BLOCKER_HEIGHT_M))
         blocker.set_actor_hidden_in_game(True)
 
 
@@ -246,7 +263,7 @@ def main():
 
     floor_size = layout["boden_m"]
     add_terrain()
-    add_walls(actors, "Rand", (0, 0), floor_size, floor_size, 0, layout["rand_hoehe_m"], EDGE_THICKNESS_M, EDGE_BLOCKER_HEIGHT_M)
+    add_sea_border(actors, floor_size)
     altar_class = unreal.load_class(None, "/Script/Eisenseelen.EIAltar")
     for index, place in enumerate(layout["orte"]):
         add_place(actors, place, index)

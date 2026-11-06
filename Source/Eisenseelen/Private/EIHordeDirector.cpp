@@ -130,6 +130,10 @@ bool UEIHordeDirector::FindStandingPlace(const FVector& Ground, FVector& OutLoca
 		return false;
 	}
 	const bool bOnTerrain = Cast<ALandscapeProxy>(Floor.GetActor()) != nullptr;
+	if (bOnTerrain && Floor.ImpactPoint.Z < -100.0f)
+	{
+		return false;
+	}
 	if (!bOnTerrain && Floor.ImpactPoint.Z > MaxGroundHeightCm)
 	{
 		return false;

@@ -221,11 +221,12 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		const FVector Location = Context.Hero->GetActorLocation();
 		const float Half = GetGameMode(Context)->GetRun()->GetContractTable().MapMeters * CentimetersPerMeter / 2.0f;
 		const float FromEdge = Half - static_cast<float>(FMath::Max(FMath::Abs(Location.X), FMath::Abs(Location.Y)));
-		Context.Test->AddInfo(FString::Printf(TEXT("The hero arrives %.0f cm from the edge"), FromEdge));
+		const float FromCenter = static_cast<float>(Location.Size2D());
+		Context.Test->AddInfo(FString::Printf(TEXT("The hero arrives %.0f cm from the center, %.0f cm inside the border"), FromCenter, FromEdge));
 		Context.Test->TestFalse(TEXT("The hero is off the barge"), Context.Hero->IsAboard());
 		Context.Test->TestNull(TEXT("The hero rides nothing any more"), Context.Hero->GetAttachParentActor());
 		Context.Test->TestTrue(TEXT("The arrival lies inside the map"), FromEdge > 0.0f);
-		Context.Test->TestTrue(TEXT("The arrival lies at the edge"), FromEdge < 2500.0f);
+		Context.Test->TestTrue(TEXT("The arrival lies away from the middle"), FromCenter >= 12000.0f);
 		Context.Test->TestTrue(TEXT("The hero stands on the ground"), Context.Movement->IsMovingOnGround());
 		Context.Test->TestTrue(TEXT("The hero can be hit again"), Context.Hero->CanBeDamaged());
 		Context.Test->TestTrue(TEXT("The clock runs"), GetState(Context)->GetRunSeconds() > 0.0f);
@@ -1292,9 +1293,9 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 		};
 		double Lowest = TNumericLimits<double>::Max();
 		double Highest = TNumericLimits<double>::Lowest();
-		for (int32 X = -14000; X <= 14000; X += 2000)
+		for (int32 X = -28000; X <= 28000; X += 2000)
 		{
-			for (int32 Y = -14000; Y <= 14000; Y += 2000)
+			for (int32 Y = -28000; Y <= 28000; Y += 2000)
 			{
 				double Height = 0.0;
 				if (GroundAt(FVector(X, Y, 0.0), Height))
@@ -1305,7 +1306,10 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 			}
 		}
 		Context.Test->AddInfo(FString::Printf(TEXT("The ground lies between %.1f m and %.1f m"), Lowest / CentimetersPerMeter, Highest / CentimetersPerMeter));
-		Context.Test->TestTrue(TEXT("The ground is not flat everywhere"), Highest - Lowest > 500.0);
+		Context.Test->TestTrue(TEXT("The sea lies below the island"), Lowest < -300.0);
+		Context.Test->TestTrue(TEXT("The mountains rise above the island"), Highest > 1500.0);
+		double SeaCornerHeight = 0.0;
+		Context.Test->TestTrue(TEXT("The outer corner lies in the sea"), GroundAt(FVector(28000.0, 28000.0, 0.0), SeaCornerHeight) && SeaCornerHeight < -300.0);
 
 		TArray<TPair<FString, FVector>> Places;
 		const TArray<FEIArrivalPoint>& Arrivals = GetGameMode(Context)->GetRun()->GetArrivals();

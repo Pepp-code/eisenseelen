@@ -504,3 +504,18 @@ In `Source/Eisenseelen/Private/Tests/EIRunTest.cpp` erweitern wir `Eisenseelen.P
    - **Bestätigt: Variante A — Eingeschnittene Schlucht auf Höhe `0 m` mit Felsdach und Seitenwänden aus Bauteilen** (zuverlässigste Wegfindung für Feinde)
 5. **Was passiert mit der alten Wüstenkarte (`Aschesteppe` aus W1)?**
    - **Bestätigt: Alte Wüstendaten komplett löschen und `Data/gelaende.json` sowie `Data/laufkarte.json` ab K2/K3 direkt überschreiben**
+
+---
+
+## 3. Umsetzungsstand der Schritte
+
+- **K0 Bestandsaufnahme:** erledigt
+- **K1 Detailplan & Planbild:** erledigt
+- **K2 Grundform (`600 × 600 m` Insel-Landschaft, Höhenplan, geschichtetes `M_Gelaende`, `Run.Terrain`):** erledigt (58/58 Tests grün)
+- **K3 Spielorte neu verteilen:** als Nächstes
+- **K4 Wasser und Wege:** offen
+- **K5 Felsmassiv und Tunnel:** offen
+- **K6 Wald:** offen
+- **K7 Orte mit Charakter:** offen
+- **K8 Orientierung und Stimmung:** offen
+- **K9 Feinschliff & Doku:** offen
