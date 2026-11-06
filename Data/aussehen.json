@@ -378,6 +378,94 @@
 		"effekt.truhe_siegel": {
 			"modell": "",
 			"leuchtteile_behalten": false
+		},
+		"_bauteile": "Bauteile für Tunnel, Felsen, Brücken, Wald und die Orte auf Aschenwerder. Ein Modell ersetzt beim Neubau der Karte alle Kopien dieses Bauteils.",
+		"bauteil.tunnel_bogen": {
+			"modell": ""
+		},
+		"bauteil.fels_gross": {
+			"modell": ""
+		},
+		"bauteil.fels_mittel": {
+			"modell": ""
+		},
+		"bauteil.fels_mauer": {
+			"modell": ""
+		},
+		"bauteil.fackel": {
+			"modell": ""
+		},
+		"bauteil.holzbruecke": {
+			"modell": ""
+		},
+		"bauteil.steg": {
+			"modell": ""
+		},
+		"bauteil.kiefer": {
+			"modell": ""
+		},
+		"bauteil.baum_tot": {
+			"modell": ""
+		},
+		"bauteil.busch": {
+			"modell": ""
+		},
+		"bauteil.scheune": {
+			"modell": ""
+		},
+		"bauteil.huette": {
+			"modell": ""
+		},
+		"bauteil.zaun": {
+			"modell": ""
+		},
+		"bauteil.acker_furche": {
+			"modell": ""
+		},
+		"bauteil.strohballen": {
+			"modell": ""
+		},
+		"bauteil.pfahlhuette": {
+			"modell": ""
+		},
+		"bauteil.holzpfahl": {
+			"modell": ""
+		},
+		"bauteil.boot": {
+			"modell": ""
+		},
+		"bauteil.schiff_wrack": {
+			"modell": ""
+		},
+		"bauteil.leuchtturm_turm": {
+			"modell": ""
+		},
+		"bauteil.leuchtturm_feuer": {
+			"modell": ""
+		},
+		"bauteil.holzgeruest": {
+			"modell": ""
+		},
+		"bauteil.rampe_holz": {
+			"modell": ""
+		},
+		"bauteil.kran_holz": {
+			"modell": ""
+		},
+		"bauteil.steinblock": {
+			"modell": ""
+		},
+		"bauteil.palisade": {
+			"modell": ""
+		},
+		"bauteil.wachplattform": {
+			"modell": ""
+		},
+		"bauteil.zelt": {
+			"modell": ""
+		},
+		"bauteil.eisenturm": {
+			"modell": ""
 		}
 	}
 }

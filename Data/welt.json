@@ -1,3 +1,5 @@
 {
-	"sprungfeld_hoehe_m": 6.0
+	"sprungfeld_hoehe_m": 6.0,
+	"wasser_spiegel_m": -0.15,
+	"wasser_tempo_faktor": 0.85
 }

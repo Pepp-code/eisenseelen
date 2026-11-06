@@ -464,6 +464,25 @@ void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 	}
 	if (Stage == EEIBossStage::Sealed)
 	{
+		if (!State->AreContractsDone())
+		{
+			DrawLine(TEXT("Schlie\u00DF zuerst die Nebenauftr\u00E4ge ab, dann beginnt der Bannbruch"), Margin, LineY, RewardColor);
+			for (TActorIterator<AEIAnchorStone> It(GetWorld()); It; ++It)
+			{
+				if (It->IsInZone(Hero))
+				{
+					DrawLine(TEXT("Erf\u00FClle zuerst alle Nebenauftr\u00E4ge!"), CenterX - 180.0f, PromptY - 80.0f, AnchorMarkColor, 1.5f);
+				}
+			}
+			for (TActorIterator<AEISoulKettle> It(GetWorld()); It; ++It)
+			{
+				if (It->IsInZone(Hero))
+				{
+					DrawLine(TEXT("Erf\u00FClle zuerst alle Nebenauftr\u00E4ge!"), CenterX - 180.0f, PromptY - 80.0f, AnchorMarkColor, 1.5f);
+				}
+			}
+			return;
+		}
 		DrawLine(FString::Printf(TEXT("%s: %d von %d. %s"), *Values->Bannbruch.Name, State->GetBannbruchDone(), State->GetBannbruchTotal(), *Values->Bannbruch.Hint), Margin, LineY, RewardColor);
 		for (TActorIterator<AEIAnchorStone> It(GetWorld()); It; ++It)
 		{

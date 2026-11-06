@@ -1,13 +1,18 @@
 #include "EIHeroMovementComponent.h"
 
+#include "Dom/JsonObject.h"
+#include "EIDataFile.h"
 #include "EIHeroValues.h"
 #include "GameFramework/Character.h"
+#include "LandscapeProxy.h"
 
 namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
 	// Input further away than this from the flight direction means "stop", not "turn around at full speed".
 	constexpr double MaxSteerAngleDegrees = 135.0;
+	constexpr float DefaultWaterSpeedFactor = 0.85f;
+	constexpr float WaterDepthThresholdCm = -25.0f;
 }
 
 /** Sends the sprint and block wishes to the server and restores the predicted state when a move is replayed. */
@@ -102,6 +107,13 @@ void UEIHeroMovementComponent::ApplyValues(const FEIHeroValues& Values, float Sp
 	SprintSpeedCm = Values.SprintSpeedMetersPerSecond * CentimetersPerMeter * SpeedFactor;
 	BlockSpeedCm = Values.BlockSpeedMetersPerSecond * CentimetersPerMeter * SpeedFactor;
 	AirTurnDegreesPerSecond = Values.AirTurnDegreesPerSecond;
+	WaterSpeedFactor = DefaultWaterSpeedFactor;
+	FString WorldError;
+	const TSharedPtr<FJsonObject> WorldRoot = FEIDataFile::Load(TEXT("welt.json"), WorldError);
+	if (WorldRoot.IsValid() && WorldRoot->HasField(TEXT("wasser_tempo_faktor")))
+	{
+		FEIDataFile::ReadNumber(*WorldRoot, TEXT("wasser_tempo_faktor"), 0.1, 1.0, WaterSpeedFactor, WorldError);
+	}
 }
 
 void UEIHeroMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
@@ -111,17 +123,23 @@ void UEIHeroMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSec
 	BlockHeldSeconds = bWantsToBlock ? BlockHeldSeconds + DeltaSeconds : 0.0f;
 }
 
+bool UEIHeroMovementComponent::IsInShallowWater() const
+{
+	return IsMovingOnGround() && GetActorFeetLocation().Z < WaterDepthThresholdCm;
+}
+
 float UEIHeroMovementComponent::GetMaxSpeed() const
 {
 	if (!IsMovingOnGround() && !IsFalling())
 	{
 		return Super::GetMaxSpeed();
 	}
+	const float Factor = IsInShallowWater() ? WaterSpeedFactor : 1.0f;
 	if (bWantsToBlock)
 	{
-		return BlockSpeedCm;
+		return BlockSpeedCm * Factor;
 	}
-	return bWantsToSprint ? SprintSpeedCm : Super::GetMaxSpeed();
+	return (bWantsToSprint ? SprintSpeedCm : Super::GetMaxSpeed()) * Factor;
 }
 
 bool UEIHeroMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)

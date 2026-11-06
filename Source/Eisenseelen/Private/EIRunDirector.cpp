@@ -467,7 +467,7 @@ void UEIRunDirector::SpawnKettle(const FVector& Ground, const FEIBannbruch& Bann
 void UEIRunDirector::FeedKettle(const AEIEnemy& Enemy)
 {
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	if (Kettle == nullptr || Boss == nullptr || &Enemy == Boss.Get() || State->GetBossStage() != EEIBossStage::Sealed || !Kettle->IsInZone(&Enemy))
+	if (Kettle == nullptr || Boss == nullptr || &Enemy == Boss.Get() || State->GetBossStage() != EEIBossStage::Sealed || !State->AreContractsDone() || !Kettle->IsInZone(&Enemy))
 	{
 		return;
 	}
@@ -503,9 +503,13 @@ TArray<AEIEnemy*> UEIRunDirector::SummonGroup(const FString& Size, const FVector
 void UEIRunDirector::UpdateBannbruch(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
 {
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	if (State->GetBossStage() != EEIBossStage::Sealed || Boss == nullptr)
+	if (State->GetBossStage() != EEIBossStage::Sealed || Boss == nullptr || !State->AreContractsDone())
 	{
 		bKettleHeld = false;
+		for (AEIAnchorStone* Anchor : Anchors)
+		{
+			Anchor->UpdateHold(false, 0.0f);
+		}
 		return;
 	}
 	if (Kettle != nullptr)

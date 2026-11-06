@@ -80,6 +80,11 @@ int32 AEIGameState::CountContractsDone() const
 	return Done;
 }
 
+bool AEIGameState::AreContractsDone() const
+{
+	return CountContractsDone() >= Contracts.Num();
+}
+
 bool AEIGameState::IsContractHeld() const
 {
 	return Contracts.ContainsByPredicate([](const FEIContract& Contract) { return Contract.bHeld; });

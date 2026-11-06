@@ -15,6 +15,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "LandscapeProxy.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
@@ -181,7 +182,7 @@ void AEIProjectile::HitTarget(AActor* Target)
 
 void AEIProjectile::HandleStop(const FHitResult& Hit)
 {
-	Burst(Hit.ImpactPoint);
+	Burst(Hit.ImpactPoint + Hit.ImpactNormal * 5.0f);
 }
 
 void AEIProjectile::LifeSpanExpired()
@@ -210,6 +211,7 @@ void AEIProjectile::Burst(const FVector& Location)
 		TArray<FOverlapResult> Overlaps;
 		GetWorld()->OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, FCollisionObjectQueryParams(ECC_Pawn), FCollisionShape::MakeSphere(RadiusCm));
 		TSet<AActor*> Done;
+		const FVector TraceStart = Location + FVector(0.0f, 0.0f, 40.0f);
 		for (const FOverlapResult& Overlap : Overlaps)
 		{
 			AActor* Target = Overlap.GetActor();
@@ -219,7 +221,12 @@ void AEIProjectile::Burst(const FVector& Location)
 			}
 			Done.Add(Target);
 			FCollisionQueryParams WallQuery(SCENE_QUERY_STAT(EIBurstWall), false, Target);
-			if (!GetWorld()->LineTraceTestByObjectType(Location, Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), WallQuery))
+			WallQuery.AddIgnoredActor(this);
+			FHitResult WallHit;
+			const bool bBlockedByWall = GetWorld()->LineTraceSingleByObjectType(WallHit, TraceStart, Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), WallQuery)
+				&& Cast<ALandscapeProxy>(WallHit.GetActor()) == nullptr
+				&& FMath::Abs(WallHit.ImpactNormal.Z) <= 0.7f;
+			if (!bBlockedByWall)
 			{
 				HitTarget(Target);
 			}

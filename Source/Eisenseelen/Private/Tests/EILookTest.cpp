@@ -233,6 +233,10 @@ bool FEILookFileTest::RunTest(const FString& Parameters)
 	{
 		Required.Add(TEXT("effekt.") + Effect.ToString());
 	}
+	for (const FString& Part : FEILookTable::GetPartNames())
+	{
+		Required.Add(TEXT("bauteil.") + Part);
+	}
 	TArray<FString> Named;
 	Named.Append(ReadNames(this, TEXT("bosse.json"), TEXT("bosse"), TEXT("boss.")));
 	// Runes show as their spell, not as a thing in the hand.

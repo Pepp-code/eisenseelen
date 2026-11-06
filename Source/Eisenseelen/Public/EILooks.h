@@ -32,7 +32,7 @@ struct EISENSEELEN_API FEILookEntry
 
 /**
  * All of Data/aussehen.json. Keys: held.<class> for the body others see, hand.<class> for the own hand, gegner.<kind>,
- * boss.<name>, item.<name>, form.<weapon form>, ort.<place> and effekt.<name> for the Niagara system of a spell or a reaction.
+ * boss.<name>, item.<name>, form.<weapon form>, ort.<place>, bauteil.<part> and effekt.<name> for the Niagara system of a spell or a reaction.
  */
 struct EISENSEELEN_API FEILookTable
 {
@@ -52,6 +52,7 @@ struct EISENSEELEN_API FEILookTable
 	/** The fixed names after held. and hand., and after ort. */
 	static const TArray<FString>& GetClassNames();
 	static const TArray<FString>& GetPlaceNames();
+	static const TArray<FString>& GetPartNames();
 
 	/** Turns "SkeletalMesh'/Game/A/B.B'" or "/Game/A/B" into "/Game/A/B.B". Empty when it is no path in /Game or /Engine. */
 	static FString NormalizeObjectPath(const FString& Path);

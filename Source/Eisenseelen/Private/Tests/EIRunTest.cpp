@@ -111,9 +111,14 @@ namespace
 	/** Standing height on the terrain at this spot, for something the size of the hero. */
 	FVector OnGround(const FEIPlayContext& Context, const FVector& Where)
 	{
+		constexpr float TunnelHeightCm = 400.0f;
 		constexpr float SearchCm = 10000.0f;
 		FHitResult Hit;
-		Context.World->LineTraceSingleByObjectType(Hit, FVector(Where.X, Where.Y, SearchCm), FVector(Where.X, Where.Y, -SearchCm), FCollisionObjectQueryParams(ECC_WorldStatic));
+		const FCollisionObjectQueryParams StaticObjects(ECC_WorldStatic);
+		if (!Context.World->LineTraceSingleByObjectType(Hit, FVector(Where.X, Where.Y, Where.Z + TunnelHeightCm), FVector(Where.X, Where.Y, -SearchCm), StaticObjects))
+		{
+			Context.World->LineTraceSingleByObjectType(Hit, FVector(Where.X, Where.Y, SearchCm), FVector(Where.X, Where.Y, -SearchCm), StaticObjects);
+		}
 		return FVector(Where.X, Where.Y, (Hit.bBlockingHit ? Hit.ImpactPoint.Z : 0.0) + HeroHeight);
 	}
 
@@ -1205,9 +1210,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FEIPathfindingTest::RunTest(const FString& Parameters)
 {
-	// The northern wall of the first place on the run map: 10 m long, along X at y = 117 m.
-	const FVector HeroSpot(0.0f, 12300.0f, HeroHeight);
-	const FVector EnemySpot(0.0f, 11100.0f, HeroHeight);
+	// The first wall of the first place on the run map (at 95 m, 140 m): 10 m long, along X at y = 147 m.
+	const FVector HeroSpot(9500.0f, 15300.0f, HeroHeight);
+	const FVector EnemySpot(9500.0f, 14100.0f, HeroHeight);
 	const TSharedRef<double> StartedAt = MakeShared<double>(0.0);
 
 	const auto FindEnemy = [](const FEIPlayContext& Context) -> AEIEnemy*
@@ -1339,9 +1344,34 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 		}
 		Context.Test->TestEqual(TEXT("Every place lies flat at height 0"), NotFlat, 0);
 
-		// Everything a team has to reach can be reached on foot from where the barge sets it down.
+		// Everything a team has to reach can be reached on foot from where the barge sets it down, and no place stands in water.
 		TArray<TPair<FString, FVector>> Goals = Places;
 		for (TActorIterator<AEIChest> It(Context.World); It; ++It) { Goals.Emplace(TEXT("chest"), It->GetActorLocation()); }
+		int32 InWater = 0;
+		for (const TPair<FString, FVector>& Goal : Goals)
+		{
+			double Height = 0.0;
+			if (!GroundAt(Goal.Value, Height) || Height < -10.0)
+			{
+				Context.Test->AddError(FString::Printf(TEXT("The %s at %.0f, %.0f m stands in water (%.0f cm)"), *Goal.Key, Goal.Value.X / CentimetersPerMeter, Goal.Value.Y / CentimetersPerMeter, Height));
+				++InWater;
+			}
+		}
+		Context.Test->TestEqual(TEXT("No gameplay place or chest stands in water"), InWater, 0);
+
+		int32 BridgeDecks = 0;
+		for (TActorIterator<AStaticMeshActor> It(Context.World); It; ++It)
+		{
+			const FVector Scale = It->GetActorScale3D();
+			const UMaterialInterface* Mat = It->GetStaticMeshComponent()->GetMaterial(0);
+			if (Mat != nullptr && Mat->GetName().Contains(TEXT("M_Holz")) && Scale.X >= 10.0)
+			{
+				++BridgeDecks;
+				Goals.Emplace(TEXT("bridge"), It->GetActorLocation() + FVector(0.0, 0.0, Scale.Z * 50.0));
+			}
+		}
+		Context.Test->TestEqual(TEXT("All 9 bridges and boardwalks stand on the island"), BridgeDecks, 9);
+
 		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
 		const FVector Start = Arrivals[0].Location;
 		Goals.RemoveAt(0);
@@ -1356,8 +1386,83 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 				++Unreachable;
 			}
 		}
-		Context.Test->AddInfo(FString::Printf(TEXT("%d goals checked for a way on foot"), Goals.Num()));
-		Context.Test->TestEqual(TEXT("Every goal can be reached on foot"), Unreachable, 0);
+		Context.Test->AddInfo(FString::Printf(TEXT("%d goals (including %d bridges) checked for a way on foot"), Goals.Num(), BridgeDecks));
+		Context.Test->TestEqual(TEXT("Every goal and bridge can be reached on foot"), Unreachable, 0);
+
+		// The Y-shaped tunnel through Das Eisenjoch must be continuously walkable on foot and covered by a rock roof.
+		const FVector TunnelNorthOutside(6400.0, 6600.0, 0.0);
+		const FVector TunnelSouthOutside(-3800.0, 5800.0, 0.0);
+		const FVector TunnelWestOutside(800.0, -1200.0, 0.0);
+		const FVector TunnelHallCenter(1400.0, 5800.0, 0.0);
+		const UNavigationPath* NorthToSouth = Navigation->FindPathToLocationSynchronously(Context.World, TunnelNorthOutside, TunnelSouthOutside);
+		const bool bTunnelNS = NorthToSouth != nullptr && NorthToSouth->IsValid() && NorthToSouth->PathPoints.Num() > 0
+			&& FVector::Dist2D(NorthToSouth->PathPoints.Last(), TunnelSouthOutside) < CloseEnoughCm
+			&& NorthToSouth->GetPathLength() < 14000.0;
+		Context.Test->TestTrue(TEXT("The tunnel is continuously walkable from north to south straight through the massif"), bTunnelNS);
+
+		const UNavigationPath* WestToHall = Navigation->FindPathToLocationSynchronously(Context.World, TunnelWestOutside, TunnelHallCenter);
+		const bool bTunnelWest = WestToHall != nullptr && WestToHall->IsValid() && WestToHall->PathPoints.Num() > 0
+			&& FVector::Dist2D(WestToHall->PathPoints.Last(), TunnelHallCenter) < CloseEnoughCm
+			&& WestToHall->GetPathLength() < 9000.0;
+		Context.Test->TestTrue(TEXT("The west tunnel passage connects directly into the central cavern"), bTunnelWest);
+
+		const FCollisionObjectQueryParams StaticObjects(ECC_WorldStatic);
+		for (const FVector& Spot : { TunnelHallCenter, FVector(3600.0, 6150.0, 0.0), FVector(-700.0, 5800.0, 0.0), FVector(1100.0, 2500.0, 0.0) })
+		{
+			FHitResult RoofHit;
+			const bool bHasRoof = Context.World->LineTraceSingleByObjectType(RoofHit, Spot + FVector(0.0, 0.0, 200.0), Spot + FVector(0.0, 0.0, 3000.0), StaticObjects);
+			Context.Test->TestTrue(TEXT("The tunnel has a solid rock roof overhead"), bHasRoof && RoofHit.ImpactPoint.Z >= 550.0);
+		}
+
+		// Measure the island travel distances and times across Aschenwerder (North to South arrival) and along Arrival -> Side Job -> Boss -> Signal Fire.
+		constexpr double WalkSpeedMetersPerSec = 5.5;
+		constexpr double SprintSpeedMetersPerSec = 8.0;
+		if (Arrivals.Num() >= 3)
+		{
+			const UNavigationPath* CrossPath = Navigation->FindPathToLocationSynchronously(Context.World, Arrivals[0].Location, Arrivals[2].Location);
+			if (Context.Test->TestTrue(TEXT("A path crosses the island from north to south"), CrossPath != nullptr && CrossPath->IsValid()))
+			{
+				const double CrossMeters = CrossPath->GetPathLength() / CentimetersPerMeter;
+				const double WalkMinutes = (CrossMeters / WalkSpeedMetersPerSec) / 60.0;
+				const double SprintMinutes = (CrossMeters / SprintSpeedMetersPerSec) / 60.0;
+				Context.Test->AddInfo(FString::Printf(TEXT("Island crossing (North -> South): %.0f m path (%.1f min walking, %.1f min sprinting)"), CrossMeters, WalkMinutes, SprintMinutes));
+				Context.Test->TestTrue(TEXT("Crossing the island takes a substantial walk"), CrossMeters >= 380.0);
+			}
+		}
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		if (Arrivals.Num() >= 1 && Run->GetActiveFire() != nullptr)
+		{
+			const FVector BossSpot = Run->GetBossPlace();
+			const FVector FireSpot = Run->GetActiveFire()->GetActorLocation();
+			const UNavigationPath* ToBoss = Navigation->FindPathToLocationSynchronously(Context.World, Arrivals[0].Location, BossSpot);
+			const UNavigationPath* ToFire = Navigation->FindPathToLocationSynchronously(Context.World, BossSpot, FireSpot);
+			if (ToBoss != nullptr && ToBoss->IsValid() && ToFire != nullptr && ToFire->IsValid())
+			{
+				const double RouteMeters = (ToBoss->GetPathLength() + ToFire->GetPathLength()) / CentimetersPerMeter;
+				Context.Test->AddInfo(FString::Printf(TEXT("Direct route Arrival -> Boss -> Fire: %.0f m (%.1f min walking)"), RouteMeters, (RouteMeters / WalkSpeedMetersPerSec) / 60.0));
+			}
+		}
+		Teleport(Context, OnGround(Context, FVector(2000.0f, -14500.0f, 0.0f)), 0.0f);
+	}));
+	Steps.Add(Wait(0.15));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("The hero stands on the wooden bridge over the stream"), Context.Movement->IsMovingOnGround() && Context.Hero->GetActorLocation().Z > HeroHeight);
+		Context.Test->TestFalse(TEXT("On a bridge the hero does not wade in water"), Context.Movement->IsInShallowWater());
+		Context.Test->TestNearlyEqual(TEXT("On a bridge the hero walks at full speed"), Context.Movement->GetMaxSpeed(), 550.0f, 1.0f);
+		Teleport(Context, OnGround(Context, FVector(-12000.0f, 16500.0f, 0.0f)), 0.0f);
+	}));
+	Steps.Add(Wait(0.15));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("In the swamp pond the hero wades in shallow water"), Context.Movement->IsInShallowWater());
+		Context.Test->TestNearlyEqual(TEXT("Shallow water slows the hero to 85 percent"), Context.Movement->GetMaxSpeed(), 550.0f * 0.85f, 1.0f);
+		Teleport(Context, OnGround(Context, FVector(1400.0f, 5800.0f, 0.0f)), 0.0f);
+	}));
+	Steps.Add(Wait(0.15));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("Inside the tunnel cavern the hero stands on flat dry ground"), Context.Movement->IsMovingOnGround() && !Context.Movement->IsInShallowWater() && FMath::Abs(Context.Hero->GetActorLocation().Z - HeroHeight) < 35.0f);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

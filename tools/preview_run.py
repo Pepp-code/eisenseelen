@@ -274,6 +274,7 @@ def scenario():
         yield AFTER_SHOT_SECONDS
 
     # The boss: bound from afar, at its Bannbruch, free, at its moves, and fallen.
+    player().preview_skip_contracts(3)
     boss = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIBoss)[0]
     spot = boss.get_actor_location()
     if boss.sleeps_in_grave():
