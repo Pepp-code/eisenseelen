@@ -12,7 +12,8 @@
 namespace
 {
 	constexpr float CentimetersPerMeter = 100.0f;
-	// Above the highest hill and below the deepest riverbed of the terrain.
+	// Above the highest hill and below the deepest riverbed of the terrain; inside a tunnel, start below the 6 m roof first.
+	constexpr float TunnelTraceHeightCm = 400.0f;
 	constexpr float TraceStartHeightCm = 10000.0f;
 	constexpr float TraceDepthCm = 5000.0f;
 	constexpr float StandHeightCm = 92.0f;
@@ -123,9 +124,12 @@ void UEIHordeDirector::RemoveAllEnemies()
 bool UEIHordeDirector::FindStandingPlace(const FVector& Ground, FVector& OutLocation) const
 {
 	FHitResult Floor;
-	const FVector TraceStart = Ground + FVector(0.0f, 0.0f, TraceStartHeightCm);
+	const FVector LowStart = Ground + FVector(0.0f, 0.0f, TunnelTraceHeightCm);
+	const FVector HighStart = Ground + FVector(0.0f, 0.0f, TraceStartHeightCm);
 	const FVector TraceEnd = Ground - FVector(0.0f, 0.0f, TraceDepthCm);
-	if (!GetWorld()->LineTraceSingleByObjectType(Floor, TraceStart, TraceEnd, FCollisionObjectQueryParams(ECC_WorldStatic)))
+	const FCollisionObjectQueryParams StaticObjects(ECC_WorldStatic);
+	if (!GetWorld()->LineTraceSingleByObjectType(Floor, LowStart, TraceEnd, StaticObjects)
+		&& !GetWorld()->LineTraceSingleByObjectType(Floor, HighStart, TraceEnd, StaticObjects))
 	{
 		return false;
 	}

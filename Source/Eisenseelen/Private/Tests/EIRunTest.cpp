@@ -111,9 +111,14 @@ namespace
 	/** Standing height on the terrain at this spot, for something the size of the hero. */
 	FVector OnGround(const FEIPlayContext& Context, const FVector& Where)
 	{
+		constexpr float TunnelHeightCm = 400.0f;
 		constexpr float SearchCm = 10000.0f;
 		FHitResult Hit;
-		Context.World->LineTraceSingleByObjectType(Hit, FVector(Where.X, Where.Y, SearchCm), FVector(Where.X, Where.Y, -SearchCm), FCollisionObjectQueryParams(ECC_WorldStatic));
+		const FCollisionObjectQueryParams StaticObjects(ECC_WorldStatic);
+		if (!Context.World->LineTraceSingleByObjectType(Hit, FVector(Where.X, Where.Y, Where.Z + TunnelHeightCm), FVector(Where.X, Where.Y, -SearchCm), StaticObjects))
+		{
+			Context.World->LineTraceSingleByObjectType(Hit, FVector(Where.X, Where.Y, SearchCm), FVector(Where.X, Where.Y, -SearchCm), StaticObjects);
+		}
 		return FVector(Where.X, Where.Y, (Hit.bBlockingHit ? Hit.ImpactPoint.Z : 0.0) + HeroHeight);
 	}
 
@@ -1384,6 +1389,31 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 		Context.Test->AddInfo(FString::Printf(TEXT("%d goals (including %d bridges) checked for a way on foot"), Goals.Num(), BridgeDecks));
 		Context.Test->TestEqual(TEXT("Every goal and bridge can be reached on foot"), Unreachable, 0);
 
+		// The Y-shaped tunnel through Das Eisenjoch must be continuously walkable on foot and covered by a rock roof.
+		const FVector TunnelNorthOutside(6400.0, 6600.0, 0.0);
+		const FVector TunnelSouthOutside(-3800.0, 5800.0, 0.0);
+		const FVector TunnelWestOutside(800.0, -1200.0, 0.0);
+		const FVector TunnelHallCenter(1400.0, 5800.0, 0.0);
+		const UNavigationPath* NorthToSouth = Navigation->FindPathToLocationSynchronously(Context.World, TunnelNorthOutside, TunnelSouthOutside);
+		const bool bTunnelNS = NorthToSouth != nullptr && NorthToSouth->IsValid() && NorthToSouth->PathPoints.Num() > 0
+			&& FVector::Dist2D(NorthToSouth->PathPoints.Last(), TunnelSouthOutside) < CloseEnoughCm
+			&& NorthToSouth->GetPathLength() < 14000.0;
+		Context.Test->TestTrue(TEXT("The tunnel is continuously walkable from north to south straight through the massif"), bTunnelNS);
+
+		const UNavigationPath* WestToHall = Navigation->FindPathToLocationSynchronously(Context.World, TunnelWestOutside, TunnelHallCenter);
+		const bool bTunnelWest = WestToHall != nullptr && WestToHall->IsValid() && WestToHall->PathPoints.Num() > 0
+			&& FVector::Dist2D(WestToHall->PathPoints.Last(), TunnelHallCenter) < CloseEnoughCm
+			&& WestToHall->GetPathLength() < 9000.0;
+		Context.Test->TestTrue(TEXT("The west tunnel passage connects directly into the central cavern"), bTunnelWest);
+
+		const FCollisionObjectQueryParams StaticObjects(ECC_WorldStatic);
+		for (const FVector& Spot : { TunnelHallCenter, FVector(3600.0, 6150.0, 0.0), FVector(-700.0, 5800.0, 0.0), FVector(1100.0, 2500.0, 0.0) })
+		{
+			FHitResult RoofHit;
+			const bool bHasRoof = Context.World->LineTraceSingleByObjectType(RoofHit, Spot + FVector(0.0, 0.0, 200.0), Spot + FVector(0.0, 0.0, 3000.0), StaticObjects);
+			Context.Test->TestTrue(TEXT("The tunnel has a solid rock roof overhead"), bHasRoof && RoofHit.ImpactPoint.Z >= 550.0);
+		}
+
 		// Measure the island travel distances and times across Aschenwerder (North to South arrival) and along Arrival -> Side Job -> Boss -> Signal Fire.
 		constexpr double WalkSpeedMetersPerSec = 5.5;
 		constexpr double SprintSpeedMetersPerSec = 8.0;
@@ -1427,6 +1457,12 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 	{
 		Context.Test->TestTrue(TEXT("In the swamp pond the hero wades in shallow water"), Context.Movement->IsInShallowWater());
 		Context.Test->TestNearlyEqual(TEXT("Shallow water slows the hero to 85 percent"), Context.Movement->GetMaxSpeed(), 550.0f * 0.85f, 1.0f);
+		Teleport(Context, OnGround(Context, FVector(1400.0f, 5800.0f, 0.0f)), 0.0f);
+	}));
+	Steps.Add(Wait(0.15));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("Inside the tunnel cavern the hero stands on flat dry ground"), Context.Movement->IsMovingOnGround() && !Context.Movement->IsInShallowWater() && FMath::Abs(Context.Hero->GetActorLocation().Z - HeroHeight) < 35.0f);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

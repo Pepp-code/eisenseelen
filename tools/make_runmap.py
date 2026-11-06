@@ -20,6 +20,8 @@ MATERIAL_PATH = "/Game/Materials/M_Schachbrett"
 TERRAIN_MATERIAL_PATH = "/Game/Materials/M_Gelaende"
 WATER_MATERIAL_PATH = "/Game/Materials/M_Wasser"
 WOOD_MATERIAL_PATH = "/Game/Materials/M_Holz"
+ROCK_MATERIAL_PATH = "/Game/Materials/M_Fels"
+GLOW_MATERIAL_PATH = "/Game/Materials/M_Glut"
 CUBE_MESH = "/Engine/BasicShapes/Cube.Cube"
 
 CM_PER_M = 100
@@ -80,8 +82,8 @@ def ground_m(x, y):
 
 
 def is_open_ground(x, y):
-    """Level enough, off the roads, and on the dry island plain, so a block or chest belongs there."""
-    if not terrain.is_dry_land(x, y) or terrain.road_weight(x, y) > 0.05:
+    """Level enough, off the roads and tunnel, and on the dry island plain, so a block or chest belongs there."""
+    if not terrain.is_dry_land(x, y) or terrain.road_weight(x, y) > 0.05 or terrain.tunnel_cut_weight(x, y) > 0.05:
         return False
     height = ground_m(x, y)
     step = 1.0
@@ -119,6 +121,35 @@ def add_box(actors, label, center_m, size_m, rotation=(0, 0, 0), material_path=M
     box.static_mesh_component.set_material(0, unreal.load_asset(material_path))
     box.set_actor_scale3d(unreal.Vector(*size_m))
     return box
+
+
+def load_looks():
+    path = os.path.join(unreal.Paths.project_dir(), "Data", "aussehen.json")
+    with open(path, encoding="utf-8") as file:
+        return json.load(file).get("aussehen", {})
+
+
+LOOKS = load_looks()
+
+
+def add_part(actors, part_key, label, center_m, size_m, rotation=(0, 0, 0), material_path=MATERIAL_PATH):
+    """Spawns a building block that replaces itself with the 3D model from Data/aussehen.json once a path is entered."""
+    entry = LOOKS.get(part_key, {})
+    model_path = entry.get("modell", "").strip() if isinstance(entry, dict) else ""
+    if model_path:
+        asset = unreal.load_asset(model_path)
+        if asset is not None:
+            offset_cm = entry.get("versatz_cm", [0, 0, 0])
+            rot_deg = entry.get("drehung_grad", [0, 0, 0])
+            scale_val = entry.get("skalierung", 1.0)
+            scale = [scale_val, scale_val, scale_val] if isinstance(scale_val, (int, float)) else list(scale_val)
+            loc = [center_m[i] * CM_PER_M + offset_cm[i] for i in range(3)]
+            rot = (rotation[0] + rot_deg[0], rotation[1] + rot_deg[1], rotation[2] + rot_deg[2])
+            actor = spawn(actors, unreal.StaticMeshActor, location=loc, rotation=rot, label=label)
+            actor.static_mesh_component.set_static_mesh(asset)
+            actor.set_actor_scale3d(unreal.Vector(*scale))
+            return actor
+    return add_box(actors, label, center_m, size_m, rotation=rotation, material_path=material_path)
 
 
 def add_walls(actors, label, center, length, width, floor_z, height, thickness, blocker_height):
@@ -190,8 +221,10 @@ def add_bridges(actors):
         x, y = bridge["x_m"], bridge["y_m"]
         length, width = bridge["laenge_m"], bridge["breite_m"]
         yaw_deg = bridge["drehung_grad"]
-        add_box(
+        part_key = "bauteil.steg" if bridge["name"].startswith("Steg") else "bauteil.holzbruecke"
+        add_part(
             actors,
+            part_key,
             f"Bruecke {index + 1}",
             (x, y, deck_center_z),
             (length, width, BRIDGE_THICKNESS_M),
@@ -213,6 +246,195 @@ def add_bridges(actors):
                     rotation=(0, 0, yaw_deg),
                     material_path=WOOD_MATERIAL_PATH,
                 )
+
+
+def add_torch(actors, base_m, light_z_m=4.2, light_xy=None):
+    """A stone brazier with glowing embers and a warm point light for the tunnel."""
+    bx, by, bz = base_m
+    stand = add_part(actors, "bauteil.fackel", "Fackel", (bx, by, bz + 0.7), (0.45, 0.45, 1.4), material_path=ROCK_MATERIAL_PATH)
+    stand.set_actor_enable_collision(False)
+    stand.static_mesh_component.set_collision_profile_name("NoCollision")
+    stand.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    ember = add_box(actors, "Fackelglut", (bx, by, bz + 1.55), (0.4, 0.4, 0.35), material_path=GLOW_MATERIAL_PATH)
+    ember.set_actor_enable_collision(False)
+    ember.static_mesh_component.set_collision_profile_name("NoCollision")
+    ember.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    lx, ly = light_xy if light_xy is not None else (bx, by)
+    light = spawn(actors, unreal.PointLight, location=(lx * CM_PER_M, ly * CM_PER_M, light_z_m * CM_PER_M), label="Tunnellicht")
+    light.point_light_component.set_light_color(unreal.LinearColor(1.0, 0.62, 0.25, 1.0))
+    light.point_light_component.set_intensity(6000.0)
+    light.point_light_component.set_attenuation_radius(2200.0)
+
+
+def add_tunnel(actors):
+    """The Y-shaped tunnel through Das Eisenjoch with a central cavern, rock roof, side walls, portal arches, and torches."""
+    tun = terrain.design.get("tunnel")
+    if not tun:
+        return
+    hm = tun["halle_mitte"]
+    hx, hy = hm["x_m"], hm["y_m"]
+    hall_ceil = hm.get("decke_hoehe_m", 9.0)
+    pass_ceil = tun.get("gang_hoehe_m", 6.0)
+    roof_thick = tun.get("dach_dicke_m", 12.0)
+
+    # Central cavern roof and upper peak cap
+    add_part(
+        actors,
+        "bauteil.tunnel_bogen",
+        "Tunnelhalle Dach",
+        (hx, hy, hall_ceil + roof_thick * 0.5),
+        (30.0, 30.0, roof_thick),
+        material_path=ROCK_MATERIAL_PATH,
+    )
+    add_part(
+        actors,
+        "bauteil.fels_gross",
+        "Tunnelhalle Kuppe",
+        (hx, hy, hall_ceil + roof_thick + 2.0),
+        (20.0, 20.0, 4.0),
+        rotation=(0, 0, 18),
+        material_path=ROCK_MATERIAL_PATH,
+    )
+
+    # Cavern walls closing the sectors between the three tunnel passages
+    for ang_deg in (85.0, 213.0, 317.0):
+        ang = math.radians(ang_deg)
+        wx = hx + 13.5 * math.cos(ang)
+        wy = hy + 13.5 * math.sin(ang)
+        add_part(
+            actors,
+            "bauteil.tunnel_bogen",
+            "Tunnelhalle Wand",
+            (wx, wy, 4.5),
+            (3.0, 12.0, 10.0),
+            rotation=(0, 0, ang_deg),
+            material_path=ROCK_MATERIAL_PATH,
+        )
+
+    # Four support pillars and braziers inside the central cavern around the bandit camp
+    for ang_deg in tun.get("pfeiler_winkel_grad", [35, 125, 215, 315]):
+        ang = math.radians(ang_deg)
+        px = hx + 8.5 * math.cos(ang)
+        py = hy + 8.5 * math.sin(ang)
+        add_part(
+            actors,
+            "bauteil.fels_mittel",
+            "Tunnelpfeiler",
+            (px, py, 4.5),
+            (2.2, 2.2, 9.5),
+            rotation=(0, 0, ang_deg),
+            material_path=ROCK_MATERIAL_PATH,
+        )
+        tx = hx + 6.8 * math.cos(ang)
+        ty = hy + 6.8 * math.sin(ang)
+        add_torch(actors, (tx, ty, 0.0), light_z_m=5.2, light_xy=(hx + 5.0 * math.cos(ang), hy + 5.0 * math.sin(ang)))
+
+    # Three tunnel passages (North, South, West) with roof slabs, side walls, and stone entrance portals
+    for key in ("eingang_nord", "eingang_sued", "eingang_west"):
+        ep = tun[key]
+        ex, ey = ep["x_m"], ep["y_m"]
+        dx, dy = ex - hx, ey - hy
+        length = math.hypot(dx, dy)
+        yaw_deg = math.degrees(math.atan2(dy, dx))
+        ux, uy = dx / length, dy / length
+        nx, ny = -uy, ux
+
+        d_roof_0, d_roof_1 = 11.0, length - 1.0
+        roof_len = d_roof_1 - d_roof_0
+        d_roof_mid = (d_roof_0 + d_roof_1) * 0.5
+        rx, ry = hx + ux * d_roof_mid, hy + uy * d_roof_mid
+        add_part(
+            actors,
+            "bauteil.tunnel_bogen",
+            f"Tunneldach {key}",
+            (rx, ry, pass_ceil + roof_thick * 0.5),
+            (roof_len, 14.0, roof_thick),
+            rotation=(0, 0, yaw_deg),
+            material_path=ROCK_MATERIAL_PATH,
+        )
+
+        d_wall_0, d_wall_1 = 12.5, length - 2.0
+        wall_len = d_wall_1 - d_wall_0
+        d_wall_mid = (d_wall_0 + d_wall_1) * 0.5
+        for side in (-1.0, 1.0):
+            wx = hx + ux * d_wall_mid + nx * (side * 5.5)
+            wy = hy + uy * d_wall_mid + ny * (side * 5.5)
+            add_part(
+                actors,
+                "bauteil.tunnel_bogen",
+                f"Tunnelwand {key}",
+                (wx, wy, 3.0),
+                (wall_len, 3.0, 7.0),
+                rotation=(0, 0, yaw_deg),
+                material_path=ROCK_MATERIAL_PATH,
+            )
+
+        px_base = hx + ux * (length - 1.0)
+        py_base = hy + uy * (length - 1.0)
+        for side in (-1.0, 1.0):
+            ppx = px_base + nx * (side * 5.6)
+            ppy = py_base + ny * (side * 5.6)
+            add_part(
+                actors,
+                "bauteil.tunnel_bogen",
+                f"Tunnelportal Pfeiler {key}",
+                (ppx, ppy, 3.25),
+                (3.2, 3.2, 7.5),
+                rotation=(0, 0, yaw_deg),
+                material_path=ROCK_MATERIAL_PATH,
+            )
+        add_part(
+            actors,
+            "bauteil.tunnel_bogen",
+            f"Tunnelportal Bogen {key}",
+            (px_base, py_base, 7.25),
+            (3.6, 14.4, 2.5),
+            rotation=(0, 0, yaw_deg),
+            material_path=ROCK_MATERIAL_PATH,
+        )
+
+        mx = hx + ux * (length * 0.55)
+        my = hy + uy * (length * 0.55)
+        add_torch(actors, (mx + nx * 3.7, my + ny * 3.7, 0.0), light_z_m=4.2, light_xy=(mx, my))
+
+
+def add_rocks(actors):
+    """Rock cliffs, coastal crags, and low stone walls along the island paths."""
+    felsen = terrain.design.get("felsen", {})
+    rock_points = []
+    for index, cliff in enumerate(felsen.get("klippen", [])):
+        x, y = cliff["x_m"], cliff["y_m"]
+        sx, sy, sz = cliff["groesse_m"]
+        yaw_deg = cliff.get("drehung_grad", 0.0)
+        part_key = cliff.get("bauteil", "bauteil.fels_gross")
+        bottom = ground_m(x, y) - 1.5
+        add_part(
+            actors,
+            part_key,
+            f"Klippe {index + 1}",
+            (x, y, bottom + (sz + 1.5) * 0.5),
+            (sx, sy, sz + 1.5),
+            rotation=(0, 0, yaw_deg),
+            material_path=ROCK_MATERIAL_PATH,
+        )
+        rock_points.append((x, y))
+
+    for index, wall in enumerate(felsen.get("felsmauern", [])):
+        x, y = wall["x_m"], wall["y_m"]
+        length, width, height = wall["laenge_m"], wall["breite_m"], wall["hoehe_m"]
+        yaw_deg = wall.get("drehung_grad", 0.0)
+        bottom = ground_m(x, y) - COVER_SINK_M
+        add_part(
+            actors,
+            "bauteil.fels_mauer",
+            f"Felsmauer {index + 1}",
+            (x, y, bottom + (height + COVER_SINK_M) * 0.5),
+            (length, width, height + COVER_SINK_M),
+            rotation=(0, 0, yaw_deg),
+            material_path=ROCK_MATERIAL_PATH,
+        )
+        rock_points.append((x, y))
+    return rock_points
 
 
 def add_dock(actors, dock):
@@ -242,12 +464,13 @@ def add_place(actors, place, index):
         add_box(actors, f"Ort {index + 1}", (center_x, center_y, floor_z + PLACE_WALL_HEIGHT_M / 2), size, rotation=(0, 0, math.degrees(yaw) + wall_yaw))
 
 
-def add_cover(actors, layout):
+def add_cover(actors, layout, extra_taken=()):
     """Loose blocks that give cover and break the view. They keep clear of the places, the fires and the middle of the map."""
     rng = random.Random(layout["deckung_zufall"])
     half = layout["boden_m"] / 2 - COVER_CLEAR_M
     taken = [(p["x_m"], p["y_m"]) for p in layout["orte"] + layout["signalfeuer"] + layout["ankunft"] + layout["sprungfelder"]]
     taken += [(b["x_m"], b["y_m"]) for b in terrain.design.get("bruecken", [])]
+    taken += list(extra_taken)
     taken.append((0, 0))
     bosses = [(p["x_m"], p["y_m"]) for p in layout["bossplaetze"]]
     placed = 0
@@ -339,12 +562,14 @@ def main():
     add_terrain()
     add_water(actors, floor_size)
     add_bridges(actors)
+    add_tunnel(actors)
+    rock_points = add_rocks(actors)
     add_sea_border(actors, floor_size)
     altar_class = unreal.load_class(None, "/Script/Eisenseelen.EIAltar")
     for index, place in enumerate(layout["orte"]):
         add_place(actors, place, index)
         spawn(actors, altar_class, location=on_ground(place["x_m"], place["y_m"]), label="Altar")
-    taken = add_cover(actors, layout)
+    taken = add_cover(actors, layout, rock_points)
     add_camps(actors, layout)
     add_chests(actors, layout, taken)
     add_launch_pads(actors, layout["sprungfelder"])

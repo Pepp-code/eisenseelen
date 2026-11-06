@@ -52,6 +52,7 @@ struct EISENSEELEN_API FEILookTable
 	/** The fixed names after held. and hand., and after ort. */
 	static const TArray<FString>& GetClassNames();
 	static const TArray<FString>& GetPlaceNames();
+	static const TArray<FString>& GetPartNames();
 
 	/** Turns "SkeletalMesh'/Game/A/B.B'" or "/Game/A/B" into "/Game/A/B.B". Empty when it is no path in /Game or /Engine. */
 	static FString NormalizeObjectPath(const FString& Path);

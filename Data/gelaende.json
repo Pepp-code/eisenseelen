@@ -248,11 +248,52 @@
 	],
 	"tunnel": {
 		"eingang_nord": { "x_m": 58, "y_m": 65, "hoehe_m": 0.0 },
-		"eingang_sued": { "x_m": -28, "y_m": 72, "hoehe_m": 0.0 },
+		"eingang_sued": { "x_m": -28, "y_m": 58, "hoehe_m": 0.0 },
 		"eingang_west": { "x_m": 8, "y_m": -8, "hoehe_m": 0.0 },
 		"halle_mitte": { "x_m": 14, "y_m": 58, "radius_m": 12, "hoehe_m": 0.0, "decke_hoehe_m": 9.0 },
 		"gang_breite_m": 10.0,
-		"gang_hoehe_m": 6.0
+		"gang_hoehe_m": 6.0,
+		"dach_dicke_m": 12.0,
+		"pfeiler_winkel_grad": [35, 125, 215, 315]
+	},
+	"felsen": {
+		"klippen": [
+			{ "name": "Eisenjoch-Nordwand-West", "x_m": 38, "y_m": 32, "groesse_m": [16, 12, 18], "drehung_grad": 15, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Eisenjoch-Nordwand-Ost", "x_m": 44, "y_m": 92, "groesse_m": [18, 12, 17], "drehung_grad": -12, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Eisenjoch-Südwand-West", "x_m": -12, "y_m": 32, "groesse_m": [15, 11, 16], "drehung_grad": 22, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Eisenjoch-Südwand-Ost", "x_m": -8, "y_m": 102, "groesse_m": [18, 13, 18], "drehung_grad": -18, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Eisenjoch-Ostspitze", "x_m": 22, "y_m": 118, "groesse_m": [16, 14, 19], "drehung_grad": 35, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Wächterkuppe-Nordklippe", "x_m": -2, "y_m": -112, "groesse_m": [14, 10, 15], "drehung_grad": 10, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Wächterkuppe-Westklippe", "x_m": -28, "y_m": -136, "groesse_m": [15, 11, 16], "drehung_grad": 80, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Wächterkuppe-Südwestgrat", "x_m": -48, "y_m": -118, "groesse_m": [13, 10, 14], "drehung_grad": 40, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Klippenkap-Hauptfels", "x_m": 142, "y_m": -228, "groesse_m": [22, 16, 22], "drehung_grad": 65, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Klippenkap-Nordzahn", "x_m": 168, "y_m": -212, "groesse_m": [16, 12, 18], "drehung_grad": 45, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Klippenkap-Südzahn", "x_m": 112, "y_m": -232, "groesse_m": [16, 12, 17], "drehung_grad": 80, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Schluchtring-Nordfels", "x_m": 94, "y_m": -132, "groesse_m": [14, 8, 12], "drehung_grad": 5, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Schluchtring-Ostfels", "x_m": 66, "y_m": -104, "groesse_m": [8, 14, 12], "drehung_grad": 10, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Schluchtring-Südfels", "x_m": 36, "y_m": -138, "groesse_m": [14, 8, 12], "drehung_grad": -10, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Schluchtring-Westfels", "x_m": 62, "y_m": -166, "groesse_m": [8, 14, 12], "drehung_grad": -5, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Ostgrat-Nordklippe", "x_m": 34, "y_m": 216, "groesse_m": [16, 12, 15], "drehung_grad": -20, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Ostklamm-Südfels", "x_m": -32, "y_m": 225, "groesse_m": [14, 10, 11], "drehung_grad": 25, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Steinbruch-Nordwand", "x_m": 132, "y_m": 102, "groesse_m": [14, 6, 6], "drehung_grad": 0, "bauteil": "bauteil.steinblock" },
+			{ "name": "Steinbruch-Westwand", "x_m": 112, "y_m": 76, "groesse_m": [6, 14, 6], "drehung_grad": 0, "bauteil": "bauteil.steinblock" },
+			{ "name": "Schäre Nordost", "x_m": 212, "y_m": 135, "groesse_m": [10, 8, 7], "drehung_grad": 30, "bauteil": "bauteil.fels_mittel" },
+			{ "name": "Schäre Nordwest", "x_m": 185, "y_m": -185, "groesse_m": [11, 9, 8], "drehung_grad": -40, "bauteil": "bauteil.fels_mittel" },
+			{ "name": "Schäre Wrackstrand", "x_m": -42, "y_m": -232, "groesse_m": [9, 7, 6], "drehung_grad": 15, "bauteil": "bauteil.fels_mittel" },
+			{ "name": "Leuchtturm-Klippe", "x_m": -218, "y_m": -148, "groesse_m": [12, 10, 8], "drehung_grad": 50, "bauteil": "bauteil.fels_gross" },
+			{ "name": "Moorplatte Ost", "x_m": -142, "y_m": 186, "groesse_m": [14, 9, 1.8], "drehung_grad": -35, "bauteil": "bauteil.fels_mittel" },
+			{ "name": "Moorplatte Süd", "x_m": -176, "y_m": 148, "groesse_m": [12, 8, 1.6], "drehung_grad": -50, "bauteil": "bauteil.fels_mittel" }
+		],
+		"felsmauern": [
+			{ "name": "Felsmauer Forst-Nord", "x_m": 96, "y_m": -12, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": 12 },
+			{ "name": "Felsmauer Forst-West", "x_m": 58, "y_m": -78, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": 75 },
+			{ "name": "Felsmauer Wrackweg-Nord", "x_m": -32, "y_m": -208, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": 85 },
+			{ "name": "Felsmauer Wrackweg-Süd", "x_m": -72, "y_m": -148, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": 60 },
+			{ "name": "Felsmauer Südwald-Ost", "x_m": -82, "y_m": -18, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": -20 },
+			{ "name": "Felsmauer Osthang-Nord", "x_m": 5, "y_m": 198, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 2.0, "drehung_grad": 80 },
+			{ "name": "Felsmauer Hof-Süd", "x_m": 162, "y_m": 5, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 1.8, "drehung_grad": 0 },
+			{ "name": "Felsmauer Moor-Nord", "x_m": -55, "y_m": 112, "laenge_m": 16, "breite_m": 2.0, "hoehe_m": 1.8, "drehung_grad": 35 }
+		]
 	},
 	"wege": {
 		"hauptweg_breite_m": 7.0,
@@ -280,22 +321,22 @@
 			{
 				"name": "Nord-Speiche",
 				"breite_m": 6.0,
-				"punkte": [[235, -55], [180, -45], [135, -35], [80, -25], [25, -55]]
+				"punkte": [[235, -55], [180, -45], [135, -35], [75, -55], [25, -55]]
 			},
 			{
 				"name": "Nordost-Speiche",
 				"breite_m": 6.0,
-				"punkte": [[185, 95], [140, 65], [140, 20]]
+				"punkte": [[185, 95], [175, 20], [125, 20]]
 			},
 			{
 				"name": "Ost-Speiche",
-				"breite_m": 5.5,
-				"punkte": [[55, 185], [60, 145], [60, 115]]
+				"breite_m": 6.0,
+				"punkte": [[60, 115], [55, 185], [22, 160], [-30, 160]]
 			},
 			{
 				"name": "Süd-Speiche",
 				"breite_m": 6.0,
-				"punkte": [[-188, -32], [-145, -38], [-105, -55], [-55, -25], [-35, 62]]
+				"punkte": [[-188, -32], [-145, -38], [-105, -55], [-55, -25], [-42, 58]]
 			},
 			{
 				"name": "West-Speiche",
@@ -310,7 +351,7 @@
 			{
 				"name": "Tunnel-Durchgang",
 				"breite_m": 8.0,
-				"punkte": [[75, 65], [58, 65], [14, 58], [-28, 72], [-35, 62]]
+				"punkte": [[75, 65], [58, 65], [14, 58], [-28, 58], [-42, 58]]
 			},
 			{
 				"name": "Tunnel-Weststollen",

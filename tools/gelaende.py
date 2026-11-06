@@ -370,6 +370,28 @@ def draw_preview(path):
         p0 = to_pixel(b["x_m"] - hl * math.cos(ang), b["y_m"] - hl * math.sin(ang))
         p1 = to_pixel(b["x_m"] + hl * math.cos(ang), b["y_m"] + hl * math.sin(ang))
         draw.line([p0, p1], fill=(165, 110, 55), width=int(b["breite_m"] * scale))
+    felsen = terrain.design.get("felsen", {})
+    for kl in felsen.get("klippen", []):
+        px, py = to_pixel(kl["x_m"], kl["y_m"])
+        rx, ry = kl["groesse_m"][1] * 0.5 * scale, kl["groesse_m"][0] * 0.5 * scale
+        draw.ellipse([px - rx, py - ry, px + rx, py + ry], fill=(120, 126, 134), outline=(70, 74, 80), width=1)
+    for mw in felsen.get("felsmauern", []):
+        ang = math.radians(mw["drehung_grad"])
+        hl = mw["laenge_m"] * 0.5
+        p0 = to_pixel(mw["x_m"] - hl * math.cos(ang), mw["y_m"] - hl * math.sin(ang))
+        p1 = to_pixel(mw["x_m"] + hl * math.cos(ang), mw["y_m"] + hl * math.sin(ang))
+        draw.line([p0, p1], fill=(105, 110, 118), width=max(2, int(mw["breite_m"] * scale)))
+    tun = terrain.design.get("tunnel")
+    if tun:
+        hm = tun["halle_mitte"]
+        hx, hy = to_pixel(hm["x_m"], hm["y_m"])
+        hr = hm["radius_m"] * scale
+        draw.ellipse([hx - hr, hy - hr, hx + hr, hy + hr], outline=(240, 160, 60), width=2)
+        for key in ("eingang_nord", "eingang_sued", "eingang_west"):
+            ep = tun[key]
+            ex, ey = to_pixel(ep["x_m"], ep["y_m"])
+            draw.line([(hx, hy), (ex, ey)], fill=(240, 160, 60), width=2)
+            draw.ellipse([ex - 5, ey - 5, ex + 5, ey + 5], fill=(240, 160, 60))
     for reg in terrain.design.get("regionen", []):
         px, py = to_pixel(reg["x_m"], reg["y_m"])
         draw.rectangle([px - 52, py - 8, px + 52, py + 8], fill=(20, 25, 30))

@@ -75,6 +75,10 @@ namespace
 		{
 			return FEILookTable::GetPlaceNames().Contains(Name);
 		}
+		if (Prefix == TEXT("bauteil"))
+		{
+			return FEILookTable::GetPartNames().Contains(Name);
+		}
 		if (Prefix == TEXT("gegner"))
 		{
 			for (int32 Index = 0; Index < EIEnemyKindCount; ++Index)
@@ -309,6 +313,18 @@ const TArray<FString>& FEILookTable::GetPlaceNames()
 	static const TArray<FString> Names = {
 		TEXT("schmiede"), TEXT("jagdbrett"), TEXT("altar"), TEXT("ankerstein"), TEXT("truhe"), TEXT("signalfeuer"),
 		TEXT("seelenkessel"), TEXT("grab"), TEXT("trainingspuppe"), TEXT("barke"), TEXT("sprungfeld"), TEXT("lager")};
+	return Names;
+}
+
+const TArray<FString>& FEILookTable::GetPartNames()
+{
+	static const TArray<FString> Names = {
+		TEXT("tunnel_bogen"), TEXT("fels_gross"), TEXT("fels_mittel"), TEXT("fels_mauer"), TEXT("fackel"),
+		TEXT("holzbruecke"), TEXT("steg"), TEXT("kiefer"), TEXT("baum_tot"), TEXT("busch"),
+		TEXT("scheune"), TEXT("huette"), TEXT("zaun"), TEXT("acker_furche"), TEXT("strohballen"),
+		TEXT("pfahlhuette"), TEXT("holzpfahl"), TEXT("boot"), TEXT("schiff_wrack"),
+		TEXT("leuchtturm_turm"), TEXT("leuchtturm_feuer"), TEXT("holzgeruest"), TEXT("rampe_holz"),
+		TEXT("kran_holz"), TEXT("steinblock"), TEXT("palisade"), TEXT("wachplattform"), TEXT("zelt"), TEXT("eisenturm")};
 	return Names;
 }
 
