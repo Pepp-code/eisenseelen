@@ -114,6 +114,16 @@
 			"spruenge": 4,
 			"sprung_m": 8,
 			"abzug_je_sprung_0_bis_1": 0.2
+		},
+		"windstoss": {
+			"name": "Windstoß",
+			"schaden": 30,
+			"mana_kosten": 30,
+			"abklingzeit_s": 6,
+			"reichweite_m": 8,
+			"winkel_grad": 70,
+			"stoss_m_pro_s": 14,
+			"taumeln_s": 0.6
 		}
 	}
 }

@@ -7,7 +7,8 @@
 	"fraktionen": [
 		{ "name": "Feuer", "farbe": [1.0, 0.38, 0.06] },
 		{ "name": "Frost", "farbe": [0.35, 0.7, 1.0] },
-		{ "name": "Blitz", "farbe": [0.95, 0.9, 0.35] }
+		{ "name": "Blitz", "farbe": [0.95, 0.9, 0.35] },
+		{ "name": "Wind", "farbe": [0.45, 1.0, 0.75] }
 	],
 	"aufgaben": [
 		{ "art": "anfuehrer", "name": "Anführer jagen", "kurz": "Anführer" },

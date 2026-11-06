@@ -25,6 +25,7 @@
 				"abstand_m": 18
 			},
 			"werte": {
+				"windfest": true,
 				"leben": 4000,
 				"bedrohung": 0,
 				"tempo_m_pro_s": 4,
@@ -88,6 +89,7 @@
 				"abstand_m": 8
 			},
 			"werte": {
+				"windfest": true,
 				"leben": 3200,
 				"bedrohung": 0,
 				"tempo_m_pro_s": 3.5,

@@ -418,17 +418,17 @@ Zwei Zauberplätze, vier Elemente, sechs Reaktionen und später eine große zu d
 | --- | --- | --- |
 | Feuer | Brennend | Feuerball auf der Waffe, Flammenwand auf der Flammenrune |
 | Eis | Verlangsamt, bei Stapelung gefroren | Eislanze auf der Waffe, Frostnova auf der Frostrune |
-| Blitz | Geladen | Kettenblitz auf der Waffe, Sturmfeld auf der Sturmrune |
-| Wind | Verweht | Windstoß auf der Waffe, Wirbelsturm auf der Windrune |
+| Blitz | Geladen | Kettenblitz auf der Waffe, Gewitterfeld auf der Donnerrune |
+| Wind | Verweht | Windstoß auf der Waffe, Windhose auf der Windrune |
 
 | Reaktion | Auslöser | Wirkung |
 | --- | --- | --- |
 | Dampfexplosion | Feuer auf Eis oder umgekehrt | Flächenschaden, Sichtschutz durch Dampf |
 | Splitterbruch | Blitz oder schwerer Hieb auf Gefrorene | Hoher Schaden, Splitter treffen Nachbarn |
 | Funkenflug | Feuer auf Geladene oder Blitz auf Brennende | Funken springen auf Nachbarn über und setzen sie in Brand |
-| Feuersturm | Wind auf Brennende oder Feuer auf Verwehte | Ein Wirbel zieht Gegner an und setzt sie in Brand |
-| Schneesturm | Wind auf Verlangsamte oder Eis auf Verwehte | Ein Wirbel zieht Gegner an und verlangsamt sie, wer drin bleibt, friert ein |
-| Gewittersturm | Wind auf Geladene oder Blitz auf Verwehte | Ein Wirbel zieht Gegner an, und Blitze schlagen in alle darin ein |
+| Feuerwirbel | Wind auf Brennende oder Feuer auf Verwehte | Ein Wirbel zieht Gegner an und setzt sie in Brand |
+| Frostwirbel | Wind auf Verlangsamte oder Eis auf Verwehte | Ein Wirbel zieht Gegner an und verlangsamt sie, wer drin bleibt, friert ein |
+| Gewitterwirbel | Wind auf Geladene oder Blitz auf Verwehte | Ein Wirbel zieht Gegner an, und Blitze schlagen in alle darin ein |
 | Dreiklang | Das dritte Element auf ein markiertes Ziel, nur mit Teammitglied | Sehr hoher Flächenschaden |
 
 Die Klingenwacht kann also selbst einfrieren und dann zerschlagen. Das funktioniert allein genauso wie mit einem Mitspieler, und deshalb kannst du es auch allein beurteilen.
@@ -438,16 +438,18 @@ Die Klingenwacht kann also selbst einfrieren und dann zerschlagen. Das funktioni
 | Stufe | Was dazukommt |
 | --- | --- |
 | 2 | Frostrune mit Frostnova auf E, Zustände am Ziel, das 2-Sekunden-Fenster, Dampfexplosion. Der Feuerball bleibt auf Q |
-| 3 | Sturmrune mit Sturmfeld, Funkenflug, Splitterbruch, Reaktionen zwischen zwei Spielern |
+| 3 | Donnerrune mit Gewitterfeld, Funkenflug, Splitterbruch, Reaktionen zwischen zwei Spielern |
 | 5 | Waffe und Rune im Ausrüstungsmenü wählen, Builds |
 | 6 | Alle Schwerter und Stäbe mit festen Zaubern, Flammenrune, Dreiklang, dazu eine Taste in der Testarena, die das dritte Element auslöst, damit du ihn allein ausprobieren kannst |
-| 2 | Das vierte Element Wind: Windrune mit Wirbelsturm, Windstoß auf den Waffen, die drei Wind-Reaktionen und alle Windwaffen |
+| 2 | Das vierte Element Wind: Windrune mit Windhose, Windstoß auf den Waffen, die drei Wind-Reaktionen und alle Windwaffen |
 
 Das kostet grob 10 Runden zusätzlich. In den Rundenzahlen der Stufen ist das noch nicht enthalten.
 
-**Stand 4. November 2026:** Runen sind Items, ihre Werte stehen in `Data/runen.json`. Frostrune mit Frostnova, Sturmrune mit Sturmfeld und Flammenrune mit Flammenwand sind im Spiel. Du wählst sie im Ausrüstungsmenü auf der Taste I. Zum Start hast du die Frostrune, die anderen kaufst du in der Schmiede, und in der Testarena sind alle frei. Alle Reaktionen sind drin: Dampfexplosion mit Wolke, Funkenflug, Splitterbruch und der Zustand Gefroren. Die Wolke verdeckt vorerst nur dir die Sicht, Gegner sehen hindurch.
+**Stand 4. November 2026:** Runen sind Items, ihre Werte stehen in `Data/runen.json`. Frostrune mit Frostnova, Donnerrune mit Gewitterfeld und Flammenrune mit Flammenwand sind im Spiel. Du wählst sie im Ausrüstungsmenü auf der Taste I. Zum Start hast du die Frostrune, die anderen kaufst du in der Schmiede, und in der Testarena sind alle frei. Alle Reaktionen sind drin: Dampfexplosion mit Wolke, Funkenflug, Splitterbruch und der Zustand Gefroren. Die Wolke verdeckt vorerst nur dir die Sicht, Gegner sehen hindurch.
 
-**Wind als viertes Element, entschieden am 4. November 2026, noch nicht gebaut:** Wind bewegt Gegner. Feuer macht Schaden über Zeit, Frost hält an, Blitz verteilt, und Wind stößt weg oder zieht zusammen. So hat zu viert jeder eine eigene Aufgabe, und auch allein bringt es etwas, denn es passt zur Säule „Bewegung ist die Verteidigung“. Der Windstoß auf der Waffe stößt Gegner von dir weg, der Wirbelsturm auf der Windrune zieht sie in einen Wirbel. Die drei neuen Reaktionen sind derselbe Wirbel, der das Element des Ziels aufnimmt, das hält den Aufwand klein. Der Kettenkoloss lässt sich nicht bewegen. Dazu kommen die Windwaffen und die Rüstungsart Windwirker, siehe den Reiter Items und Builds. Die Farbe ist ein helles Mintgrün, weil Orange, Hellblau und Gelb vergeben sind. Beim Bau werden Sturmrune, Sturmfeld und Sturmklinge umbenannt, weil „Sturm“ nach Wind klingt. Aufwand: etwa 4 bis 6 Runden, das ist eine Schätzung.
+**Wind als viertes Element, entschieden am 4. November 2026:** Wind bewegt Gegner. Feuer macht Schaden über Zeit, Frost hält an, Blitz verteilt, und Wind stößt weg oder zieht zusammen. So hat zu viert jeder eine eigene Aufgabe, und auch allein bringt es etwas, denn es passt zur Säule „Bewegung ist die Verteidigung“. Der Windstoß auf der Waffe stößt Gegner von dir weg, die Windhose auf der Windrune zieht sie in einen Wirbel. Die drei neuen Reaktionen sind derselbe Wirbel, der das Element des Ziels aufnimmt, das hält den Aufwand klein. Der Kettenkoloss lässt sich nicht bewegen. Dazu kommen die Windwaffen und die Rüstungsart Windwirker, siehe den Reiter Items und Builds. Die Farbe ist ein helles Mintgrün, weil Orange, Hellblau und Gelb vergeben sind. Sturmrune, Sturmfeld und Sturmklinge heißen jetzt Donnerrune, Gewitterfeld und Donnerklinge, weil „Sturm“ nach Wind klingt. Alte Spielstände werden beim Laden umgeschrieben.
+
+**Gebaut am 6. November 2026:** Der Windstoß trifft alles in einem Kegel von 70 Grad bis 8 m vor dir, macht 30 Schaden, lässt kurz taumeln und schleudert die Gegner weg. Die Windhose ist eine Säule mit 5 m Umkreis, die 4 Sekunden lang Gegner zur Mitte zieht. Trifft Wind auf ein Ziel mit einem anderen Element oder umgekehrt, entsteht ein Wirbel: Der Feuerwirbel setzt in Brand, der Frostwirbel verlangsamt und friert am Ende alle ein, die noch drin sind, und im Gewitterwirbel schlagen Blitze ein. Wirbel lösen keine weiteren Reaktionen aus, damit sich nichts endlos aufschaukelt. Kettenkoloss und Bosse sind windfest und lassen sich nicht bewegen. Alle Werte stehen in `Data/waffen.json` unter `windstoss` und in `Data/runen.json` bei der Windrune und den `wirbel_`-Werten. Die Zahlen sind erste Annahmen.
 
 ### Keine Omen mehr
 

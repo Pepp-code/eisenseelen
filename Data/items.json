@@ -18,12 +18,13 @@
 		{ "name": "Henkersgarde", "je_zwei_teile": { "aufladetempo": 0.1 } },
 		{ "name": "Glutschmiede", "je_zwei_teile": { "zustandsdauer": 0.25 } },
 		{ "name": "Frostwacht", "je_zwei_teile": { "zustandsdauer": 0.25 } },
-		{ "name": "Quellwächter", "je_zwei_teile": { "angriffskraft": 0.1 } }
+		{ "name": "Quellwächter", "je_zwei_teile": { "angriffskraft": 0.1 } },
+		{ "name": "Windwirker", "je_zwei_teile": { "zustandsdauer": 0.25 } }
 	],
 	"items": [
 		{ "name": "Flammenschwert", "platz": "waffe", "preis_gold": 0, "ab_level": 1, "grundform": "langschwert", "element": "feuer" },
 		{ "name": "Frostklinge", "platz": "waffe", "preis_gold": 800, "ab_level": 2, "grundform": "langschwert", "element": "eis" },
-		{ "name": "Sturmklinge", "platz": "waffe", "preis_gold": 800, "ab_level": 4, "grundform": "langschwert", "element": "blitz" },
+		{ "name": "Donnerklinge", "platz": "waffe", "preis_gold": 800, "ab_level": 4, "grundform": "langschwert", "element": "blitz" },
 		{ "name": "Aschenbrecher", "platz": "waffe", "preis_gold": 1200, "ab_level": 8, "grundform": "zweihaender", "element": "feuer" },
 		{ "name": "Gletscherbrecher", "platz": "waffe", "preis_gold": 1200, "ab_level": 10, "grundform": "zweihaender", "element": "eis" },
 		{ "name": "Donnerbrecher", "platz": "waffe", "preis_gold": 1200, "ab_level": 12, "grundform": "zweihaender", "element": "blitz" },
@@ -36,10 +37,16 @@
 		{ "name": "Aschenzepter", "platz": "waffe", "preis_gold": 1200, "ab_level": 8, "grundform": "zepter", "element": "feuer" },
 		{ "name": "Gletscherzepter", "platz": "waffe", "preis_gold": 1200, "ab_level": 10, "grundform": "zepter", "element": "eis" },
 		{ "name": "Donnerzepter", "platz": "waffe", "preis_gold": 1200, "ab_level": 12, "grundform": "zepter", "element": "blitz" },
+		{ "name": "Windklinge", "platz": "waffe", "preis_gold": 800, "ab_level": 9, "grundform": "langschwert", "element": "wind" },
+		{ "name": "Böensäbel", "platz": "waffe", "preis_gold": 900, "ab_level": 9, "grundform": "kurzschwert", "element": "wind" },
+		{ "name": "Windstab", "platz": "waffe", "preis_gold": 800, "ab_level": 9, "grundform": "stab", "element": "wind" },
+		{ "name": "Orkanbrecher", "platz": "waffe", "preis_gold": 1200, "ab_level": 14, "grundform": "zweihaender", "element": "wind" },
+		{ "name": "Orkanzepter", "platz": "waffe", "preis_gold": 1200, "ab_level": 14, "grundform": "zepter", "element": "wind" },
 
 		{ "name": "Frostrune", "platz": "rune", "preis_gold": 0, "ab_level": 1 },
-		{ "name": "Sturmrune", "platz": "rune", "preis_gold": 600, "ab_level": 4 },
+		{ "name": "Donnerrune", "platz": "rune", "preis_gold": 600, "ab_level": 4 },
 		{ "name": "Flammenrune", "platz": "rune", "preis_gold": 600, "ab_level": 2 },
+		{ "name": "Windrune", "platz": "rune", "preis_gold": 600, "ab_level": 9 },
 
 		{ "name": "Helm der Eisenwacht", "platz": "helm", "preis_gold": 300, "ab_level": 3, "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 15, "ruestung": 0.03 } },
 		{ "name": "Brustpanzer der Eisenwacht", "platz": "brustpanzer", "preis_gold": 450, "ab_level": 3, "art": "Eisenwacht", "klasse": "klingenwacht", "werte": { "leben": 30, "ruestung": 0.06, "tempo": -0.03 } },
@@ -64,6 +71,11 @@
 		{ "name": "Helm des Quellwächters", "platz": "helm", "preis_gold": 300, "ab_level": 3, "art": "Quellwächter", "klasse": "arkanist", "werte": { "mana": 25, "manarueckkehr": 0.1 } },
 		{ "name": "Brustpanzer des Quellwächters", "platz": "brustpanzer", "preis_gold": 450, "ab_level": 3, "art": "Quellwächter", "klasse": "arkanist", "werte": { "leben": 15, "manarueckkehr": 0.1 } },
 		{ "name": "Handschuhe des Quellwächters", "platz": "handschuhe", "preis_gold": 300, "ab_level": 3, "art": "Quellwächter", "klasse": "arkanist", "werte": { "manakosten": -0.15 } },
-		{ "name": "Schuhe des Quellwächters", "platz": "schuhe", "preis_gold": 300, "ab_level": 3, "art": "Quellwächter", "klasse": "arkanist", "werte": { "manarueckkehr": 0.15, "tempo": 0.03 } }
+		{ "name": "Schuhe des Quellwächters", "platz": "schuhe", "preis_gold": 300, "ab_level": 3, "art": "Quellwächter", "klasse": "arkanist", "werte": { "manarueckkehr": 0.15, "tempo": 0.03 } },
+
+		{ "name": "Helm des Windwirkers", "platz": "helm", "preis_gold": 300, "ab_level": 9, "art": "Windwirker", "werte": { "windschaden": 0.12 } },
+		{ "name": "Brustpanzer des Windwirkers", "platz": "brustpanzer", "preis_gold": 450, "ab_level": 9, "art": "Windwirker", "werte": { "windschaden": 0.06, "leben": 15 } },
+		{ "name": "Handschuhe des Windwirkers", "platz": "handschuhe", "preis_gold": 300, "ab_level": 9, "art": "Windwirker", "werte": { "windschaden": 0.06, "angriffskraft": 0.06 } },
+		{ "name": "Schuhe des Windwirkers", "platz": "schuhe", "preis_gold": 300, "ab_level": 9, "art": "Windwirker", "werte": { "windschaden": 0.06, "tempo": 0.03 } }
 	]
 }

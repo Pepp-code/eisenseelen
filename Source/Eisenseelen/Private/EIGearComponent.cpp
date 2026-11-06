@@ -62,12 +62,7 @@ EEIElement UEIGearComponent::GetWeaponElement() const
 
 float UEIGearComponent::GetElementBonus(EEIElement Element) const
 {
-	switch (Element)
-	{
-	case EEIElement::Fire: return GetStat(EEIStat::FireDamage);
-	case EEIElement::Ice: return GetStat(EEIStat::IceDamage);
-	default: return GetStat(EEIStat::LightningDamage);
-	}
+	return GetStat(EIElementDamageStat(Element));
 }
 
 float UEIGearComponent::GetSwordFactor() const

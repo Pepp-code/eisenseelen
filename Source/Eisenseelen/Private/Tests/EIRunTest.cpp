@@ -172,10 +172,10 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
 		UEIProfileComponent* Profile = Context.Player->GetProfile();
-		Profile->EquipByName(TEXT("Sturmrune"));
+		Profile->EquipByName(TEXT("Donnerrune"));
 		Context.Test->TestEqual(TEXT("What the player does not own stays off"), Context.Hero->GetRunes()->GetRuneIndex(), 0);
-		Profile->GetSave().Items.Add(TEXT("Sturmrune"));
-		Profile->EquipByName(TEXT("Sturmrune"));
+		Profile->GetSave().Items.Add(TEXT("Donnerrune"));
+		Profile->EquipByName(TEXT("Donnerrune"));
 	}));
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)

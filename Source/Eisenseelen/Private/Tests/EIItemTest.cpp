@@ -128,7 +128,14 @@ bool FEIItemTableTest::RunTest(const FString& Parameters)
 	{
 		AddError(Error);
 	}
-	TestEqual(TEXT("There are five arts of armour"), Table.Sets.Num(), 5);
+	TestEqual(TEXT("There are six arts of armour"), Table.Sets.Num(), 6);
+	for (const EEIElement Element : { EEIElement::Fire, EEIElement::Ice, EEIElement::Lightning, EEIElement::Wind })
+	{
+		TestTrue(*FString::Printf(TEXT("A weapon of element %d is in the forge"), static_cast<int32>(Element)), Table.Items.ContainsByPredicate([Element](const FEIItem& Item) { return Item.Slot == EEISlot::Weapon && Item.Element == Element; }));
+	}
+	const int32 WindHelmet = Table.FindItem(TEXT("Helm des Windwirkers"));
+	TestTrue(TEXT("The wind armour gives wind damage"), WindHelmet != INDEX_NONE && Table.Items[WindHelmet].Stats.ContainsByPredicate([](const FEIStatLine& Line) { return Line.Stat == EEIStat::WindDamage && Line.Amount > 0.0f; }));
+	TestEqual(TEXT("Wind damage is named"), EIDescribeStat(EEIStat::WindDamage, 0.12f), FString(TEXT("+12 % Windschaden")));
 	for (const FEIItem& Item : Table.Items)
 	{
 		const bool bStart = Table.StartItems.Contains(Item.Name);
@@ -227,7 +234,7 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	const int32 RuneSlot = static_cast<int32>(EEISlot::Rune);
 	FEISaveGame Save = FEISaveGame::MakeNew(Table);
 	TestTrue(TEXT("A new player owns the start items"), Save.Items.Contains(TEXT("Frostrune")));
-	TestFalse(TEXT("A new player owns nothing else"), Save.Items.Contains(TEXT("Sturmrune")));
+	TestFalse(TEXT("A new player owns nothing else"), Save.Items.Contains(TEXT("Donnerrune")));
 	TestEqual(TEXT("A new blade warden holds the sword"), Save.Classes[0].Slots[WeaponSlot], FString(TEXT("Flammenschwert")));
 	TestEqual(TEXT("A new arcanist holds the staff"), Save.Classes[1].Slots[WeaponSlot], FString(TEXT("Feuerstab")));
 	TestEqual(TEXT("Both have the first rune on"), Save.Classes[1].Slots[RuneSlot], FString(TEXT("Frostrune")));
@@ -237,8 +244,8 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	Save.FactionPoints.Add(TEXT("Feuer"), 40);
 	Save.Ingredients.Add(TEXT("Glutkern"), 3);
 	Save.FoundIngredients.Add(TEXT("Grabkerze"));
-	Save.Items.Add(TEXT("Sturmrune"));
-	Save.Classes[0].Slots[RuneSlot] = TEXT("Sturmrune");
+	Save.Items.Add(TEXT("Donnerrune"));
+	Save.Classes[0].Slots[RuneSlot] = TEXT("Donnerrune");
 	Save.Classes[1].Slots[RuneSlot].Reset();
 	Save.ArenaClasses[1].Slots[WeaponSlot] = TEXT("Donnerzepter");
 
@@ -251,9 +258,9 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("What was found once stays found"), Loaded.FoundIngredients.Contains(TEXT("Grabkerze")));
 	TestTrue(TEXT("What is in the bag counts as found"), Loaded.FoundIngredients.Contains(TEXT("Glutkern")));
 	TestFalse(TEXT("Nothing else counts as found"), Loaded.FoundIngredients.Contains(TEXT("Seelenasche")));
-	TestTrue(TEXT("What was bought stays"), Loaded.Items.Contains(TEXT("Sturmrune")));
+	TestTrue(TEXT("What was bought stays"), Loaded.Items.Contains(TEXT("Donnerrune")));
 	TestFalse(TEXT("What was not bought stays away"), Loaded.Items.Contains(TEXT("Donnerzepter")));
-	TestEqual(TEXT("What is on stays on"), Loaded.Classes[0].Slots[RuneSlot], FString(TEXT("Sturmrune")));
+	TestEqual(TEXT("What is on stays on"), Loaded.Classes[0].Slots[RuneSlot], FString(TEXT("Donnerrune")));
 	TestTrue(TEXT("An empty slot stays empty"), Loaded.Classes[1].Slots[RuneSlot].IsEmpty());
 	TestEqual(TEXT("The test arena keeps its own things"), Loaded.ArenaClasses[1].Slots[WeaponSlot], FString(TEXT("Donnerzepter")));
 	TestEqual(TEXT("A real run is not touched by that"), Loaded.Classes[1].Slots[WeaponSlot], FString(TEXT("Feuerstab")));
@@ -266,7 +273,7 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	// A file from before the forge had a quality for every item and points for attributes. What was owned stays owned.
 	FEISaveGame Old = FEISaveGame::MakeNew(Table);
 	TestTrue(TEXT("An old file can be read"), Old.FromJson(TEXT("{ \"version\": 1, \"erfahrung\": 500, \"items\": { \"Frostrune\": 0, \"Sturmklinge\": 2 }, \"klingenwacht\": { \"attribute\": { \"Kraft\": 3 } } }"), Error));
-	TestTrue(TEXT("An item of an old file stays owned"), Old.Items.Contains(TEXT("Sturmklinge")));
+	TestTrue(TEXT("An item of an old file stays owned, under its new name"), Old.Items.Contains(TEXT("Donnerklinge")));
 	TestEqual(TEXT("The experience of an old file stays"), Old.Experience, 500);
 	TestTrue(TEXT("The new file has no qualities"), !Old.ToJson().Contains(TEXT("qualitaet")) && !Old.ToJson().Contains(TEXT("attribute")));
 
@@ -276,7 +283,7 @@ bool FEISaveGameTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The file is there"), FFileHelper::LoadFileToString(Json, *Path));
 	FEISaveGame FromFile = FEISaveGame::MakeNew(Table);
 	TestTrue(TEXT("The file can be read"), FromFile.FromJson(Json, Error));
-	TestTrue(TEXT("The file holds the same"), FromFile.Items.Contains(TEXT("Sturmrune")));
+	TestTrue(TEXT("The file holds the same"), FromFile.Items.Contains(TEXT("Donnerrune")));
 	TestFalse(TEXT("No half file stays behind"), IFileManager::Get().FileExists(*(Path + TEXT(".neu"))));
 	IFileManager::Get().Delete(*Path);
 	return true;
@@ -410,7 +417,7 @@ bool FEIGearTest::RunTest(const FString& Parameters)
 	{
 		State->First->Destroy();
 		State->Second->Destroy();
-		Profile(Context)->EquipByName(TEXT("Sturmklinge"));
+		Profile(Context)->EquipByName(TEXT("Donnerklinge"));
 	}));
 	Steps.Add(WaitUntil(TEXT("Q cools down"), 8.0, [](const FEIPlayContext& Context) { return Context.Hero->GetCaster()->GetSpellCooldownFraction() <= 0.0f; }));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
@@ -586,7 +593,7 @@ bool FEIForgeTest::RunTest(const FString& Parameters)
 	{
 		UEIProfileComponent* Player = Profile(Context);
 		FEISaveGame& Save = Player->GetSave();
-		const int32 Rune = Player->GetTable().FindItem(TEXT("Sturmrune"));
+		const int32 Rune = Player->GetTable().FindItem(TEXT("Donnerrune"));
 		Save.Gold = Player->GetTable().Items[Rune].Price;
 		FEIGearMenu& Menu = Context.Player->GetMenu();
 		Menu.ShowPage(EEIMenuPage::Gear);
@@ -614,7 +621,7 @@ bool FEIForgeTest::RunTest(const FString& Parameters)
 		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
 		Context.Test->TestTrue(TEXT("What is owned says so"), Menu.Shows(TEXT("Frostrune \u2013 gekauft")));
 		Context.Test->TestNull(TEXT("What is owned cannot be clicked"), Menu.FindButton(TEXT("Frostrune")));
-		const FEIMenuElement* Offer = Menu.FindButton(TEXT("Sturmrune \u2013 kaufen"));
+		const FEIMenuElement* Offer = Menu.FindButton(TEXT("Donnerrune \u2013 kaufen"));
 		Context.Test->TestNotNull(TEXT("What is open and paid for has a button"), Offer);
 		for (const FEIMenuElement& Element : Menu.GetElements())
 		{
@@ -625,10 +632,10 @@ bool FEIForgeTest::RunTest(const FString& Parameters)
 			return;
 		}
 		Menu.Click(Offer->X + 1.0f, Offer->Y + 1.0f);
-		Context.Test->TestTrue(TEXT("A click buys it"), Save.Items.Contains(TEXT("Sturmrune")));
+		Context.Test->TestTrue(TEXT("A click buys it"), Save.Items.Contains(TEXT("Donnerrune")));
 		Context.Test->TestEqual(TEXT("And pays for it"), Save.Gold, 0);
 		Menu.Build(*Player, *Context.Hero, 1600.0f, 900.0f, -1.0f, -1.0f);
-		Context.Test->TestTrue(TEXT("Then the forge shows it as bought"), Menu.Shows(TEXT("Sturmrune \u2013 gekauft")));
+		Context.Test->TestTrue(TEXT("Then the forge shows it as bought"), Menu.Shows(TEXT("Donnerrune \u2013 gekauft")));
 		Context.Test->TestTrue(TEXT("Without gold the rest waits"), Menu.Shows(TEXT("Flammenrune \u2013 zu wenig Gold")));
 	}));
 
@@ -656,7 +663,7 @@ bool FEIForgeTest::RunTest(const FString& Parameters)
 		UEIProfileComponent* Player = Profile(Context);
 		Player->GetSave().Gold = 100000;
 		Context.World->GetAuthGameMode<AEIGameMode>()->GetRun()->BeginRunNow();
-		Context.Test->TestFalse(TEXT("During a run nothing can be bought"), Player->BuyByName(TEXT("Sturmklinge")));
+		Context.Test->TestFalse(TEXT("During a run nothing can be bought"), Player->BuyByName(TEXT("Donnerklinge")));
 		Context.Test->TestEqual(TEXT("And nothing is paid"), Player->GetSave().Gold, 100000);
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));

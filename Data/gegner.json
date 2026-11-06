@@ -74,6 +74,7 @@
 	},
 	"kettenkoloss": {
 		"name": "Kettenkoloss",
+		"windfest": true,
 		"leben": 900,
 		"bedrohung": 10,
 		"tempo_m_pro_s": 3.5,

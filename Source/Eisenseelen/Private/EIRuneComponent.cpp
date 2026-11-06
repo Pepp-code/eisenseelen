@@ -46,7 +46,12 @@ namespace
 		Out.bWall = Form == TEXT("wand");
 		if (!Line.TryGetStringField(TEXT("element"), Element) || !EIElementFromKey(Element, Out.Element))
 		{
-			OutError = FString::Printf(TEXT("%s braucht als element feuer, eis oder blitz."), *Out.Name);
+			OutError = FString::Printf(TEXT("%s braucht als element feuer, eis, blitz oder wind."), *Out.Name);
+			return false;
+		}
+		// Only the wind draws, so the others may leave it out.
+		if (Line.HasField(TEXT("ziehen_m_pro_s")) && !FEIDataFile::ReadNumber(Line, TEXT("ziehen_m_pro_s"), 0.0, 100.0, Out.PullMetersPerSecond, OutError))
+		{
 			return false;
 		}
 		return FEIDataFile::ReadNumber(Line, TEXT("schaden"), 0.0, 100000.0, Out.Damage, OutError)
@@ -79,7 +84,18 @@ namespace
 			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_radius_m"), 0.1, 200.0, Out.SparkRadiusMeters, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_ziele"), 0.0, 100.0, Out.SparkTargets, OutError)
 			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_brennen_pro_s"), 0.0, 100000.0, Out.SparkBurnPerSecond, OutError)
-			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_brennen_s"), 0.0, 60.0, Out.SparkBurnSeconds, OutError))
+			|| !FEIDataFile::ReadNumber(Root, TEXT("funkenflug_brennen_s"), 0.0, 60.0, Out.SparkBurnSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("wirbel_radius_m"), 0.1, 200.0, Out.Whirl.RadiusMeters, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("wirbel_dauer_s"), 0.1, 60.0, Out.Whirl.DurationSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("wirbel_takt_s"), 0.05, 60.0, Out.Whirl.TickSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("wirbel_ziehen_m_pro_s"), 0.0, 100.0, Out.Whirl.PullMetersPerSecond, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("feuerwirbel_schaden"), 0.0, 100000.0, Out.Whirl.FireDamage, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("feuerwirbel_brennen_pro_s"), 0.0, 100000.0, Out.Whirl.FireBurnPerSecond, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("feuerwirbel_brennen_s"), 0.0, 60.0, Out.Whirl.FireBurnSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("frostwirbel_schaden"), 0.0, 100000.0, Out.Whirl.FrostDamage, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("frostwirbel_verlangsamen_0_bis_1"), 0.0, 1.0, Out.Whirl.FrostSlowShare, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("frostwirbel_gefrieren_s"), 0.0, 60.0, Out.Whirl.FrostFreezeSeconds, OutError)
+			|| !FEIDataFile::ReadNumber(Root, TEXT("gewitterwirbel_schaden"), 0.0, 100000.0, Out.Whirl.StormDamage, OutError))
 		{
 			return false;
 		}
@@ -256,7 +272,8 @@ void UEIRuneComponent::HitWithElement(AEIEnemy* Enemy, EEIElement Element)
 		Shatter(Enemy);
 		return;
 	}
-	switch (Enemy->MarkElement(Element, Table.ReactionWindowSeconds))
+	EEIElement Partner = EEIElement::Wind;
+	switch (Enemy->MarkElement(Element, Table.ReactionWindowSeconds, &Partner))
 	{
 	case EEIReaction::Steam:
 		SteamExplosion(Enemy);
@@ -264,8 +281,38 @@ void UEIRuneComponent::HitWithElement(AEIEnemy* Enemy, EEIElement Element)
 	case EEIReaction::Sparks:
 		SparksFly(Enemy);
 		break;
+	case EEIReaction::Whirl:
+		StartWhirl(Enemy, Partner);
+		break;
 	default:
 		break;
+	}
+}
+
+void UEIRuneComponent::StartWhirl(const AEIEnemy* Enemy, EEIElement Partner)
+{
+	const FVector At = Enemy->GetActorLocation();
+	Whirls.RemoveAll([](const TWeakObjectPtr<AEIRuneField>& Whirl) { return !Whirl.IsValid(); });
+	for (const TWeakObjectPtr<AEIRuneField>& Whirl : Whirls)
+	{
+		if (FVector::Dist2D(Whirl->GetActorLocation(), At) <= Whirl->GetRadiusCm())
+		{
+			return;
+		}
+	}
+	FHitResult Floor;
+	const FVector To = At - FVector(0.0f, 0.0f, FloorSearchBelowCm);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(EIWhirlFloor), false, Enemy);
+	const FVector Place = GetWorld()->LineTraceSingleByObjectType(Floor, At, To, FCollisionObjectQueryParams(ECC_WorldStatic), Query) ? Floor.ImpactPoint : At;
+	AEIHeroCharacter* Hero = GetHero();
+	const FTransform Spawn(FRotator::ZeroRotator, Place);
+	AEIRuneField* Field = GetWorld()->SpawnActorDeferred<AEIRuneField>(AEIRuneField::StaticClass(), Spawn, Hero, Hero, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Field != nullptr)
+	{
+		const UEIGearComponent* Gear = Hero->GetGear();
+		Field->ConfigureWhirl(Partner, Table.Whirl, Gear->GetReactionFactor(), Gear->GetStatusFactor());
+		Field->FinishSpawning(Spawn);
+		Whirls.Add(Field);
 	}
 }
 

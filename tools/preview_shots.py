@@ -108,7 +108,7 @@ def scenario():
     yield 0.15
     shot()
     yield AFTER_SHOT_SECONDS
-    player().preview_equip("Sturmrune")
+    player().preview_equip("Donnerrune")
     yield 0.1
     yield from tap("E")
     yield 0.6

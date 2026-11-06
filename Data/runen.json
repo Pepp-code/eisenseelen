@@ -10,6 +10,17 @@
 	"funkenflug_ziele": 4,
 	"funkenflug_brennen_pro_s": 10,
 	"funkenflug_brennen_s": 3,
+	"wirbel_radius_m": 5,
+	"wirbel_dauer_s": 3,
+	"wirbel_takt_s": 0.5,
+	"wirbel_ziehen_m_pro_s": 6,
+	"feuerwirbel_schaden": 8,
+	"feuerwirbel_brennen_pro_s": 10,
+	"feuerwirbel_brennen_s": 3,
+	"frostwirbel_schaden": 5,
+	"frostwirbel_verlangsamen_0_bis_1": 0.5,
+	"frostwirbel_gefrieren_s": 2,
+	"gewitterwirbel_schaden": 18,
 	"runen": [
 		{
 			"name": "Frostrune",
@@ -28,8 +39,8 @@
 			"zustand_s": 3
 		},
 		{
-			"name": "Sturmrune",
-			"zauber": "Sturmfeld",
+			"name": "Donnerrune",
+			"zauber": "Gewitterfeld",
 			"form": "kreis",
 			"element": "blitz",
 			"schaden": 12,
@@ -58,6 +69,23 @@
 			"verlangsamen_0_bis_1": 0,
 			"brennen_pro_s": 8,
 			"zustand_s": 3
+		},
+		{
+			"name": "Windrune",
+			"zauber": "Windhose",
+			"form": "kreis",
+			"element": "wind",
+			"schaden": 8,
+			"abklingzeit_s": 14,
+			"groesse_m": 5,
+			"reichweite_m": 20,
+			"dauer_s": 4,
+			"takt_s": 0.5,
+			"gefrieren_s": 0,
+			"verlangsamen_0_bis_1": 0,
+			"brennen_pro_s": 0,
+			"zustand_s": 0,
+			"ziehen_m_pro_s": 8
 		}
 	]
 }

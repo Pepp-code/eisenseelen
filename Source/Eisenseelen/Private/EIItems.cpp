@@ -21,6 +21,7 @@ namespace
 		{ TEXT("feuerschaden"), TEXT("Feuerschaden"), false },
 		{ TEXT("eisschaden"), TEXT("Eisschaden"), false },
 		{ TEXT("blitzschaden"), TEXT("Blitzschaden"), false },
+		{ TEXT("windschaden"), TEXT("Windschaden"), false },
 		{ TEXT("abklingzeit"), TEXT("Abklingzeit"), false },
 		{ TEXT("zustandsdauer"), TEXT("Zustandsdauer"), false },
 		{ TEXT("reaktionsschaden"), TEXT("Reaktionsschaden"), false },
@@ -165,13 +166,12 @@ namespace
 		}
 		if (!EIElementFromKey(ElementText, Out.Element))
 		{
-			OutError = FString::Printf(TEXT("%s braucht als element feuer, eis oder blitz."), *Out.Name);
+			OutError = FString::Printf(TEXT("%s braucht als element feuer, eis, blitz oder wind."), *Out.Name);
 			return false;
 		}
 		Out.bForBladewarden = !Table.Forms[Out.Form].bStaff;
 		Out.bForArcanist = Table.Forms[Out.Form].bStaff;
-		const EEIStat ElementStat = Out.Element == EEIElement::Fire ? EEIStat::FireDamage : (Out.Element == EEIElement::Ice ? EEIStat::IceDamage : EEIStat::LightningDamage);
-		Out.Stats.Add({ ElementStat, Table.WeaponElementBonus });
+		Out.Stats.Add({ EIElementDamageStat(Out.Element), Table.WeaponElementBonus });
 		return true;
 	}
 
@@ -304,6 +304,17 @@ namespace
 			}
 		}
 		return true;
+	}
+}
+
+EEIStat EIElementDamageStat(EEIElement Element)
+{
+	switch (Element)
+	{
+	case EEIElement::Ice: return EEIStat::IceDamage;
+	case EEIElement::Lightning: return EEIStat::LightningDamage;
+	case EEIElement::Wind: return EEIStat::WindDamage;
+	default: return EEIStat::FireDamage;
 	}
 }
 

@@ -75,10 +75,20 @@ bool FEIRuneTableTest::RunTest(const FString& Parameters)
 	{
 		AddError(Error);
 	}
-	TestEqual(TEXT("There are three runes"), Table.Runes.Num(), 3);
+	TestEqual(TEXT("There are four runes"), Table.Runes.Num(), 4);
+	const int32 Wind = Table.FindByName(TEXT("Windrune"));
+	TestTrue(TEXT("The wind rune is there"), Wind != INDEX_NONE);
+	if (Wind != INDEX_NONE)
+	{
+		TestEqual(TEXT("The wind rune is of wind"), Table.Runes[Wind].Element, EEIElement::Wind);
+		TestTrue(TEXT("The wind rune draws"), Table.Runes[Wind].PullMetersPerSecond > 0.0f);
+	}
+	TestTrue(TEXT("A whirl draws too"), Table.Whirl.PullMetersPerSecond > 0.0f);
 
 	const FString Valid = TEXT("{\"reaktion_fenster_s\": 2, \"dampfexplosion_schaden\": 50, \"dampfexplosion_radius_m\": 4, \"dampfwolke_s\": 2, \"splitterbruch_schaden\": 90, \"splitterbruch_radius_m\": 3, ")
-		TEXT("\"funkenflug_schaden\": 20, \"funkenflug_radius_m\": 5, \"funkenflug_ziele\": 2, \"funkenflug_brennen_pro_s\": 4, \"funkenflug_brennen_s\": 1, \"runen\": [")
+		TEXT("\"funkenflug_schaden\": 20, \"funkenflug_radius_m\": 5, \"funkenflug_ziele\": 2, \"funkenflug_brennen_pro_s\": 4, \"funkenflug_brennen_s\": 1, ")
+		TEXT("\"wirbel_radius_m\": 4, \"wirbel_dauer_s\": 2, \"wirbel_takt_s\": 0.5, \"wirbel_ziehen_m_pro_s\": 5, \"feuerwirbel_schaden\": 7, \"feuerwirbel_brennen_pro_s\": 9, \"feuerwirbel_brennen_s\": 2, ")
+		TEXT("\"frostwirbel_schaden\": 4, \"frostwirbel_verlangsamen_0_bis_1\": 0.4, \"frostwirbel_gefrieren_s\": 1.5, \"gewitterwirbel_schaden\": 17, \"runen\": [")
 		TEXT("{\"name\": \"Proberune\", \"zauber\": \"Probe\", \"form\": \"wand\", \"element\": \"feuer\", \"schaden\": 5, \"abklingzeit_s\": 3, \"groesse_m\": 9,")
 		TEXT("\"reichweite_m\": 8, \"dauer_s\": 4, \"takt_s\": 0.5, \"gefrieren_s\": 1, \"verlangsamen_0_bis_1\": 0.25, \"brennen_pro_s\": 6, \"zustand_s\": 2}]}");
 	FEIRuneTable Small;
@@ -88,11 +98,17 @@ bool FEIRuneTableTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("The element counts"), Small.Runes[0].Element, EEIElement::Fire);
 	TestEqual(TEXT("The size counts"), Small.Runes[0].SizeMeters, 9.0f);
 	TestEqual(TEXT("The freeze counts"), Small.Runes[0].FreezeSeconds, 1.0f);
+	TestEqual(TEXT("Without a pull it does not draw"), Small.Runes[0].PullMetersPerSecond, 0.0f);
 	TestEqual(TEXT("The reaction counts"), Small.SteamDamage, 50.0f);
 	TestEqual(TEXT("The shatter counts"), Small.ShatterDamage, 90.0f);
 	TestEqual(TEXT("The sparks count"), Small.SparkDamage, 20.0f);
+	TestEqual(TEXT("The whirl size counts"), Small.Whirl.RadiusMeters, 4.0f);
+	TestEqual(TEXT("The thunder whirl counts"), Small.Whirl.StormDamage, 17.0f);
+	TestEqual(TEXT("The frost whirl counts"), Small.Whirl.FrostFreezeSeconds, 1.5f);
 
 	FEIRuneTable Untouched;
+	TestFalse(TEXT("A whirl without its values is refused"), FEIRuneTable::LoadFromString(Valid.Replace(TEXT("\"gewitterwirbel_schaden\""), TEXT("\"gewitter\"")), Untouched, Error));
+	TestFalse(TEXT("A pull that is far too strong is refused"), FEIRuneTable::LoadFromString(Valid.Replace(TEXT("\"zustand_s\": 2}"), TEXT("\"zustand_s\": 2, \"ziehen_m_pro_s\": 1000}")), Untouched, Error));
 	TestFalse(TEXT("An unknown form is refused"), FEIRuneTable::LoadFromString(Valid.Replace(TEXT("\"wand\""), TEXT("\"stern\"")), Untouched, Error));
 	TestTrue(TEXT("The error names the rune"), Error.Contains(TEXT("Proberune")));
 	TestFalse(TEXT("An unknown element is refused"), FEIRuneTable::LoadFromString(Valid.Replace(TEXT("\"feuer\""), TEXT("\"wasser\"")), Untouched, Error));
@@ -190,7 +206,7 @@ bool FEIRuneSpellsTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("The next rune is on"), CurrentRune(Context).Name, FString(TEXT("Sturmrune")));
+		Context.Test->TestEqual(TEXT("The next rune is on"), CurrentRune(Context).Name, FString(TEXT("Donnerrune")));
 		Context.Test->TestEqual(TEXT("A new rune is ready at once"), Context.Hero->GetRunes()->GetCooldownFraction(), 0.0f);
 		State->Life = State->Target->GetHealth()->GetHealth();
 	}));
@@ -239,6 +255,34 @@ bool FEIRuneSpellsTest::RunTest(const FString& Parameters)
 		Context.Test->TestTrue(TEXT("It keeps burning without the wall"), Lost() > 0.0f);
 	}));
 	Steps.Add(WaitUntil(TEXT("the fire goes out"), 4.0, [State](const FEIPlayContext& Context) { return !State->Target->IsBurning(); }));
+
+	// The fourth rune: a column of wind that draws the enemies to its middle.
+	Steps.Add(NextRune());
+	Steps.Add(Wait(2.1));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("The fourth rune is on"), CurrentRune(Context).Name, FString(TEXT("Windrune")));
+		Context.Hero->GetRunes()->GetTable().Runes[3].DurationSeconds = 1.3f;
+		// Off to the side of where the hero looks, but still in the column.
+		const FVector Middle = Context.Hero->GetActorLocation() + FVector(TargetDistanceCm, 0.0f, 0.0f);
+		State->Target->SetActorLocation(Middle + FVector(0.0f, 320.0f, 0.0f));
+		State->Life = State->Target->GetHealth()->GetHealth();
+	}));
+	AddTap(Steps, EKeys::E);
+	Steps.Add(Wait(1.0));
+	Steps.Add(Do([State, Lost](const FEIPlayContext& Context)
+	{
+		TActorIterator<AEIRuneField> Field(Context.World);
+		Context.Test->TestTrue(TEXT("The column stands"), static_cast<bool>(Field));
+		if (Field)
+		{
+			const double Away = FVector::Dist2D(Field->GetActorLocation(), State->Target->GetActorLocation());
+			Context.Test->AddInfo(FString::Printf(TEXT("After 1 s in the wind the enemy stands %.0f cm from the middle, it began 320 cm away"), Away));
+			Context.Test->TestTrue(TEXT("The wind draws the enemy to its middle"), Away < 200.0);
+		}
+		Context.Test->TestTrue(TEXT("The wind hurts"), Lost() > 0.0f);
+	}));
+	Steps.Add(WaitUntil(TEXT("the column is over"), 2.0, [](const FEIPlayContext& Context) { return CountFields(Context) == 0; }));
 
 	// The choice goes round, and the choice survives a restart.
 	Steps.Add(NextRune());
@@ -364,6 +408,187 @@ bool FEIReactionsTest::RunTest(const FString& Parameters)
 		Context.Test->TestFalse(TEXT("Whoever is frozen does not strike"), State->Target->IsTelegraphing());
 	}));
 	Steps.Add(WaitUntil(TEXT("it thaws and winds up"), 2.0, [State](const FEIPlayContext& Context) { return !State->Target->IsFrozen() && State->Target->IsTelegraphing(); }));
+	return RunInArena(this, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEIWindTest,
+	"Eisenseelen.Play.Wind",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEIWindTest::RunTest(const FString& Parameters)
+{
+	struct FState
+	{
+		TWeakObjectPtr<AEIEnemy> Light;
+		TWeakObjectPtr<AEIEnemy> Heavy;
+		TWeakObjectPtr<AEIEnemy> Neighbour;
+		FVector HeavyAt = FVector::ZeroVector;
+		float LightLife = 0.0f;
+		float NeighbourStart = 0.0f;
+	};
+	const TSharedRef<FState> State = MakeShared<FState>();
+
+	// Two enemies next to each other in a fresh place, one of them marked with an element, then the wind on it.
+	const auto StartWhirl = [State](const FEIPlayContext& Context, EEIElement Partner, float FacingYaw)
+	{
+		const FVector Before = Context.Hero->GetActorLocation() + FRotator(0.0f, FacingYaw, 0.0f).Vector() * 500.0f;
+		AEIEnemy* Target = SpawnTarget(Context);
+		AEIEnemy* Neighbour = SpawnTarget(Context);
+		Target->SetActorLocation(Before);
+		Neighbour->SetActorLocation(Before + FRotator(0.0f, FacingYaw + 90.0f, 0.0f).Vector() * 300.0f);
+		State->Light = Target;
+		State->Neighbour = Neighbour;
+		State->LightLife = Target->GetHealth()->GetHealth();
+		State->NeighbourStart = static_cast<float>(FVector::Dist2D(Before, Neighbour->GetActorLocation()));
+		UEIRuneComponent* Runes = Context.Hero->GetRunes();
+		Runes->GetTable().Whirl.DurationSeconds = 1.2f;
+		Runes->HitWithElement(Target, Partner);
+		Context.Test->TestEqual(TEXT("One element alone brings no whirl"), CountFields(Context), 0);
+		Runes->HitWithElement(Target, EEIElement::Wind);
+		Context.Test->TestEqual(TEXT("Wind on an element brings a whirl"), CountFields(Context), 1);
+		TActorIterator<AEIRuneField> Field(Context.World);
+		Context.Test->TestTrue(TEXT("It is a whirl"), Field && Field->IsWhirl());
+		Context.Test->TestTrue(TEXT("The whirl is of the other element"), Field && Field->GetElement() == Partner);
+
+		// Where a whirl already turns, no second one starts.
+		Runes->HitWithElement(Neighbour, Partner);
+		Runes->HitWithElement(Neighbour, EEIElement::Wind);
+		Context.Test->TestEqual(TEXT("A second whirl does not start inside the first"), CountFields(Context), 1);
+	};
+	const auto Clear = [State]()
+	{
+		for (const TWeakObjectPtr<AEIEnemy>& Enemy : { State->Light, State->Neighbour, State->Heavy })
+		{
+			if (Enemy.IsValid())
+			{
+				Enemy->Destroy();
+			}
+		}
+	};
+	// Whoever falls off the arena is gone, and the test must not go on with it.
+	const auto Alive = [State](const FEIPlayContext& Context, const TCHAR* When)
+	{
+		const bool bAlive = State->Light.IsValid() && State->Neighbour.IsValid();
+		if (!bAlive)
+		{
+			Context.Test->AddError(FString::Printf(TEXT("An enemy is gone %s"), When));
+		}
+		return bAlive;
+	};
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		Context.Hero->SetCanBeDamaged(false);
+		Teleport(Context, OpenFloor, 0.0f);
+		UEIProfileComponent* Profile = Context.Player->GetProfile();
+		Profile->GetSave().Items.Add(TEXT("Windklinge"));
+		Profile->EquipByName(TEXT("Windklinge"));
+	}));
+	Steps.Add(Wait(0.2));
+
+	// The gust: it throws the light enemy away, and the heavy one stands.
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		Context.Test->TestEqual(TEXT("The blade is of wind"), Context.Hero->GetGear()->GetWeaponElement(), EEIElement::Wind);
+		Context.Player->SetControlRotation(FRotator::ZeroRotator);
+		AEIEnemy* Light = SpawnTarget(Context);
+		AEIEnemy* Heavy = SpawnTarget(Context);
+		Light->SetActorLocation(Context.Hero->GetActorLocation() + FVector(300.0f, -120.0f, 0.0f));
+		Heavy->SetActorLocation(Context.Hero->GetActorLocation() + FVector(300.0f, 120.0f, 0.0f));
+		FEIEnemyValues Windproof = Heavy->GetValues();
+		Windproof.bWindproof = true;
+		Heavy->ApplyValues(Windproof);
+		State->Light = Light;
+		State->Heavy = Heavy;
+		State->HeavyAt = Heavy->GetActorLocation();
+		State->LightLife = Light->GetHealth()->GetHealth();
+	}));
+	AddTap(Steps, EKeys::Q);
+	Steps.Add(Wait(0.6));
+	Steps.Add(Do([State, Clear](const FEIPlayContext& Context)
+	{
+		if (!State->Light.IsValid() || !State->Heavy.IsValid())
+		{
+			Context.Test->AddError(TEXT("An enemy is gone after the gust"));
+			Clear();
+			return;
+		}
+		const double LightAway = FVector::Dist2D(Context.Hero->GetActorLocation(), State->Light->GetActorLocation());
+		const double HeavyMoved = FVector::Dist2D(State->HeavyAt, State->Heavy->GetActorLocation());
+		Context.Test->AddInfo(FString::Printf(TEXT("After the gust the light enemy stands %.0f cm from the hero, it began 323 cm away. The heavy one moved %.0f cm"), LightAway, HeavyMoved));
+		Context.Test->TestTrue(TEXT("The gust hurts"), State->Light->GetHealth()->GetHealth() < State->LightLife);
+		Context.Test->TestTrue(TEXT("The gust throws the enemy away"), LightAway > 550.0);
+		Context.Test->TestTrue(TEXT("A windproof enemy stands"), HeavyMoved < 50.0);
+		Clear();
+	}));
+	Steps.Add(Wait(0.1));
+
+	// The fire whirl: it draws the neighbour in and sets on fire.
+	Steps.Add(Do([StartWhirl](const FEIPlayContext& Context) { StartWhirl(Context, EEIElement::Fire, 0.0f); }));
+	Steps.Add(Wait(0.7));
+	Steps.Add(Do([State, Alive](const FEIPlayContext& Context)
+	{
+		if (!Alive(Context, TEXT("in the fire whirl")))
+		{
+			return;
+		}
+		TActorIterator<AEIRuneField> Field(Context.World);
+		if (Field)
+		{
+			const double Away = FVector::Dist2D(Field->GetActorLocation(), State->Neighbour->GetActorLocation());
+			Context.Test->AddInfo(FString::Printf(TEXT("The fire whirl drew the neighbour from %.0f cm to %.0f cm"), State->NeighbourStart, Away));
+			Context.Test->TestTrue(TEXT("The whirl draws the neighbour in"), Away < State->NeighbourStart - 100.0f);
+		}
+		Context.Test->TestTrue(TEXT("The fire whirl sets on fire"), State->Light->IsBurning() && State->Neighbour->IsBurning());
+		Context.Test->TestTrue(TEXT("The fire whirl hurts"), State->Light->GetHealth()->GetHealth() < State->LightLife);
+	}));
+	Steps.Add(WaitUntil(TEXT("the fire whirl is over"), 2.0, [](const FEIPlayContext& Context) { return CountFields(Context) == 0; }));
+	Steps.Add(Do([Clear](const FEIPlayContext& Context) { Clear(); }));
+	Steps.Add(Wait(0.1));
+	Steps.Add(Do([](const FEIPlayContext& Context) { Teleport(Context, OpenFloor, 0.0f); }));
+	Steps.Add(Wait(0.1));
+
+	// The frost whirl: it slows, and at its end it freezes everyone in it.
+	Steps.Add(Do([StartWhirl](const FEIPlayContext& Context) { StartWhirl(Context, EEIElement::Ice, 0.0f); }));
+	Steps.Add(Wait(0.3));
+	Steps.Add(Do([State, Alive](const FEIPlayContext& Context)
+	{
+		if (!Alive(Context, TEXT("in the frost whirl")))
+		{
+			return;
+		}
+		Context.Test->TestTrue(TEXT("The frost whirl slows"), State->Light->IsSlowed());
+		Context.Test->TestFalse(TEXT("It does not freeze yet"), State->Light->IsFrozen());
+	}));
+	Steps.Add(WaitUntil(TEXT("the frost whirl is over"), 2.0, [](const FEIPlayContext& Context) { return CountFields(Context) == 0; }));
+	Steps.Add(Do([State, Clear, Alive](const FEIPlayContext& Context)
+	{
+		Context.Test->TestTrue(TEXT("At its end the frost whirl freezes"), Alive(Context, TEXT("after the frost whirl")) && State->Light->IsFrozen() && State->Neighbour->IsFrozen());
+		Clear();
+	}));
+	Steps.Add(Wait(0.1));
+
+	// The thunder whirl: lightning strikes everyone in it.
+	Steps.Add(Do([State, StartWhirl](const FEIPlayContext& Context)
+	{
+		StartWhirl(Context, EEIElement::Lightning, 0.0f);
+		const float Strike = Context.Hero->GetRunes()->GetTable().Whirl.StormDamage * Context.Hero->GetGear()->GetReactionFactor();
+		Context.Test->TestNearlyEqual(TEXT("The thunder whirl strikes at once"), State->LightLife - State->Light->GetHealth()->GetHealth(), Strike, 0.01f);
+	}));
+	Steps.Add(WaitUntil(TEXT("the thunder whirl is over"), 2.0, [](const FEIPlayContext& Context) { return CountFields(Context) == 0; }));
+	Steps.Add(Do([State, Alive](const FEIPlayContext& Context)
+	{
+		if (!Alive(Context, TEXT("in the thunder whirl")))
+		{
+			return;
+		}
+		const float Strike = Context.Hero->GetRunes()->GetTable().Whirl.StormDamage * Context.Hero->GetGear()->GetReactionFactor();
+		const float Lost = State->LightLife - State->Light->GetHealth()->GetHealth();
+		Context.Test->AddInfo(FString::Printf(TEXT("The thunder whirl did %.0f damage, one strike is %.0f"), Lost, Strike));
+		Context.Test->TestTrue(TEXT("The thunder whirl strikes again and again"), Lost >= Strike * 2.0f);
+	}));
 	return RunInArena(this, MoveTemp(Steps));
 }
 

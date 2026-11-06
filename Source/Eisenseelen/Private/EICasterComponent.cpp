@@ -26,6 +26,13 @@ namespace
 	// The flash starts at the hand, because straight ahead of the eye its end would fill the view.
 	const FVector ChainStartCm(100.0f, 24.0f, -30.0f);
 
+	// The gust: whoever stands this close is always caught, and it lifts a little, so that the floor does not brake it at once.
+	constexpr float GustAlwaysWithinCm = 120.0f;
+	constexpr float GustLiftCm = 250.0f;
+	constexpr int32 GustStreaks = 7;
+	constexpr float GustStreakStartCm = 80.0f;
+	constexpr float GustStreakHeightCm = 60.0f;
+
 	bool ReadSpell(const FJsonObject& Spells, const TCHAR* Key, FEISpellValues& Out, TSharedPtr<FJsonObject>& OutObject, FString& OutError)
 	{
 		const TSharedPtr<FJsonObject>* Spell = nullptr;
@@ -67,6 +74,7 @@ const FEISpellValues& FEICasterValues::GetSpell(EEIElement Element) const
 	{
 	case EEIElement::Ice: return IceLance;
 	case EEIElement::Lightning: return ChainLightning;
+	case EEIElement::Wind: return Gust;
 	default: return Fireball;
 	}
 }
@@ -100,7 +108,12 @@ bool FEICasterValues::LoadFromProjectFile(FEICasterValues& OutValues, FString& O
 		|| !FEIDataFile::ReadNumber(*Spell, TEXT("reichweite_m"), 1.0, 500.0, Loaded.ChainLightning.RangeMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Spell, TEXT("spruenge"), 0.0, 100.0, Loaded.ChainLightning.Jumps, OutError)
 		|| !FEIDataFile::ReadNumber(*Spell, TEXT("sprung_m"), 0.1, 200.0, Loaded.ChainLightning.JumpMeters, OutError)
-		|| !FEIDataFile::ReadNumber(*Spell, TEXT("abzug_je_sprung_0_bis_1"), 0.0, 1.0, Loaded.ChainLightning.JumpFalloff, OutError))
+		|| !FEIDataFile::ReadNumber(*Spell, TEXT("abzug_je_sprung_0_bis_1"), 0.0, 1.0, Loaded.ChainLightning.JumpFalloff, OutError)
+		|| !ReadSpell(**Spells, TEXT("windstoss"), Loaded.Gust, Spell, OutError)
+		|| !FEIDataFile::ReadNumber(*Spell, TEXT("reichweite_m"), 0.5, 100.0, Loaded.Gust.RangeMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Spell, TEXT("winkel_grad"), 1.0, 360.0, Loaded.Gust.AngleDegrees, OutError)
+		|| !FEIDataFile::ReadNumber(*Spell, TEXT("stoss_m_pro_s"), 0.0, 100.0, Loaded.Gust.PushMetersPerSecond, OutError)
+		|| !FEIDataFile::ReadNumber(*Spell, TEXT("taumeln_s"), 0.0, 10.0, Loaded.Gust.StaggerSeconds, OutError))
 	{
 		return false;
 	}
@@ -357,6 +370,11 @@ void UEICasterComponent::SpawnProjectile(EEICast Kind, const FVector& Target)
 		CastChain(Target, Values.ChainLightning.Damage * Factor);
 		return;
 	}
+	if (Kind != EEICast::Bolt && Element == EEIElement::Wind)
+	{
+		CastGust(Target, Values.Gust.Damage * Factor);
+		return;
+	}
 
 	FEIProjectileSetup Setup;
 	Setup.Element = Element;
@@ -434,6 +452,80 @@ void UEICasterComponent::CastChain(const FVector& Target, float Damage)
 		Current = Jump < FMath::RoundToInt(Spell.Jumps) ? FindNextChainTarget(Current->GetActorLocation(), Struck) : nullptr;
 	}
 	MulticastChain(Points);
+}
+
+void UEICasterComponent::CastGust(const FVector& Target, float Damage)
+{
+	AEIHeroCharacter* Hero = GetHero();
+	const FEISpellValues& Spell = Values.Gust;
+	const FVector From = Hero->GetActorLocation();
+	FVector Direction = (Target - From).GetSafeNormal2D();
+	if (Direction.IsNearlyZero())
+	{
+		Direction = Hero->GetViewRotation().Vector().GetSafeNormal2D();
+	}
+	const float RangeCm = Spell.RangeMeters * CentimetersPerMeter;
+	const float HalfAngleCos = FMath::Cos(FMath::DegreesToRadians(Spell.AngleDegrees * 0.5f));
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(EIGust), false, Hero);
+	TArray<FOverlapResult> Overlaps;
+	GetWorld()->OverlapMultiByObjectType(Overlaps, From, FQuat::Identity, FCollisionObjectQueryParams(ECC_Pawn), FCollisionShape::MakeSphere(RangeCm), Query);
+	TSet<AActor*> Done;
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Struck = Overlap.GetActor();
+		if (!IsChainTarget(Struck) || Done.Contains(Struck))
+		{
+			continue;
+		}
+		const FVector Flat = (Struck->GetActorLocation() - From) * FVector(1.0f, 1.0f, 0.0f);
+		const double Distance = Flat.Size();
+		// Whoever stands right at the hero is always in the gust.
+		if (Distance > RangeCm || (Distance > GustAlwaysWithinCm && FVector::DotProduct(Flat / Distance, Direction) < HalfAngleCos))
+		{
+			continue;
+		}
+		FCollisionQueryParams WallQuery(SCENE_QUERY_STAT(EIGustWall), false, Struck);
+		if (GetWorld()->LineTraceTestByObjectType(Hero->GetPawnViewLocation(), Struck->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), WallQuery))
+		{
+			continue;
+		}
+		Done.Add(Struck);
+		AEIEnemy* Enemy = Cast<AEIEnemy>(Struck);
+		if (Enemy != nullptr)
+		{
+			Hero->GetRunes()->HitWithElement(Enemy, EEIElement::Wind);
+		}
+		UGameplayStatics::ApplyDamage(Struck, Damage, Hero->GetController(), Hero, UEISpellDamage::StaticClass());
+		if (Enemy != nullptr && Enemy->CanBeMoved())
+		{
+			const FVector Away = Distance > 1.0 ? Flat / Distance : Direction;
+			if (Spell.StaggerSeconds > 0.0f)
+			{
+				Enemy->Stagger(Spell.StaggerSeconds);
+			}
+			Enemy->Push(Away * Spell.PushMetersPerSecond * CentimetersPerMeter + FVector(0.0f, 0.0f, GustLiftCm));
+		}
+	}
+	MulticastGust(From, Direction);
+}
+
+void UEICasterComponent::MulticastGust_Implementation(FVector_NetQuantize From, FVector_NetQuantizeNormal Direction)
+{
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const float RangeCm = Values.Gust.RangeMeters * CentimetersPerMeter;
+	const FLinearColor Color = EIElementColor(EEIElement::Wind);
+	for (int32 Streak = 0; Streak < GustStreaks; ++Streak)
+	{
+		const float Share = static_cast<float>(Streak) / static_cast<float>(GustStreaks - 1) - 0.5f;
+		const FVector Way = Direction.RotateAngleAxis(Share * Values.Gust.AngleDegrees, FVector::UpVector);
+		const FVector Height(0.0f, 0.0f, GustStreakHeightCm * (Streak % 2 == 0 ? 1.0f : 0.4f));
+		const FVector Start = From + Way * GustStreakStartCm + Height;
+		if (AEIBeamFX* Beam = GetWorld()->SpawnActor<AEIBeamFX>(Start, FRotator::ZeroRotator, Params))
+		{
+			Beam->Setup(Start, From + Way * RangeCm + Height, Color);
+		}
+	}
 }
 
 AActor* UEICasterComponent::FindNextChainTarget(const FVector& From, const TArray<AActor*>& Struck) const

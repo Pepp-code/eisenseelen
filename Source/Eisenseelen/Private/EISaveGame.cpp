@@ -16,6 +16,20 @@ namespace
 {
 	const TCHAR* const ClassKeys[2] = { TEXT("klingenwacht"), TEXT("arkanist") };
 
+	/** Items that got a new name. A file from before still holds the old one. */
+	FString RenamedItem(const FString& Name)
+	{
+		if (Name == TEXT("Sturmklinge"))
+		{
+			return TEXT("Donnerklinge");
+		}
+		if (Name == TEXT("Sturmrune"))
+		{
+			return TEXT("Donnerrune");
+		}
+		return Name;
+	}
+
 	TSharedRef<FJsonObject> WriteClass(const FEISavedClass& Saved)
 	{
 		const TSharedRef<FJsonObject> Slots = MakeShared<FJsonObject>();
@@ -42,7 +56,7 @@ namespace
 		for (int32 Index = 0; Index < EISlotCount; ++Index)
 		{
 			FString Name;
-			Out.Slots[Index] = (*Slots)->TryGetStringField(EISlotKey(static_cast<EEISlot>(Index)), Name) ? Name : FString();
+			Out.Slots[Index] = (*Slots)->TryGetStringField(EISlotKey(static_cast<EEISlot>(Index)), Name) ? RenamedItem(Name) : FString();
 		}
 	}
 }
@@ -135,7 +149,7 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 			FString Name;
 			if (Value->TryGetString(Name) && !Name.IsEmpty())
 			{
-				OwnedNames.Add(Name);
+				OwnedNames.Add(RenamedItem(Name));
 			}
 		}
 	}
@@ -143,7 +157,7 @@ bool FEISaveGame::FromJson(const FString& Json, FString& OutError)
 	{
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*OwnedObject)->Values)
 		{
-			OwnedNames.Add(Pair.Key);
+			OwnedNames.Add(RenamedItem(Pair.Key));
 		}
 	}
 	else

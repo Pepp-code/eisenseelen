@@ -6,6 +6,7 @@
 #include "EIRuneComponent.generated.h"
 
 class AEIHeroCharacter;
+class AEIRuneField;
 
 /** One line of Data/runen.json: an item that gives the hero a spell on the E key. */
 struct EISENSEELEN_API FEIRune
@@ -30,6 +31,25 @@ struct EISENSEELEN_API FEIRune
 	float SlowShare = 0.0f;
 	float BurnPerSecond = 0.0f;
 	float StatusSeconds = 0.0f;
+
+	/** How fast it draws enemies to its middle. 0 for all but wind. */
+	float PullMetersPerSecond = 0.0f;
+};
+
+/** Wind on an enemy with another element, or the other way round: a whirl of that element. */
+struct EISENSEELEN_API FEIWhirlValues
+{
+	float RadiusMeters = 5.0f;
+	float DurationSeconds = 3.0f;
+	float TickSeconds = 0.5f;
+	float PullMetersPerSecond = 6.0f;
+	float FireDamage = 8.0f;
+	float FireBurnPerSecond = 10.0f;
+	float FireBurnSeconds = 3.0f;
+	float FrostDamage = 5.0f;
+	float FrostSlowShare = 0.5f;
+	float FrostFreezeSeconds = 2.0f;
+	float StormDamage = 18.0f;
 };
 
 struct EISENSEELEN_API FEIRuneTable
@@ -46,6 +66,7 @@ struct EISENSEELEN_API FEIRuneTable
 	float SparkTargets = 4.0f;
 	float SparkBurnPerSecond = 10.0f;
 	float SparkBurnSeconds = 3.0f;
+	FEIWhirlValues Whirl;
 
 	/** INDEX_NONE if there is none of that name. */
 	int32 FindByName(const FString& Name) const;
@@ -108,8 +129,12 @@ private:
 	void HurtAround(const FVector& Location, float RadiusCm, float Damage);
 	void SteamExplosion(const AEIEnemy* Enemy);
 	void SparksFly(AEIEnemy* Enemy);
+	void StartWhirl(const AEIEnemy* Enemy, EEIElement Partner);
 
 	FEIRuneTable Table;
+
+	/** Server only. A new whirl does not start where one already turns. */
+	TArray<TWeakObjectPtr<AEIRuneField>> Whirls;
 
 	int32 RuneIndex = INDEX_NONE;
 

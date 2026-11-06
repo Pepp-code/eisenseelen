@@ -37,6 +37,9 @@ struct FEISpellValues : public FEIProjectileValues
 	float Jumps = 0.0f;
 	float JumpMeters = 0.0f;
 	float JumpFalloff = 0.0f;
+	float AngleDegrees = 0.0f;
+	float PushMetersPerSecond = 0.0f;
+	float StaggerSeconds = 0.0f;
 };
 
 struct EISENSEELEN_API FEICasterValues
@@ -46,6 +49,7 @@ struct EISENSEELEN_API FEICasterValues
 	FEISpellValues Fireball;
 	FEISpellValues IceLance;
 	FEISpellValues ChainLightning;
+	FEISpellValues Gust;
 	float HoldForSpellSeconds = 0.4f;
 
 	FEICasterValues();
@@ -109,12 +113,16 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastChain(const TArray<FVector_NetQuantize>& Points);
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastGust(FVector_NetQuantize From, FVector_NetQuantizeNormal Direction);
+
 	AEIHeroCharacter* GetHero() const;
 	float GetManaCost(EEICast Kind) const;
 	bool CanAfford(float Cost) const;
 	void FireAsOwner(EEICast Kind);
 	void SpawnProjectile(EEICast Kind, const FVector& Target);
 	void CastChain(const FVector& Target, float Damage);
+	void CastGust(const FVector& Target, float Damage);
 	AActor* FindNextChainTarget(const FVector& From, const TArray<AActor*>& Struck) const;
 	FVector FindAimPoint() const;
 

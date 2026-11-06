@@ -25,7 +25,7 @@ Das Claude Doc ist das Original des Plans, und der Entwickler bearbeitet es auch
 - Eine Person, 5 bis 6 Stunden pro Woche, wenig Vorerfahrung, testet allein. Ziel ist, dass es Spaß macht und fertig wird, nicht der Verkauf.
 - Vereinbarte Punkte werden am Stück gebaut, jeder mit eigenen grünen Tests. Der Entwickler testet gebündelt am Ende. Angehalten wird nur, wo sein Urteil gebraucht wird.
 - Er gibt kurze, klare Rückmeldungen zum Spielgefühl. Nimm sie wörtlich, und erkläre nicht, warum die alte Zahl gut war. Alle Zahlen sind erste Annahmen.
-- Eigene Namen im Spiel. Begriffe des Vorbilds Far Far West (zum Beispiel Sturm, Kopfgeld, Boss Spawner) dürfen nur im Gespräch fallen, nie im Spiel.
+- Eigene Namen im Spiel. Begriffe des Vorbilds Far Far West (zum Beispiel Sturm, Kopfgeld, Boss Spawner) dürfen nur im Gespräch fallen, nie im Spiel. Deshalb heißen die Blitz-Items Donnerklinge, Donnerrune und Gewitterfeld. Sturmläufer, Sturmlauf und der Ansturm des Kolosses bleiben, weil sie nichts mit dem Wetter zu tun haben.
 
 ## Bauen und testen
 
@@ -35,6 +35,9 @@ Das Claude Doc ist das Original des Plans, und der Entwickler bearbeitet es auch
 - Einzelne Tests: `pwsh tools/check.ps1 -NoBuild -Filter Eisenseelen.Play.Run`. Alle Tests dauern etwa 7 Minuten. Die letzte Zeile heißt `GRUEN: n von n Tests` oder beginnt mit `ROT`.
 - Gib die Ausgabe von `check.ps1` nie direkt in einen verketteten `git commit`. Schreib sie in eine Datei und committe nur, wenn dort `GRUEN` steht. Einmal ging so ein roter Stand durch.
 - `Kein Testbericht entstanden` heißt: Ein Test ist abgestürzt. Die Ursache steht in `Saved/Logs/Eisenseelen.log`, suche nach `Critical error` und der Zeile mit `Eisenseelen.dll`.
+- In Test-Lambdas nie `->` auf einen `TWeakObjectPtr` ohne `IsValid`-Prüfung. Ein weggeschleuderter oder gestorbener Gegner reißt sonst den ganzen Editor mit (Zugriffsfehler bei 0x70).
+- Der Test-Held ist ein Klingenwächter. Stäbe und Zepter lassen sich in Spieltests nicht anlegen, nimm Schwerter.
+- Arbeitet ein zweiter Agent im Hauptordner, baue in einem eigenen Worktree (`git worktree add ..\game-project-<thema> -b <thema>`), rebase am Ende auf `origin/main` und pushe mit `git push origin <thema>:main`.
 - Nur die Laufkarte neu erzeugen (nach einer Änderung an `Data/laufkarte.json`):
   `UnrealEditor-Cmd.exe Eisenseelen.uproject -run=pythonscript -script=<voller Pfad>/tools/make_runmap.py -unattended -nullrhi -nosplash`
 

@@ -2,6 +2,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "EIHeroCharacter.h"
+#include "EIProjectile.h"
 #include "EIRuneComponent.h"
 #include "EIVisuals.h"
 #include "Engine/OverlapResult.h"
@@ -24,6 +25,11 @@ namespace
 	constexpr float WallStrength = 0.45f;
 	constexpr float WallCheckHeightCm = 100.0f;
 	constexpr float LookAboveFloorCm = 5.0f;
+	// Wind stands up as a turning column, see-through, so that the player still sees what is in it.
+	constexpr float TallHeightCm = 250.0f;
+	constexpr float TallStrength = 0.18f;
+	constexpr float TallTurnDegreesPerSecond = 240.0f;
+	constexpr float WhirlPartnerShare = 0.6f;
 }
 
 AEIRuneField::AEIRuneField()
@@ -50,6 +56,7 @@ void AEIRuneField::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIRuneField, SizeCm);
 	DOREPLIFETIME(AEIRuneField, DurationSeconds);
 	DOREPLIFETIME(AEIRuneField, Color);
+	DOREPLIFETIME(AEIRuneField, bTall);
 }
 
 void AEIRuneField::Configure(const FEIRune& Rune, float InDamage, float StatusFactor)
@@ -65,6 +72,40 @@ void AEIRuneField::Configure(const FEIRune& Rune, float InDamage, float StatusFa
 	BurnPerSecond = Rune.BurnPerSecond;
 	StatusSeconds = Rune.StatusSeconds * StatusFactor;
 	Element = Rune.Element;
+	PullCm = Rune.PullMetersPerSecond * CentimetersPerMeter;
+	bTall = !bWall && Rune.Element == EEIElement::Wind;
+}
+
+void AEIRuneField::ConfigureWhirl(EEIElement Partner, const FEIWhirlValues& Whirl, float ReactionFactor, float StatusFactor)
+{
+	bWhirl = true;
+	bTall = true;
+	SizeCm = Whirl.RadiusMeters * CentimetersPerMeter * 2.0f;
+	DurationSeconds = Whirl.DurationSeconds;
+	TickSeconds = Whirl.TickSeconds;
+	PullCm = Whirl.PullMetersPerSecond * CentimetersPerMeter;
+	Element = Partner;
+	Color = FMath::Lerp(EIElementColor(EEIElement::Wind), EIElementColor(Partner), WhirlPartnerShare);
+	switch (Partner)
+	{
+	case EEIElement::Fire:
+		Damage = Whirl.FireDamage * ReactionFactor;
+		BurnPerSecond = Whirl.FireBurnPerSecond;
+		StatusSeconds = Whirl.FireBurnSeconds * StatusFactor;
+		break;
+	case EEIElement::Ice:
+		Damage = Whirl.FrostDamage * ReactionFactor;
+		SlowShare = Whirl.FrostSlowShare;
+		// The slow lasts until the next turn of the whirl.
+		StatusSeconds = Whirl.TickSeconds * 2.0f;
+		EndFreezeSeconds = Whirl.FrostFreezeSeconds * StatusFactor;
+		break;
+	case EEIElement::Lightning:
+		Damage = Whirl.StormDamage * ReactionFactor;
+		break;
+	default:
+		break;
+	}
 }
 
 void AEIRuneField::BeginPlay()
@@ -77,19 +118,42 @@ void AEIRuneField::BeginPlay()
 		Shape->SetWorldScale3D(FVector(WallThicknessCm, SizeCm, WallHeightCm) / 100.0f);
 		AddActorWorldOffset(FVector(0.0f, 0.0f, WallHeightCm / 2.0f));
 	}
+	else if (bTall)
+	{
+		Shape->SetWorldScale3D(FVector(SizeCm, SizeCm, TallHeightCm) / 100.0f);
+		AddActorWorldOffset(FVector(0.0f, 0.0f, TallHeightCm / 2.0f + LookAboveFloorCm));
+	}
 	else
 	{
 		Shape->SetWorldScale3D(FVector(SizeCm, SizeCm, CircleHeightCm) / 100.0f);
 		AddActorWorldOffset(FVector(0.0f, 0.0f, CircleHeightCm / 2.0f + LookAboveFloorCm));
 	}
-	Material = EIVisuals::SetGlow(Shape, Color, bWall ? WallStrength : CircleStrength);
-	EIVisuals::PlaySoundAt(this, TEXT("ExplosionKlein"), GetActorLocation());
+	Material = EIVisuals::SetGlow(Shape, Color, bWall ? WallStrength : (bTall ? TallStrength : CircleStrength));
+	EIVisuals::PlaySoundAt(this, bWhirl ? TEXT("ExplosionGross") : TEXT("ExplosionKlein"), GetActorLocation());
 	SetLifeSpan(FMath::Max(DurationSeconds, BurstSeconds));
 	if (HasAuthority())
 	{
 		Pulse();
 		NextPulseIn = TickSeconds;
 	}
+}
+
+void AEIRuneField::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// The frost whirl freezes everyone it still holds when it ends.
+	if (EndPlayReason == EEndPlayReason::Destroyed && HasAuthority() && EndFreezeSeconds > 0.0f)
+	{
+		TArray<AActor*> Targets;
+		CollectTargets(Targets);
+		for (AActor* Target : Targets)
+		{
+			if (AEIEnemy* Enemy = Cast<AEIEnemy>(Target))
+			{
+				Enemy->Freeze(EndFreezeSeconds);
+			}
+		}
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void AEIRuneField::Tick(float DeltaSeconds)
@@ -106,7 +170,12 @@ void AEIRuneField::Tick(float DeltaSeconds)
 	if (DurationSeconds <= 0.0f && !bWall)
 	{
 		const float Width = SizeCm * FMath::Lerp(0.2f, 1.0f, 1.0f - FMath::Square(1.0f - FMath::Clamp(Age / BurstSeconds, 0.0f, 1.0f)));
-		Shape->SetWorldScale3D(FVector(Width, Width, CircleHeightCm) / 100.0f);
+		Shape->SetWorldScale3D(FVector(Width, Width, bTall ? TallHeightCm : CircleHeightCm) / 100.0f);
+	}
+	// Wind turns.
+	if (bTall)
+	{
+		AddActorWorldRotation(FRotator(0.0f, TallTurnDegreesPerSecond * DeltaSeconds, 0.0f));
 	}
 	if (!HasAuthority() || DurationSeconds <= 0.0f)
 	{
@@ -120,48 +189,87 @@ void AEIRuneField::Tick(float DeltaSeconds)
 	}
 }
 
-void AEIRuneField::Pulse()
+void AEIRuneField::CollectTargets(TArray<AActor*>& OutTargets) const
 {
-	AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(GetOwner());
 	const FCollisionShape Area = bWall
 		? FCollisionShape::MakeBox(FVector(WallThicknessCm, SizeCm, WallHeightCm) / 2.0f)
 		: FCollisionShape::MakeSphere(SizeCm / 2.0f);
 	TArray<FOverlapResult> Overlaps;
 	GetWorld()->OverlapMultiByObjectType(Overlaps, GetActorLocation(), GetActorQuat(), FCollisionObjectQueryParams(ECC_Pawn), Area);
-	TSet<AActor*> Done;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
 		AActor* Target = Overlap.GetActor();
-		if (Target == nullptr || Done.Contains(Target) || Target->IsA<AEIHeroCharacter>() || !Target->CanBeDamaged())
+		if (Target == nullptr || OutTargets.Contains(Target) || Target->IsA<AEIHeroCharacter>() || !Target->CanBeDamaged())
 		{
 			continue;
 		}
-		Done.Add(Target);
 		FCollisionQueryParams WallQuery(SCENE_QUERY_STAT(EIRuneWall), false, Target);
 		if (GetWorld()->LineTraceTestByObjectType(GetActorLocation() + FVector(0.0f, 0.0f, WallCheckHeightCm), Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), WallQuery))
 		{
 			continue;
 		}
+		OutTargets.Add(Target);
+	}
+}
+
+void AEIRuneField::Pulse()
+{
+	AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(GetOwner());
+	TArray<AActor*> Targets;
+	CollectTargets(Targets);
+	TArray<FVector_NetQuantize> Struck;
+	for (AActor* Target : Targets)
+	{
 		AEIEnemy* Enemy = Cast<AEIEnemy>(Target);
-		if (Enemy != nullptr && Hero != nullptr)
+		if (Enemy != nullptr && Hero != nullptr && !bWhirl)
 		{
 			Hero->GetRunes()->HitWithElement(Enemy, Element);
 		}
-		UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Hero, UEISpellDamage::StaticClass());
-		if (Enemy != nullptr)
+		if (Damage > 0.0f)
 		{
-			if (FreezeSeconds > 0.0f)
-			{
-				Enemy->Freeze(FreezeSeconds);
-			}
-			if (SlowShare > 0.0f)
-			{
-				Enemy->ApplySlow(SlowShare, StatusSeconds);
-			}
-			if (BurnPerSecond > 0.0f)
-			{
-				Enemy->ApplyBurn(BurnPerSecond, StatusSeconds);
-			}
+			UGameplayStatics::ApplyDamage(Target, Damage, GetInstigatorController(), Hero, UEISpellDamage::StaticClass());
+		}
+		if (bWhirl && Element == EEIElement::Lightning)
+		{
+			Struck.Add(Target->GetActorLocation());
+		}
+		if (Enemy == nullptr)
+		{
+			continue;
+		}
+		if (FreezeSeconds > 0.0f)
+		{
+			Enemy->Freeze(FreezeSeconds);
+		}
+		if (SlowShare > 0.0f)
+		{
+			Enemy->ApplySlow(SlowShare, StatusSeconds);
+		}
+		if (BurnPerSecond > 0.0f)
+		{
+			Enemy->ApplyBurn(BurnPerSecond, StatusSeconds);
+		}
+		if (PullCm > 0.0f && !Enemy->IsFrozen())
+		{
+			Enemy->PullToward(GetActorLocation(), PullCm);
+		}
+	}
+	if (Struck.Num() > 0)
+	{
+		MulticastStrikes(Struck);
+	}
+}
+
+void AEIRuneField::MulticastStrikes_Implementation(const TArray<FVector_NetQuantize>& Targets)
+{
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const FVector Top = GetActorLocation() + FVector(0.0f, 0.0f, TallHeightCm / 2.0f);
+	for (const FVector_NetQuantize& Target : Targets)
+	{
+		if (AEIBeamFX* Beam = GetWorld()->SpawnActor<AEIBeamFX>(Top, FRotator::ZeroRotator, Params))
+		{
+			Beam->Setup(Top, Target, EIElementColor(EEIElement::Lightning));
 		}
 	}
 }

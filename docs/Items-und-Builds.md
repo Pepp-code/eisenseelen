@@ -100,7 +100,7 @@ Alle Boni zählen zusammen: Waffe, Rüstung und Kristall landen in derselben Sum
 | Zaubermacht | Mehr Schaden von Q und E | Helm | Schritt 1 |
 | Feuerschaden | Mehr Schaden mit Feuer | Waffe, Helm | Schritt 1 |
 | Eisschaden | Mehr Schaden mit Eis | Waffe, Helm | Frostrune |
-| Blitzschaden | Mehr Schaden mit Blitz | Waffe, Helm | Sturmrune |
+| Blitzschaden | Mehr Schaden mit Blitz | Waffe, Helm | Donnerrune |
 | Windschaden | Mehr Schaden mit Wind | Waffe, Helm | Windrune |
 | Abklingzeit | Q und E sind schneller wieder bereit | Handschuhe | Schritt 1 |
 | Zauberfläche | Zauber treffen auf einer größeren Fläche | Handschuhe | Stufe 6 |
@@ -146,7 +146,7 @@ Eine Waffe besteht aus Grundform und Element. Die Grundform bestimmt, wie sie si
 
 | Grundform | Feuer: Q Feuerball | Eis: Q Eislanze | Blitz: Q Kettenblitz | Wind: Q Windstoß |
 | --- | --- | --- | --- | --- |
-| Langschwert | Flammenschwert | Frostklinge | Sturmklinge | Windklinge |
+| Langschwert | Flammenschwert | Frostklinge | Donnerklinge | Windklinge |
 | Zweihänder | Aschenbrecher | Gletscherbrecher | Donnerbrecher | Orkanbrecher |
 | Kurzschwert | Glutsäbel | Reifsäbel | Funkensäbel | Böensäbel |
 | Stab | Feuerstab | Froststab | Funkenstab | Windstab |
@@ -155,9 +155,9 @@ Eine Waffe besteht aus Grundform und Element. Die Grundform bestimmt, wie sie si
 
 Jede Waffe gibt zusätzlich +10 % Schaden ihres Elements. Zum Start hat die Klingenwacht das Flammenschwert und der Arkanist den Feuerstab.
 
-Gebaut sind 5 der 6 Grundformen, also 15 Waffen, die Rute kommt später. Zweihänder und Kurzschwert nutzen vorerst dieselbe Bewegung wie das Langschwert, nur langsamer oder schneller und mit längerer oder kürzerer Klinge.
+Gebaut sind 5 der 6 Grundformen in allen vier Elementen, also 20 Waffen, die Rute kommt später. Zweihänder und Kurzschwert nutzen vorerst dieselbe Bewegung wie das Langschwert, nur langsamer oder schneller und mit längerer oder kürzerer Klinge.
 
-**Wind ist eingeplant, aber noch nicht gebaut.** Die Windwaffen stehen schon in der Tabelle. Beim Bau werden Sturmklinge, Sturmrune und Sturmfeld umbenannt, weil „Sturm“ nach Wind klingt. Die Rüstungsart Sturmläufer bleibt, denn sie passt dann noch besser.
+**Wind ist seit dem 6. November gebaut.** Sturmklinge, Sturmrune und Sturmfeld heißen jetzt Donnerklinge, Donnerrune und Gewitterfeld, weil „Sturm“ nach Wind klingt. Die Rüstungsart Sturmläufer bleibt, denn sie passt jetzt noch besser. Eine Windwaffe wirkt auf Q den Windstoß, beim Arkanisten auch aufgeladen mit der rechten Maustaste.
 
 ## Gravuren und Meisterstücke
 
@@ -191,14 +191,14 @@ So wirken die neuen Zauber: Die Eislanze fliegt durch alle Gegner hindurch und v
 | --- | --- | --- | --- |
 | Feuer | Feuerball | Flammenrune | Flammenwand |
 | Eis | Eislanze | Frostrune | Frostnova |
-| Blitz | Kettenblitz | Sturmrune | Sturmfeld |
-| Wind | Windstoß | Windrune | Wirbelsturm |
+| Blitz | Kettenblitz | Donnerrune | Gewitterfeld |
+| Wind | Windstoß | Windrune | Windhose |
 
 ## Rüstung
 
 Es gibt 10 Arten mit je 4 Teilen, also 40 Rüstungsteile. Du kannst sie frei mischen. 2 Teile derselben Art geben einen kleinen Bonus, 4 Teile denselben Bonus doppelt und zusätzlich eine neue Regel. Du entscheidest also jedes Mal: das volle Set oder zwei Arten zu je zwei Teilen.
 
-Gebaut sind die ersten 5 Arten: Eisenwacht, Henkersgarde, Glutschmiede, Frostwacht und Quellwächter.
+Gebaut sind 6 Arten: Eisenwacht, Henkersgarde, Glutschmiede, Frostwacht, Quellwächter und Windwirker.
 
 | Art | Helm | Brustpanzer | Handschuhe | Schuhe |
 | --- | --- | --- | --- | --- |
@@ -272,13 +272,15 @@ Was wann kommt, steht in Data/items.json bei jedem Teil unter `ab_level` und `pr
 | 1 | Flammenschwert, Feuerstab und Frostrune hast du schon. Dazu die Glutschmiede-Rüstung | 300 bis 450 Gold je Teil |
 | 2 | Frostklinge, Froststab, Flammenrune | 800 Gold, Rune 600 |
 | 3 | Eisenwacht (Klingenwacht) und Quellwächter (Arkanist) | 300 bis 450 Gold je Teil |
-| 4 | Sturmklinge, Funkenstab, Sturmrune | 800 Gold, Rune 600 |
+| 4 | Donnerklinge, Funkenstab, Donnerrune | 800 Gold, Rune 600 |
 | 5 | Frostwacht | 300 bis 450 Gold je Teil |
 | 6 | Glutsäbel, Reifsäbel, Funkensäbel | 900 Gold |
 | 7 | Henkersgarde (Klingenwacht) | 300 bis 450 Gold je Teil |
 | 8 | Aschenbrecher, Aschenzepter | 1.200 Gold |
+| 9 | Windklinge, Böensäbel, Windstab, Windrune, dazu die Windwirker-Rüstung | 800 Gold, Säbel 900, Rune 600, Rüstung 300 bis 450 je Teil |
 | 10 | Gletscherbrecher, Gletscherzepter | 1.200 Gold |
 | 12 | Donnerbrecher, Donnerzepter | 1.200 Gold |
+| 14 | Orkanbrecher, Orkanzepter | 1.200 Gold |
 
 Steigst du ein Level auf, sagt dir eine Meldung, was in der Schmiede neu ist. Im Menü steht unten, was mit dem nächsten Level kommt.
 
@@ -299,10 +301,10 @@ Die Belohnungen sind fest und steigen nicht mit der Zeit. Mehr bekommst du nur d
 ## Beispiel-Builds
 
 - **Dampfhammer (Klingenwacht):** Aschenbrecher, Frostrune, 4 Teile Kesselwacht, Zeitkern. Frostnova, dann Feuerball: Mit 4 statt 2 Sekunden Zeit zündest du die Dampfexplosion auch im Getümmel, danach räumt der Zweihänder auf.
-- **Bollwerk (Klingenwacht):** Flammenschwert, Sturmrune, 4 Teile Eisenwacht, Paradekern. Du stehst mitten in der Horde, und jede Parade wirft eine Druckwelle.
+- **Bollwerk (Klingenwacht):** Flammenschwert, Donnerrune, 4 Teile Eisenwacht, Paradekern. Du stehst mitten in der Horde, und jede Parade wirft eine Druckwelle.
 - **Sturmtänzer (Klingenwacht):** Funkensäbel, Flammenrune, 4 Teile Sturmläufer, Glaskern. Rein, zuschlagen, raus: Du machst viel Schaden, aber jeder Treffer tut weh.
 - **Glutmagier (Arkanist):** Feuerstab, Flammenrune, 4 Teile Glutschmiede, Zwillingskern. Keine Reaktionen, dafür zwei Feuerbälle auf einmal, und alles brennt länger.
-- **Frostbrecher (Arkanist):** Froststab, Sturmrune, 2 Teile Frostwacht, 2 Teile Kesselwacht, Blutkern. Erst einfrieren, dann mit Blitz in ganzen Gruppen den Splitterbruch auslösen, und der Schaden heilt dich.
+- **Frostbrecher (Arkanist):** Froststab, Donnerrune, 2 Teile Frostwacht, 2 Teile Kesselwacht, Blutkern. Erst einfrieren, dann mit Blitz in ganzen Gruppen den Splitterbruch auslösen, und der Schaden heilt dich.
 
 ## Was das Aussehen kostet
 

@@ -84,7 +84,7 @@
 			"modell": "",
 			"leuchtteile_behalten": false
 		},
-		"item.Sturmklinge": {
+		"item.Donnerklinge": {
 			"modell": "",
 			"leuchtteile_behalten": false
 		},
@@ -133,6 +133,26 @@
 			"leuchtteile_behalten": false
 		},
 		"item.Donnerzepter": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Windklinge": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Böensäbel": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Windstab": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Orkanbrecher": {
+			"modell": "",
+			"leuchtteile_behalten": false
+		},
+		"item.Orkanzepter": {
 			"modell": "",
 			"leuchtteile_behalten": false
 		},
@@ -195,6 +215,18 @@
 			"modell": ""
 		},
 		"item.Schuhe des Quellwächters": {
+			"modell": ""
+		},
+		"item.Helm des Windwirkers": {
+			"modell": ""
+		},
+		"item.Brustpanzer des Windwirkers": {
+			"modell": ""
+		},
+		"item.Handschuhe des Windwirkers": {
+			"modell": ""
+		},
+		"item.Schuhe des Windwirkers": {
 			"modell": ""
 		},
 		"_orte": "Orte auf der Karte. Leuchtende Teile wie Kristalle, Glut oder Siegel bleiben sichtbar, solange leuchtteile_behalten nicht false ist.",

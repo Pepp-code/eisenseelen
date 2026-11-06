@@ -86,6 +86,11 @@ namespace
 	constexpr float NoticeCheckSeconds = 0.25f;
 	constexpr float HomeReachCm = 200.0f;
 
+	// Being drawn into a whirl.
+	constexpr float PullStopCm = 60.0f;
+	constexpr float PullHopSeconds = 0.4f;
+	constexpr float PullHopUpCm = 200.0f;
+
 	constexpr int32 DebrisPieces = 7;
 	constexpr float DebrisLifeSeconds = 1.8f;
 	constexpr float DebrisSpeedCm = 450.0f;
@@ -156,6 +161,11 @@ bool EIElementFromKey(const FString& Key, EEIElement& OutElement)
 		OutElement = EEIElement::Lightning;
 		return true;
 	}
+	if (Key == TEXT("wind"))
+	{
+		OutElement = EEIElement::Wind;
+		return true;
+	}
 	return false;
 }
 
@@ -165,6 +175,7 @@ FLinearColor EIElementColor(EEIElement Element)
 	{
 	case EEIElement::Ice: return FLinearColor(0.35f, 0.7f, 1.0f);
 	case EEIElement::Lightning: return FLinearColor(0.95f, 0.9f, 0.35f);
+	case EEIElement::Wind: return FLinearColor(0.45f, 1.0f, 0.75f);
 	default: return FLinearColor(1.0f, 0.38f, 0.06f);
 	}
 }
@@ -191,6 +202,7 @@ bool FEIEnemyValues::ReadFrom(const FJsonObject& Section, FEIEnemyValues& OutVal
 	Section.TryGetStringField(TEXT("name"), Loaded.Name);
 	// Only a big enemy shows its blow on the floor. With many small ones that would say nothing any more.
 	Section.TryGetBoolField(TEXT("schlag_markiert"), Loaded.bMarksStrike);
+	Section.TryGetBoolField(TEXT("windfest"), Loaded.bWindproof);
 	if (!FEIDataFile::ReadNumber(Section, TEXT("leben"), 1.0, 100000.0, Loaded.Life, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("bedrohung"), 0.0, 1000.0, Loaded.Threat, OutError)
 		|| !FEIDataFile::ReadNumber(Section, TEXT("tempo_m_pro_s"), 0.1, 30.0, Loaded.SpeedMetersPerSecond, OutError)
@@ -514,17 +526,28 @@ void AEIEnemy::ApplyBurn(float PerSecond, float Seconds)
 	bBurning = true;
 }
 
-EEIReaction AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds)
+EEIReaction AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds, EEIElement* OutPartner)
 {
 	EEIReaction Reaction = EEIReaction::None;
 	if (IsUntouchable())
 	{
 		return Reaction;
 	}
-	if (ElementMarkRemaining > 0.0f)
+	if (ElementMarkRemaining > 0.0f && ElementMark != Element)
 	{
 		const auto Between = [Element, this](EEIElement A, EEIElement B) { return (Element == A && ElementMark == B) || (Element == B && ElementMark == A); };
-		Reaction = Between(EEIElement::Fire, EEIElement::Ice) ? EEIReaction::Steam : (Between(EEIElement::Fire, EEIElement::Lightning) ? EEIReaction::Sparks : EEIReaction::None);
+		if (Element == EEIElement::Wind || ElementMark == EEIElement::Wind)
+		{
+			Reaction = EEIReaction::Whirl;
+			if (OutPartner != nullptr)
+			{
+				*OutPartner = Element == EEIElement::Wind ? ElementMark : Element;
+			}
+		}
+		else
+		{
+			Reaction = Between(EEIElement::Fire, EEIElement::Ice) ? EEIReaction::Steam : (Between(EEIElement::Fire, EEIElement::Lightning) ? EEIReaction::Sparks : EEIReaction::None);
+		}
 	}
 	if (Reaction != EEIReaction::None)
 	{
@@ -534,6 +557,37 @@ EEIReaction AEIEnemy::MarkElement(EEIElement Element, float WindowSeconds)
 	ElementMark = Element;
 	ElementMarkRemaining = WindowSeconds;
 	return EEIReaction::None;
+}
+
+bool AEIEnemy::CanBeMoved() const
+{
+	// Once a charge runs, nothing stops it.
+	return !Values.bWindproof && !IsDead() && !IsUntouchable() && State != EState::Charging;
+}
+
+void AEIEnemy::Push(const FVector& Velocity)
+{
+	if (HasAuthority() && CanBeMoved())
+	{
+		LaunchCharacter(Velocity, true, true);
+	}
+}
+
+void AEIEnemy::PullToward(const FVector& Center, float SpeedCm)
+{
+	if (!HasAuthority() || !CanBeMoved())
+	{
+		return;
+	}
+	const FVector Offset = (Center - GetActorLocation()) * FVector(1.0f, 1.0f, 0.0f);
+	const float Distance = static_cast<float>(Offset.Size());
+	if (Distance < PullStopCm)
+	{
+		return;
+	}
+	// A short hop, so that the floor does not brake it at once, and never past the middle.
+	const float Speed = FMath::Min(SpeedCm, Distance / PullHopSeconds);
+	LaunchCharacter(Offset / Distance * Speed + FVector(0.0f, 0.0f, PullHopUpCm), true, true);
 }
 
 void AEIEnemy::Freeze(float Seconds)

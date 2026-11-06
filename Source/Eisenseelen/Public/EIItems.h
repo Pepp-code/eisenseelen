@@ -14,6 +14,7 @@ enum class EEIStat : uint8
 	FireDamage,
 	IceDamage,
 	LightningDamage,
+	WindDamage,
 	Cooldown,
 	StatusDuration,
 	ReactionDamage,
@@ -26,7 +27,10 @@ enum class EEIStat : uint8
 	ManaCost
 };
 
-constexpr int32 EIStatCount = 17;
+constexpr int32 EIStatCount = 18;
+
+/** The value that raises the damage of this element. */
+EISENSEELEN_API EEIStat EIElementDamageStat(EEIElement Element);
 
 /** The places on a hero that can hold an item. */
 enum class EEISlot : uint8

@@ -33,15 +33,17 @@ enum class EEIElement : uint8
 {
 	Fire,
 	Ice,
-	Lightning
+	Lightning,
+	Wind
 };
 
-/** What two elements on one target set off. */
+/** What two elements on one target set off. Wind with any other element makes a whirl of that element. */
 enum class EEIReaction : uint8
 {
 	None,
 	Steam,
-	Sparks
+	Sparks,
+	Whirl
 };
 
 /** The name of a kind in the data files. */
@@ -91,6 +93,9 @@ struct EISENSEELEN_API FEIEnemyValues
 	bool bExplodes = false;
 	float ExplosionEnemyDamage = 0.0f;
 	float RetreatBelowMeters = 0.0f;
+
+	/** Wind neither pushes nor pulls it. */
+	bool bWindproof = false;
 
 	static bool LoadFromProjectFile(EEIEnemyKind Kind, FEIEnemyValues& OutValues, FString& OutError);
 
@@ -186,8 +191,20 @@ public:
 	/** Who did this to a hero, for the note on the screen. Empty if nobody can be named. */
 	static FString DescribeAttackOf(const AActor* Causer);
 
-	/** Server only. Leaves the element on the enemy for a while, or sets off what it does with the one already there. */
-	EEIReaction MarkElement(EEIElement Element, float WindowSeconds);
+	/**
+	 * Server only. Leaves the element on the enemy for a while, or sets off what it does with the one already there.
+	 * For a whirl, OutPartner is the element that is not wind.
+	 */
+	EEIReaction MarkElement(EEIElement Element, float WindowSeconds, EEIElement* OutPartner = nullptr);
+
+	/** Whether wind can move it right now. */
+	bool CanBeMoved() const;
+
+	/** Server only. Throws it away with this speed in cm/s. */
+	void Push(const FVector& Velocity);
+
+	/** Server only. Draws it a step toward Center, at most SpeedCm per second. */
+	void PullToward(const FVector& Center, float SpeedCm);
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
