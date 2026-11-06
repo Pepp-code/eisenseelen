@@ -1,0 +1,396 @@
+{
+	"_info": "Entwurf der neuen Laufkarte nach dem Vorbild einer Waldinsel (Schritte K1 bis K9). Alle Maße in Metern. X zeigt nach Norden (+X = Nord, -X = Süd), Y zeigt nach Osten (+Y = Ost, -Y = West). 0,0 ist die Inselmitte. Diese Datei steuert bis zum Start von K2 nur das Planbild (py -3.12 tools/plan_waldinsel.py).",
+	"arbeitsname": "Aschenwerder",
+	"kandidaten_namen": ["Aschenwerder", "Nebelholm", "Seelenforst", "Moorholm"],
+	"boden_m": 600,
+	"insel_radius_m": 255,
+	"zufall": 13,
+	"aufloesung": {
+		"teile_pro_seite": 10,
+		"quadrate_pro_teil": 63,
+		"quadrat_cm": 100
+	},
+	"hoehen_m": {
+		"meeresboden": -4.0,
+		"flachwasser": -0.6,
+		"strand": 0.4,
+		"ebene": 0.0,
+		"wellen_hoehe": 2.2,
+		"wellen_laenge": 65.0
+	},
+	"eben_um": {
+		"sandplaetze_m": 22,
+		"bossplaetze_m": 26,
+		"signalfeuer_m": 14,
+		"ankunft_m": 12,
+		"lager_m": 9,
+		"sprungfelder_m": 8,
+		"uebergang_m": 12
+	},
+	"_umriss": "Stützpunkte der Küstenlinie im Uhrzeigersinn (x_m = Nord, y_m = Ost). Außerhalb fällt das Land über den Strand ins Flachwasser und dann ins tiefe Meer ab.",
+	"kueste_punkte": [
+		[255, -55],
+		[225, -10],
+		[205, 25],
+		[235, 70],
+		[210, 125],
+		[165, 165],
+		[115, 215],
+		[60, 265],
+		[10, 245],
+		[-45, 240],
+		[-115, 215],
+		[-175, 165],
+		[-195, 95],
+		[-190, 25],
+		[-195, -45],
+		[-210, -110],
+		[-245, -165],
+		[-185, -180],
+		[-120, -210],
+		[-50, -230],
+		[30, -235],
+		[90, -265],
+		[155, -245],
+		[205, -195],
+		[215, -135]
+	],
+	"regionen": [
+		{
+			"id": "felsmassiv",
+			"name": "Das Eisenjoch",
+			"x_m": 15,
+			"y_m": 75,
+			"flaeche_m": "210 × 110",
+			"untergrund": "Fels, Kiefernnadeln, Höhlenboden",
+			"hoehe_m": "0 bis +26 (Tunnel auf 0)",
+			"dichte": "dicht",
+			"stimmung": "Dunkler Felskamm mit Kiefern, darunter Fackelschein im Tunnel",
+			"rolle": "Zentrales Hindernis, Sichtschutz, Abkürzung durch den Tunnel, schweres Lager",
+			"gefahr": 3
+		},
+		{
+			"id": "westberg",
+			"name": "Die Wächterkuppe",
+			"x_m": -25,
+			"y_m": -105,
+			"flaeche_m": "95 × 95",
+			"untergrund": "Fels und Waldboden",
+			"hoehe_m": "0 bis +18",
+			"dichte": "dicht",
+			"stimmung": "Runder, bewaldeter Felsstock mit Holzstegen und Aussicht nach Westen",
+			"rolle": "Zweiter Höhenpunkt, teilt die Westwege, Sprungfeld-Ziel",
+			"gefahr": 2
+		},
+		{
+			"id": "kernwald",
+			"name": "Der Seelenforst",
+			"x_m": 30,
+			"y_m": -20,
+			"flaeche_m": "280 × 220 (Ring)",
+			"untergrund": "Dunkles Moos, Waldboden, Felsmauern",
+			"hoehe_m": "0 bis +5",
+			"dichte": "dicht",
+			"stimmung": "Hohe Kiefern, tiefhängender Walddunst, lange Holzgerüste über den Wegen",
+			"rolle": "Hauptkampfgebiet im Inneren, Gassen aus Felsmauern, Boss- und Auftragsplätze",
+			"gefahr": 3
+		},
+		{
+			"id": "schlucht_marsch",
+			"name": "Schluchtring & Nebelmarsch",
+			"x_m": 85,
+			"y_m": -140,
+			"flaeche_m": "150 × 140",
+			"untergrund": "Schlamm, Bachkiesel, Sandplateau, Felsklippen",
+			"hoehe_m": "-1.5 (Bach) bis +22 (Kap)",
+			"dichte": "halboffen",
+			"stimmung": "Weißes Klippenkap am Meer, dahinter verzweigte Bäche und ein Felsring mit Brücke",
+			"rolle": "Festung im Felsring (Anführer/Lager), Brücken-Engpässe",
+			"gefahr": 2
+		},
+		{
+			"id": "bauernhof",
+			"name": "Die Brachfelder",
+			"x_m": 165,
+			"y_m": -45,
+			"flaeche_m": "150 × 130",
+			"untergrund": "Ackerfurchen, Wiese, Sandflecken",
+			"hoehe_m": "0 bis +2",
+			"dichte": "offen",
+			"stimmung": "Verlassener Hof mit Scheune, Holzzäunen und geordneten Feldreihen bis zur Nordbucht",
+			"rolle": "Offene Sichtlinien für Fernkampf, Ankunft Nord, großer Sandplatz",
+			"gefahr": 1
+		},
+		{
+			"id": "steinbruch_turm",
+			"name": "Steinbruch & Eisenturm",
+			"x_m": 135,
+			"y_m": 115,
+			"flaeche_m": "160 × 140",
+			"untergrund": "Wiese, heller Grubensand, Küstenfelsen",
+			"hoehe_m": "-3.5 (Grube) bis +3",
+			"dichte": "offen",
+			"stimmung": "Weite Wiesen mit Findlingen, große Grube, ein rostiger Eisenturm und tote Bäume im Wasser",
+			"rolle": "Bossplatz, Orientierungsturm im Nordosten, Ankunft Nordost",
+			"gefahr": 2
+		},
+		{
+			"id": "ostgrat",
+			"name": "Die Ostklamm",
+			"x_m": -10,
+			"y_m": 205,
+			"flaeche_m": "140 × 90",
+			"untergrund": "Felsgrat, Gras, Sandwege",
+			"hoehe_m": "-1.5 bis +14",
+			"dichte": "halboffen",
+			"stimmung": "Schroffer Küstengrat mit Holzbrücke über einer Meeresrinne",
+			"rolle": "Östlicher Flankenweg zwischen Steinbruch und Sumpf, Signalfeuer Ost",
+			"gefahr": 2
+		},
+		{
+			"id": "suedost_sumpf",
+			"name": "Das Bleiche Moor",
+			"x_m": -135,
+			"y_m": 125,
+			"flaeche_m": "150 × 130",
+			"untergrund": "Moorwasser, Schlamminseln, weiße Kalkplatten",
+			"hoehe_m": "-0.8 bis +1",
+			"dichte": "halboffen",
+			"stimmung": "Trübe Tümpel, bodennaher Nebel, Pfähle im Meer und helle Felsplatten am Ufer",
+			"rolle": "Flaches Wasser mit kleinen Inseln, Boss-/Auftragsplatz im Südosten",
+			"gefahr": 2
+		},
+		{
+			"id": "stegdorf_leuchtturm",
+			"name": "Pfahlbucht & Leuchtturm",
+			"x_m": -185,
+			"y_m": -55,
+			"flaeche_m": "190 × 110",
+			"untergrund": "Holzplanken, Sandstrand, seichtes Wasser",
+			"hoehe_m": "-0.5 bis +6 (Leuchtturm-Hügel)",
+			"dichte": "halboffen",
+			"stimmung": "Hütten auf Pfählen, lange Holzstege ins Meer, verankertes Schiff und Leuchtturm auf der Halbinsel",
+			"rolle": "Ankunft Süd, Signalfeuer am Leuchtturm, Deckung zwischen Hütten",
+			"gefahr": 1
+		},
+		{
+			"id": "westkueste",
+			"name": "Die Wrackküste",
+			"x_m": -25,
+			"y_m": -205,
+			"flaeche_m": "180 × 80",
+			"untergrund": "Breiter Sandstrand, Dünengras, Felsmauern",
+			"hoehe_m": "0 bis +3",
+			"dichte": "offen",
+			"stimmung": "Langer Weststrand mit gestrandetem Schiffswrack und schmalen Felsgassen landeinwärts",
+			"rolle": "Ankunft West, schnelle Küstenroute, Signalfeuer West",
+			"gefahr": 1
+		}
+	],
+	"erhebungen": [
+		{ "name": "Eisenjoch-West", "x_m": 5, "y_m": 30, "radius_x_m": 55, "radius_y_m": 50, "hoehe_m": 26, "steilheit": 0.45, "rampe_grad": 200 },
+		{ "name": "Eisenjoch-Mitte", "x_m": 20, "y_m": 90, "radius_x_m": 45, "radius_y_m": 55, "hoehe_m": 22, "steilheit": 0.45 },
+		{ "name": "Eisenjoch-Ost", "x_m": 35, "y_m": 155, "radius_x_m": 40, "radius_y_m": 50, "hoehe_m": 18, "steilheit": 0.45, "rampe_grad": 20 },
+		{ "name": "Ostgrat-Klippe", "x_m": 45, "y_m": 215, "radius_x_m": 35, "radius_y_m": 35, "hoehe_m": 15, "steilheit": 0.5 },
+		{ "name": "Wächterkuppe", "x_m": -25, "y_m": -105, "radius_x_m": 44, "radius_y_m": 44, "hoehe_m": 18, "steilheit": 0.42, "rampe_grad": 110 },
+		{ "name": "Nordwest-Kap", "x_m": 145, "y_m": -225, "radius_x_m": 55, "radius_y_m": 35, "hoehe_m": 22, "steilheit": 0.55 },
+		{ "name": "Schlucht-Plateau", "x_m": 65, "y_m": -125, "radius_x_m": 34, "radius_y_m": 34, "hoehe_m": 4.5, "steilheit": 0.5, "rampe_grad": 45 },
+		{ "name": "Leuchtturm-Kuppe", "x_m": -225, "y_m": -155, "radius_x_m": 20, "radius_y_m": 20, "hoehe_m": 5.0, "steilheit": 0.35, "rampe_grad": 55 }
+	],
+	"senken": [
+		{ "name": "Steinbruch", "x_m": 110, "y_m": 100, "radius_m": 26, "tiefe_m": 3.5 },
+		{ "name": "Sumpfbecken", "x_m": -130, "y_m": 120, "radius_m": 52, "tiefe_m": 0.7 },
+		{ "name": "Marschbecken", "x_m": 135, "y_m": -105, "radius_m": 45, "tiefe_m": 0.6 }
+	],
+	"baeche": [
+		{
+			"name": "Schluchtbach-West",
+			"punkte": [[175, -165], [130, -155], [90, -165], [45, -155], [15, -125], [25, -90]],
+			"sohle_m": 7,
+			"ufer_m": 4,
+			"tiefe_m": 1.2
+		},
+		{
+			"name": "Schluchtbach-Ost",
+			"punkte": [[185, -110], [140, -100], [95, -90], [45, -90], [25, -90]],
+			"sohle_m": 8,
+			"ufer_m": 5,
+			"tiefe_m": 1.2
+		},
+		{
+			"name": "Ostklamm-Rinne",
+			"punkte": [[-25, 195], [-25, 225], [-25, 255]],
+			"sohle_m": 8,
+			"ufer_m": 4,
+			"tiefe_m": 1.4
+		}
+	],
+	"tunnel": {
+		"name": "Eisenjoch-Durchbruch",
+		"bauweise": "Landschafts-Senke auf Höhe 0 mit Felsdach und Seitenwänden aus Bauteilen (Variante A, empfohlen) oder Visibility-Hole (Variante B)",
+		"eingang_nord": { "x_m": 58, "y_m": 65 },
+		"eingang_sued": { "x_m": -28, "y_m": 72 },
+		"eingang_west": { "x_m": 8, "y_m": -8 },
+		"halle_mitte": { "x_m": 14, "y_m": 58, "radius_m": 18, "decke_hoehe_m": 9 },
+		"gang_breite_m": 8,
+		"gang_hoehe_m": 6
+	},
+	"bruecken": [
+		{ "name": "Brücke Schlucht-Nordost", "x_m": 82, "y_m": -90, "laenge_m": 16, "breite_m": 4, "drehung_grad": 0 },
+		{ "name": "Brücke Schlucht-Südost", "x_m": 32, "y_m": -92, "laenge_m": 16, "breite_m": 4, "drehung_grad": -25 },
+		{ "name": "Brücke Schlucht-Südwest", "x_m": 35, "y_m": -152, "laenge_m": 16, "breite_m": 4, "drehung_grad": 35 },
+		{ "name": "Brücke Schlucht-Nordwest", "x_m": 88, "y_m": -165, "laenge_m": 16, "breite_m": 4, "drehung_grad": 15 },
+		{ "name": "Brücke Westkuppe", "x_m": -62, "y_m": -65, "laenge_m": 14, "breite_m": 4, "drehung_grad": 75 },
+		{ "name": "Brücke Ostklamm", "x_m": -25, "y_m": 218, "laenge_m": 18, "breite_m": 4, "drehung_grad": 90 },
+		{ "name": "Steg Moor-West", "x_m": -125, "y_m": 65, "laenge_m": 18, "breite_m": 3.5, "drehung_grad": 55 },
+		{ "name": "Steg Pfahlbucht-Haupt", "x_m": -192, "y_m": -35, "laenge_m": 55, "breite_m": 4, "drehung_grad": 10 },
+		{ "name": "Steg Pfahlbucht-See", "x_m": -205, "y_m": -60, "laenge_m": 35, "breite_m": 3.5, "drehung_grad": 95 }
+	],
+	"holzgerueste": [
+		{ "name": "Hochsteg Ost", "von": [25, 82], "bis": [105, 82], "breite_m": 3.0, "hoehe_m": 7.0 },
+		{ "name": "Hochsteg West", "von": [20, 32], "bis": [75, 18], "breite_m": 3.0, "hoehe_m": 6.5 }
+	],
+	"wege": {
+		"haupt_breite_m": 7.0,
+		"pfad_breite_m": 4.0,
+		"polylinien": [
+			{
+				"name": "Innerer Ring",
+				"breite_m": 7.0,
+				"punkte": [
+					[135, -35], [140, 20], [95, 55], [75, 115], [60, 155],
+					[-10, 165], [-65, 130], [-100, 65], [-115, -15], [-95, -75],
+					[-55, -145], [10, -170], [75, -175], [125, -110], [135, -35]
+				]
+			},
+			{
+				"name": "Nord-Speiche",
+				"breite_m": 6.5,
+				"punkte": [[135, -35], [185, -55], [235, -55]]
+			},
+			{
+				"name": "Nordost-Speiche",
+				"breite_m": 6.5,
+				"punkte": [[140, 20], [180, 65], [205, 110]]
+			},
+			{
+				"name": "Ost-Speiche",
+				"breite_m": 6.0,
+				"punkte": [[60, 155], [25, 210], [-25, 218], [-50, 200]]
+			},
+			{
+				"name": "Südost-Speiche",
+				"breite_m": 6.0,
+				"punkte": [[-65, 130], [-115, 125], [-155, 115]]
+			},
+			{
+				"name": "Süd-Speiche",
+				"breite_m": 6.5,
+				"punkte": [[-115, -15], [-165, -25], [-188, -35]]
+			},
+			{
+				"name": "Südwest-Speiche",
+				"breite_m": 6.5,
+				"punkte": [[-95, -75], [-135, -125], [-165, -135], [-215, -150]]
+			},
+			{
+				"name": "West-Speiche",
+				"breite_m": 6.5,
+				"punkte": [[-55, -145], [-65, -195], [-15, -210], [35, -185]]
+			},
+			{
+				"name": "Nordwest-Speiche",
+				"breite_m": 6.0,
+				"punkte": [[75, -175], [135, -190], [160, -180]]
+			},
+			{
+				"name": "Mittelweg & Tunnel",
+				"breite_m": 5.5,
+				"punkte": [[95, 55], [58, 65], [14, 58], [-28, 72], [-45, 65], [-100, 65]]
+			},
+			{
+				"name": "Herzpfad",
+				"breite_m": 5.5,
+				"punkte": [[125, -110], [65, -60], [20, -55], [-25, -45], [-95, -75]]
+			}
+		]
+	},
+	"felsmauern": [
+		{ "punkte": [[90, -15], [115, 25], [125, 65]], "hoehe_m": 3.5, "breite_m": 3.0 },
+		{ "punkte": [[-55, 35], [-65, 70], [-55, 100]], "hoehe_m": 3.5, "breite_m": 3.0 },
+		{ "punkte": [[-95, -45], [-105, -5], [-95, 25]], "hoehe_m": 3.0, "breite_m": 2.5 },
+		{ "punkte": [[-45, -175], [-5, -185], [35, -175]], "hoehe_m": 3.5, "breite_m": 3.0 },
+		{ "punkte": [[-80, 145], [-45, 170], [-10, 175]], "hoehe_m": 3.0, "breite_m": 2.5 }
+	],
+	"sandplaetze": [
+		{ "id": "S1", "name": "Nordkap-Kreis", "x_m": 235, "y_m": -55, "radius_m": 22, "nutzung": "Ankunft Nord / Nebenauftrag" },
+		{ "id": "S2", "name": "Nordostbucht-Kreis", "x_m": 205, "y_m": 110, "radius_m": 22, "nutzung": "Signalfeuer Nordost / Nebenauftrag" },
+		{ "id": "S3", "name": "Klippen-Kreis", "x_m": 160, "y_m": -180, "radius_m": 22, "nutzung": "Signalfeuer Nordwest / Nebenauftrag" },
+		{ "id": "S4", "name": "Hof-Kreis", "x_m": 140, "y_m": 20, "radius_m": 22, "nutzung": "Bossplatz 1 (Hof-Lichtung)" },
+		{ "id": "S5", "name": "Steinbruch-Kreis", "x_m": 95, "y_m": 160, "radius_m": 22, "nutzung": "Nebenauftrag (Altar/Schrein)" },
+		{ "id": "S6", "name": "Forstherz-Kreis", "x_m": 25, "y_m": -55, "radius_m": 22, "nutzung": "Bossplatz 2 (Seelenforst-Mitte)" },
+		{ "id": "S7", "name": "Westwald-Kreis", "x_m": 20, "y_m": -180, "radius_m": 22, "nutzung": "Nebenauftrag (Altar/Schrein)" },
+		{ "id": "S8", "name": "Osthang-Kreis", "x_m": -30, "y_m": 185, "radius_m": 22, "nutzung": "Bossplatz 3 (Ostklamm)" },
+		{ "id": "S9", "name": "Südfels-Kreis", "x_m": -45, "y_m": 65, "radius_m": 22, "nutzung": "Bossplatz 4 (Südwand des Massivs)" },
+		{ "id": "S10", "name": "Südwald-Kreis", "x_m": -95, "y_m": -75, "radius_m": 22, "nutzung": "Nebenauftrag (Altar/Schrein)" },
+		{ "id": "S11", "name": "Moor-Kreis", "x_m": -155, "y_m": 115, "radius_m": 22, "nutzung": "Signalfeuer Südost / Nebenauftrag" },
+		{ "id": "S12", "name": "Bucht-Kreis", "x_m": -165, "y_m": -135, "radius_m": 22, "nutzung": "Signalfeuer Südwest / Nebenauftrag" }
+	],
+	"ankunft": [
+		{ "name": "Ankunft Nord (Sandzunge)", "x_m": 248, "y_m": -55, "blick_grad": 180 },
+		{ "name": "Ankunft Ost (Ostbucht)", "x_m": 8, "y_m": 238, "blick_grad": 270 },
+		{ "name": "Ankunft Süd (Pfahlbucht)", "x_m": -192, "y_m": -35, "blick_grad": 0 },
+		{ "name": "Ankunft West (Wrackstrand)", "x_m": -65, "y_m": -212, "blick_grad": 90 }
+	],
+	"bossplaetze": [
+		{ "name": "Hof-Lichtung (S4)", "x_m": 140, "y_m": 20 },
+		{ "name": "Forstherz (S6)", "x_m": 25, "y_m": -55 },
+		{ "name": "Osthang (S8)", "x_m": -30, "y_m": 185 },
+		{ "name": "Südfels (S9)", "x_m": -45, "y_m": 65 }
+	],
+	"signalfeuer": [
+		{ "name": "Feuer Nordost (S2)", "x_m": 205, "y_m": 110 },
+		{ "name": "Feuer Nordwest (S3)", "x_m": 160, "y_m": -180 },
+		{ "name": "Feuer Südost (S11)", "x_m": -155, "y_m": 115 },
+		{ "name": "Feuer Südwest (S12)", "x_m": -165, "y_m": -135 }
+	],
+	"orte_mit_charakter": [
+		{ "id": "hof", "name": "Brachhof", "x_m": 150, "y_m": -50, "radius_m": 28 },
+		{ "id": "steinbruch", "name": "Steinbruch", "x_m": 110, "y_m": 100, "radius_m": 26 },
+		{ "id": "eisenturm", "name": "Eisenturm", "x_m": 155, "y_m": 75, "radius_m": 14 },
+		{ "id": "schluchtlager", "name": "Felsring-Feste", "x_m": 65, "y_m": -125, "radius_m": 30 },
+		{ "id": "wrack", "name": "Schiffswrack", "x_m": -75, "y_m": -215, "radius_m": 18 },
+		{ "id": "leuchtturm", "name": "Leuchtturm", "x_m": -225, "y_m": -155, "radius_m": 18 },
+		{ "id": "stegdorf", "name": "Pfahlbucht-Dorf", "x_m": -180, "y_m": -30, "radius_m": 32 },
+		{ "id": "waldtor", "name": "Gerüstlager Nord", "x_m": 70, "y_m": 55, "radius_m": 24 },
+		{ "id": "tunnelhalle", "name": "Tunnel-Halle", "x_m": 14, "y_m": 58, "radius_m": 18 }
+	],
+	"sprungfelder": [
+		{ "name": "Aufstieg Eisenjoch-Nord", "x_m": 75, "y_m": 82, "turm_hoehe_m": 7 },
+		{ "name": "Aufstieg Eisenjoch-Süd", "x_m": -35, "y_m": 35, "turm_hoehe_m": 8 },
+		{ "name": "Aufstieg Wächterkuppe", "x_m": -5, "y_m": -75, "turm_hoehe_m": 7 },
+		{ "name": "Aufstieg Schlucht-Feste", "x_m": 40, "y_m": -100, "turm_hoehe_m": 5 },
+		{ "name": "Aufstieg Ostgrat", "x_m": 15, "y_m": 205, "turm_hoehe_m": 6 }
+	],
+	"lager": [
+		{ "x_m": 195, "y_m": -35, "groesse": "klein", "ort": "Brachfelder Nord" },
+		{ "x_m": 150, "y_m": -55, "groesse": "klein", "ort": "Brachhof Scheune" },
+		{ "x_m": 170, "y_m": 65, "groesse": "klein", "ort": "Eisenturm-Wiese" },
+		{ "x_m": 110, "y_m": 100, "groesse": "mittel", "ort": "Steinbruch-Sohle" },
+		{ "x_m": 125, "y_m": 180, "groesse": "klein", "ort": "Nordost-Küste" },
+		{ "x_m": 25, "y_m": 215, "groesse": "klein", "ort": "Ostgrat" },
+		{ "x_m": -90, "y_m": 165, "groesse": "klein", "ort": "Moor-Nordrand" },
+		{ "x_m": -130, "y_m": 90, "groesse": "klein", "ort": "Moor-Steg" },
+		{ "x_m": -175, "y_m": -25, "groesse": "klein", "ort": "Pfahlbucht-Dorf" },
+		{ "x_m": -195, "y_m": -115, "groesse": "klein", "ort": "Buchtweg Südwest" },
+		{ "x_m": -85, "y_m": -185, "groesse": "klein", "ort": "Wrackstrand" },
+		{ "x_m": -15, "y_m": -195, "groesse": "klein", "ort": "Westdüne" },
+		{ "x_m": 125, "y_m": -125, "groesse": "klein", "ort": "Nebelmarsch-Bach" },
+		{ "x_m": 65, "y_m": -125, "groesse": "mittel", "ort": "Felsring-Feste" },
+		{ "x_m": 70, "y_m": 55, "groesse": "mittel", "ort": "Gerüstlager vor dem Massiv" },
+		{ "x_m": 14, "y_m": 58, "groesse": "mittel", "ort": "Tunnel-Halle im Massiv" },
+		{ "x_m": -25, "y_m": -15, "groesse": "klein", "ort": "Südlicher Seelenforst" },
+		{ "x_m": -75, "y_m": 20, "groesse": "klein", "ort": "Kreuzung Südwald" }
+	],
+	"truhen": 14
+}
