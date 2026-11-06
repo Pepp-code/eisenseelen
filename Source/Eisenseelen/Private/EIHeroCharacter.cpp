@@ -12,13 +12,16 @@
 #include "EIHeroMovementComponent.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
+#include "EIProjectile.h"
 #include "EIRuneComponent.h"
 #include "EISkyBarge.h"
+#include "EISoulKettle.h"
 #include "EISwordComponent.h"
 #include "EIViewModelComponent.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
 namespace
@@ -132,6 +135,7 @@ void AEIHeroCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AEIHeroCharacter, HeroClass);
 	DOREPLIFETIME(AEIHeroCharacter, bAboard);
 	DOREPLIFETIME(AEIHeroCharacter, bCarriesSoulStone);
+	DOREPLIFETIME(AEIHeroCharacter, CarriedCargoId);
 }
 
 void AEIHeroCharacter::PossessedBy(AController* NewController)
@@ -228,6 +232,11 @@ void AEIHeroCharacter::MulticastLookEvent_Implementation(FName Event)
 
 void AEIHeroCharacter::PressPrimary()
 {
+	if (IsCarryingSoulCargo())
+	{
+		DropSoulCargo(true);
+		return;
+	}
 	if (HeroClass == EEIHeroClass::Arcanist)
 	{
 		Caster->FireBolt();
@@ -248,6 +257,10 @@ void AEIHeroCharacter::ReleasePrimary()
 
 void AEIHeroCharacter::PressSecondary()
 {
+	if (IsCarryingSoulCargo())
+	{
+		return;
+	}
 	if (HeroClass == EEIHeroClass::Arcanist)
 	{
 		Caster->PressCharge();
@@ -266,12 +279,101 @@ void AEIHeroCharacter::ReleaseSecondary()
 
 void AEIHeroCharacter::PressSpell()
 {
+	if (IsCarryingSoulCargo())
+	{
+		return;
+	}
 	Caster->CastSpell();
 }
 
 void AEIHeroCharacter::PressRuneSpell()
 {
+	if (IsCarryingSoulCargo())
+	{
+		return;
+	}
 	Runes->CastRune();
+}
+
+bool AEIHeroCharacter::PickUpSoulCargo(FName CargoId)
+{
+	if (IsCarryingSoulCargo())
+	{
+		return false;
+	}
+
+	const FEISoulCargoDef* Def = FEIDataFile::FindSoulCargoDef(CargoId);
+	if (!Def)
+	{
+		return false;
+	}
+
+	CarriedCargoId = CargoId;
+	CachedCargoDef = *Def;
+
+	if (UEIHeroMovementComponent* MoveComp = Cast<UEIHeroMovementComponent>(GetCharacterMovement()))
+	{
+		MoveComp->SetCarrySpeedModifier(Def->CarrierSpeedFactor);
+	}
+
+	if (Body != nullptr)
+	{
+		Body->SetCarryingVisualState(true);
+	}
+	return true;
+}
+
+void AEIHeroCharacter::DropSoulCargo(bool bThrowForward)
+{
+	if (!IsCarryingSoulCargo())
+	{
+		return;
+	}
+
+	const FEISoulCargoDef CargoToRelease = CachedCargoDef;
+	CarriedCargoId = NAME_None;
+
+	if (UEIHeroMovementComponent* MoveComp = Cast<UEIHeroMovementComponent>(GetCharacterMovement()))
+	{
+		MoveComp->SetCarrySpeedModifier(1.0f);
+	}
+
+	if (Body != nullptr)
+	{
+		Body->SetCarryingVisualState(false);
+	}
+
+	if (bThrowForward)
+	{
+		const FVector Forward = GetActorForwardVector();
+		const FVector SpawnLoc = GetActorLocation() + Forward * 120.0f + FVector(0.0f, 0.0f, 40.0f);
+		FActorSpawnParameters Params;
+		Params.Owner = this;
+		Params.Instigator = this;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		if (AEIProjectile* Thrown = GetWorld()->SpawnActor<AEIProjectile>(AEIProjectile::StaticClass(), SpawnLoc, Forward.Rotation(), Params))
+		{
+			Thrown->InitAsThrownCargo(CargoToRelease.ThrowDamage, CargoToRelease.ThrowRadius, this);
+			Thrown->FinishSpawning(FTransform(Forward.Rotation(), SpawnLoc));
+		}
+	}
+	else
+	{
+		TArray<AActor*> OverlappingKettles;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEISoulKettle::StaticClass(), OverlappingKettles);
+		for (AActor* Actor : OverlappingKettles)
+		{
+			if (AEISoulKettle* Kettle = Cast<AEISoulKettle>(Actor))
+			{
+				if (FVector::Dist(GetActorLocation(), Kettle->GetActorLocation()) <= 500.0f)
+				{
+					Kettle->DeliverSoulCargo(CargoToRelease, this);
+					break;
+				}
+			}
+		}
+	}
 }
 
 bool AEIHeroCharacter::IsDead() const

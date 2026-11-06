@@ -1,5 +1,63 @@
 {
 	"sprungfeld_hoehe_m": 6.0,
 	"wasser_spiegel_m": -0.15,
-	"wasser_tempo_faktor": 0.85
+	"wasser_tempo_faktor": 0.85,
+	"welt_mutatoren": [
+		{
+			"id": "klar",
+			"anzeigename": "Klare Sicht",
+			"beschreibung": "Keine besonderen Umweltgefahren auf der Waldinsel.",
+			"intervall_sekunden": 0.0,
+			"runenfeld_groesse_faktor": 1.0,
+			"licht_faktor": 1.0
+		},
+		{
+			"id": "schlacke_finsternis",
+			"anzeigename": "Schlacke-Finsternis",
+			"beschreibung": "Dichter Aschenebel. Gegner im Dunkeln sind widerstandsfähiger; Signalfeuer und Runenfelder brechen ihren Schutz.",
+			"intervall_sekunden": 0.0,
+			"runenfeld_groesse_faktor": 1.15,
+			"licht_faktor": 0.35
+		},
+		{
+			"id": "magnet_gewitter",
+			"anzeigename": "Magnetisches Gewitter",
+			"beschreibung": "Periodische Blitzschläge auf Eisenrüstungen. Können mit dem Schwert pariert werden, um die Klinge aufzuladen.",
+			"intervall_sekunden": 18.0,
+			"runenfeld_groesse_faktor": 1.0,
+			"licht_faktor": 0.75
+		},
+		{
+			"id": "seelensturm",
+			"anzeigename": "Seelensturm",
+			"beschreibung": "Runenfelder sind um 40 % vergrößert, doch gefallene Gegner entfesseln rachsüchtige Seelensplitter.",
+			"intervall_sekunden": 0.0,
+			"runenfeld_groesse_faktor": 1.4,
+			"licht_faktor": 0.85
+		}
+	],
+	"seelenfracht_typen": [
+		{
+			"id": "instabiler_glutkern",
+			"anzeigename": "Instabiler Glutkern",
+			"tempo_faktor_traeger": 0.75,
+			"wurf_schaden": 140.0,
+			"wurf_radius": 400.0,
+			"kessel_ladung_bonus": 0.50,
+			"beute_seelen_wert": 85,
+			"sound_wurf": "S_Feuerball",
+			"sound_explosion": "S_ExplosionGross"
+		},
+		{
+			"id": "eisen_seelenherz",
+			"anzeigename": "Eisen-Seelenherz",
+			"tempo_faktor_traeger": 0.70,
+			"wurf_schaden": 60.0,
+			"wurf_radius": 200.0,
+			"kessel_ladung_bonus": 1.00,
+			"beute_seelen_wert": 150,
+			"sound_wurf": "S_HiebSchwer",
+			"sound_explosion": "S_TrefferSchwer"
+		}
+	]
 }

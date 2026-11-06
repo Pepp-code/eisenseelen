@@ -392,5 +392,12 @@
 		{ "x_m": -25, "y_m": -15, "groesse": "klein", "ort": "Südlicher Seelenforst" },
 		{ "x_m": -75, "y_m": 20, "groesse": "klein", "ort": "Kreuzung Südwald" }
 	],
-	"truhen": 14
+	"truhen": 14,
+	"insel_events": {
+		"fluchtruhe_chance": 0.40,
+		"fluchtruhe_dauer_sekunden": 25.0,
+		"fluchtruhe_radius": 800.0,
+		"kessel_ueberladung_zeitfenster": 5.0,
+		"kessel_ueberladung_beute_faktor": 2.0
+	}
 }

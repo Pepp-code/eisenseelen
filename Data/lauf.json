@@ -11,6 +11,7 @@
 	"signalfeuer_halten_s": 60,
 	"signalfeuer_reichweite_m": 4,
 	"signalfeuer_zone_m": 15,
+	"signalfeuer_koop_tempo_bonus": 0.35,
 	"jagdbrett_reichweite_m": 4,
 	"schmiede_reichweite_m": 4,
 	"barke_abstand_m": 12,
@@ -18,5 +19,12 @@
 	"anfuehrer_art": "schildtraeger",
 	"anfuehrer_leben_faktor": 2.5,
 	"anfuehrer_schaden_faktor": 1.5,
-	"anfuehrer_groesse_faktor": 1.25
+	"anfuehrer_groesse_faktor": 1.25,
+	"insel_events": {
+		"fluchtruhe_chance": 0.40,
+		"fluchtruhe_dauer_sekunden": 25.0,
+		"fluchtruhe_radius": 800.0,
+		"kessel_ueberladung_zeitfenster": 5.0,
+		"kessel_ueberladung_beute_faktor": 2.0
+	}
 }

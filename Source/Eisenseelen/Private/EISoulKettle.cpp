@@ -1,7 +1,12 @@
 #include "EISoulKettle.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "EIDataFile.h"
+#include "EIGameMode.h"
+#include "EIHeroCharacter.h"
+#include "EIHordeDirector.h"
 #include "EILookComponent.h"
+#include "EIRunDirector.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
@@ -99,6 +104,8 @@ void AEISoulKettle::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AEISoulKettle, ZoneMeters);
 	DOREPLIFETIME(AEISoulKettle, Count);
 	DOREPLIFETIME(AEISoulKettle, Souls);
+	DOREPLIFETIME(AEISoulKettle, bIsOvercharged);
+	DOREPLIFETIME(AEISoulKettle, bCanBeOvercharged);
 }
 
 void AEISoulKettle::BeginPlay()
@@ -159,6 +166,50 @@ void AEISoulKettle::SetSouls(int32 NewSouls)
 {
 	Souls = FMath::Clamp(NewSouls, 0, Count);
 	OnRep_Souls();
+}
+
+void AEISoulKettle::DeliverSoulCargo(const FEISoulCargoDef& CargoDef, AEIHeroCharacter* Deliverer)
+{
+	const int32 SoulsBonus = FMath::RoundToInt(Count * CargoDef.KettleChargeBonus);
+	SetSouls(FMath::Min(Count, Souls + SoulsBonus));
+	if (IsFull())
+	{
+		bCanBeOvercharged = true;
+		OverchargeWindowRemaining = FEIDataFile::GetIslandEventsDef().KettleOverchargeWindowSeconds;
+	}
+	if (UEIRunDirector* RunDir = UEIRunDirector::Get(this))
+	{
+		RunDir->AddBossTrackProgress(2);
+		RunDir->AddUnsecuredLoot(CargoDef.SoulValue);
+	}
+	EIVisuals::PlaySoundAt(this, CargoDef.ExplosionSoundId.IsNone() ? TEXT("ExplosionGross") : *CargoDef.ExplosionSoundId.ToString(), GetActorLocation());
+}
+
+bool AEISoulKettle::TryOverchargeKettle(AEIHeroCharacter* Striker)
+{
+	if (!IsFull() || bIsOvercharged)
+	{
+		return false;
+	}
+	bIsOvercharged = true;
+	bCanBeOvercharged = false;
+	if (UEIRunDirector* RunDir = UEIRunDirector::Get(this))
+	{
+		RunDir->IncreaseEscalationTier();
+		RunDir->AddUnsecuredLoot(120);
+	}
+	if (UWorld* World = GetWorld())
+	{
+		if (AEIGameMode* GM = Cast<AEIGameMode>(World->GetAuthGameMode()))
+		{
+			if (GM->GetHorde())
+			{
+				GM->GetHorde()->SpawnEliteAmbushAtLocation(GetActorLocation());
+			}
+		}
+	}
+	EIVisuals::PlaySoundAt(this, TEXT("ExplosionGross"), GetActorLocation());
+	return true;
 }
 
 void AEISoulKettle::MulticastSoulFlies_Implementation(FVector_NetQuantize From)

@@ -36,6 +36,7 @@ struct EISENSEELEN_API FEIRunValues
 	float SignalHoldSeconds = 60.0f;
 	float SignalReachMeters = 4.0f;
 	float SignalZoneMeters = 15.0f;
+	float SignalCoopSpeedBonus = 0.35f;
 	float BargeDistanceMeters = 12.0f;
 	float BargeDepartMetersPerSecond = 6.0f;
 	float HuntBoardReachMeters = 4.0f;
@@ -75,9 +76,23 @@ class EISENSEELEN_API UEIRunDirector : public UActorComponent
 public:
 	UEIRunDirector();
 
+	static UEIRunDirector* Get(const UObject* WorldContext);
+
+	void StartHuntFromSkyBarge();
+	void AddBossTrackProgress(int32 Amount);
+	int32 GetCurrentBossTracks() const { return CurrentBossTracks; }
+	void AddUnsecuredLoot(int32 Souls);
+	int32 GetUnsecuredLoot() const { return UnsecuredSouls; }
+	void IncreaseEscalationTier();
+	int32 GetCurrentEscalationTier() const { return EscalationTier; }
+	float GetEscalationLootMultiplier() const { return EscalationLootMultiplier; }
+	void ActivateWorldMutator(FName MutatorId);
+	const FEIWorldMutatorDef& GetActiveMutator() const { return ActiveMutator; }
+	void TickWorldMutator(float DeltaTime);
+
 	void LoadValues();
 	const FEIRunValues& GetValues() const { return Values; }
-	void ApplyValues(const FEIRunValues& NewValues) { Values = NewValues; }
+	void ApplyValues(const FEIRunValues& NewValues);
 
 	/** Who comes when. Tests may change it. */
 	FEIEnemyGroups& GetGroups() { return Groups; }
@@ -245,4 +260,12 @@ private:
 	float WaveLeft = 0.0f;
 	float BloodMoonLeft = 0.0f;
 	bool bForcedBloodMoon = false;
+
+	int32 CurrentBossTracks = 0;
+	int32 UnsecuredSouls = 0;
+	int32 EscalationTier = 1;
+	float EscalationLootMultiplier = 1.0f;
+	float EscalationNoteSeconds = 0.0f;
+	FEIWorldMutatorDef ActiveMutator;
+	float MutatorTimer = 0.0f;
 };

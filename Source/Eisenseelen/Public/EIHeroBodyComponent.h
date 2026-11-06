@@ -37,6 +37,8 @@ public:
 	/** The hero falls. The model plays "tod", and without one the blocks topple over. */
 	void ShowDeath();
 
+	void SetCarryingVisualState(bool bCarrying);
+
 	UEILookComponent* GetLook() const { return Look; }
 	UEILookComponent* GetWeaponLook() const { return WeaponLook; }
 	bool IsBuilt() const { return Frame != nullptr; }

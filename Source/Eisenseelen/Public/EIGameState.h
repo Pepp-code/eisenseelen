@@ -67,7 +67,11 @@ public:
 	EEIRunPhase GetRunPhase() const { return RunPhase; }
 	float GetRunSeconds() const;
 	float GetSignalHoldLeft() const { return SignalHoldLeft; }
+	float GetSignalHoldTotal() const { return SignalHoldTotal; }
+	float GetSignalHoldProgress() const { return 1.0f - FMath::Clamp(SignalHoldLeft / FMath::Max(0.1f, SignalHoldTotal), 0.0f, 1.0f); }
 	bool IsSignalHeld() const { return bSignalHeld; }
+	int32 GetSignalHeldHeroes() const { return SignalHeldHeroes; }
+	float GetSignalCoopBonus() const { return SignalCoopBonus; }
 
 	/** Everybody is aboard, and the barge is about to leave the dock. */
 	bool IsCastingOff() const { return bCastingOff; }
@@ -102,7 +106,8 @@ public:
 	void ResetRunClock();
 	void StartRunClock();
 	void StopRunClock();
-	void SetSignalHold(float SecondsLeft, bool bHeld);
+	void SetSignalHold(float SecondsLeft, bool bHeld, int32 HeroesHolding = 0, float TotalSeconds = 0.0f);
+	void SetSignalCoopBonus(float Bonus) { SignalCoopBonus = Bonus; }
 	void SetCastingOff(bool bNewCastingOff) { bCastingOff = bNewCastingOff; }
 	void SetBossStage(EEIBossStage NewStage) { BossStage = NewStage; }
 	void SetBannbruchProgress(int32 Done, int32 Total);
@@ -147,7 +152,16 @@ private:
 	float SignalHoldLeft = 0.0f;
 
 	UPROPERTY(Replicated)
+	float SignalHoldTotal = 60.0f;
+
+	UPROPERTY(Replicated)
 	bool bSignalHeld = false;
+
+	UPROPERTY(Replicated)
+	int32 SignalHeldHeroes = 0;
+
+	UPROPERTY(Replicated)
+	float SignalCoopBonus = 0.35f;
 
 	UPROPERTY(Replicated)
 	bool bCastingOff = false;

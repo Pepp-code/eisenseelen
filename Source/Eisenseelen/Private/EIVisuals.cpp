@@ -118,6 +118,23 @@ void EIVisuals::ApplyBloodMoonLook(UWorld* World, float Share)
 	}
 }
 
+void EIVisuals::SetWorldAtmosphereLightFactor(UWorld* World, float LightFactor)
+{
+	if (!World)
+	{
+		return;
+	}
+	constexpr float BaseSunLight = 10.0f;
+	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
+	{
+		It->GetLightComponent()->SetIntensity(BaseSunLight * LightFactor);
+	}
+	for (TActorIterator<AExponentialHeightFog> It(World); It; ++It)
+	{
+		It->GetComponent()->SetFogDensity(0.02f * (1.0f / FMath::Max(0.1f, LightFactor)));
+	}
+}
+
 void EIVisuals::SetEffectsVolume(float Volume)
 {
 	EffectsVolume = FMath::Clamp(Volume, 0.0f, 1.0f);

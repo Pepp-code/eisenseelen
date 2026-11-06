@@ -24,6 +24,9 @@ public:
 	bool IsBlocking() const { return bWantsToBlock; }
 	bool IsInShallowWater() const;
 
+	void SetCarrySpeedModifier(float Modifier) { CarrySpeedModifier = FMath::Clamp(Modifier, 0.1f, 1.0f); }
+	float GetCarrySpeedModifier() const { return CarrySpeedModifier; }
+
 	/** How long the block has been up. It only counts on the server, which decides about every hit. */
 	float GetBlockHeldSeconds() const { return BlockHeldSeconds; }
 
@@ -49,4 +52,5 @@ private:
 	bool bWantsToBlock = false;
 
 	float BlockHeldSeconds = 0.0f;
+	float CarrySpeedModifier = 1.0f;
 };

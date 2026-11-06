@@ -13,11 +13,13 @@
 #include "EIGameState.h"
 #include "EIProfileComponent.h"
 #include "EIHealthComponent.h"
+#include "EIHeroMovementComponent.h"
 #include "EIHordeDirector.h"
 #include "EIRunDirector.h"
 #include "EIRuneComponent.h"
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
+#include "EISoulKettle.h"
 #include "EITestScript.h"
 #include "EIWorldTools.h"
 #include "Engine/DamageEvents.h"
@@ -30,6 +32,7 @@
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "Tests/AutomationEditorCommon.h"
 
 using namespace EITestScript;
 
@@ -1546,6 +1549,102 @@ bool FEIRunFailedTest::RunTest(const FString& Parameters)
 	{
 		Context.Test->TestFalse(TEXT("The fresh hero lives"), Context.Hero->IsDead());
 		Context.Test->TestEqual(TEXT("What stayed is still there"), Context.Player->GetProfile()->GetSave().Gold, 30);
+	}));
+	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEISignalFireCoopExtractionTest,
+	"Eisenseelen.Play.Run.SignalFireCoopExtraction",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEISignalFireCoopExtractionTest::RunTest(const FString& Parameters)
+{
+	struct FTestState
+	{
+		float HoldAtStart = 0.0f;
+		float HoldAfterSolo = 0.0f;
+		float HoldAfterCoop = 0.0f;
+		AEIHeroCharacter* SecondHero = nullptr;
+	};
+	const TSharedRef<FTestState> State = MakeShared<FTestState>();
+
+	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		UEIRunDirector* Run = GetGameMode(Context)->GetRun();
+		FEIRunValues Fast = Run->GetValues();
+		Fast.CampFactor = 0.0f;
+		Fast.CastOffSeconds = 0.1f;
+		Fast.CrossingSeconds = 0.1f;
+		Fast.SignalHoldSeconds = 20.0f;
+		Run->ApplyValues(Fast);
+		SwitchOffDirector(Context);
+		Context.Hero->SetCanBeDamaged(false);
+		StartRun(Context);
+		StandAtFire(Context, 200.0f);
+	}));
+	Steps.Add(WaitForPhase(TEXT("the run begins on island"), 2.0, EEIRunPhase::Exploring));
+	Steps.Add(Wait(0.2));
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		GetState(Context)->SetBossStage(EEIBossStage::Down);
+		Context.Test->TestNearlyEqual(TEXT("Signal Coop bonus is 35 percent"), GetGameMode(Context)->GetRun()->GetValues().SignalCoopSpeedBonus, 0.35f, 0.01f);
+		Context.Test->TestNearlyEqual(TEXT("GameState has coop bonus"), GetState(Context)->GetSignalCoopBonus(), 0.35f, 0.01f);
+		Context.Test->TestTrue(TEXT("Can light signal"), GetState(Context)->CanLightSignal());
+	}));
+	AddTap(Steps, EKeys::F);
+	Steps.Add(WaitForPhase(TEXT("signal fire is lit"), 1.0, EEIRunPhase::SignalLit));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		AEIGameState* GameState = GetState(Context);
+		Context.Test->TestTrue(TEXT("Fire is lit"), GameState->GetRunPhase() == EEIRunPhase::SignalLit);
+		Context.Test->TestTrue(TEXT("Signal is held"), GameState->IsSignalHeld());
+		Context.Test->TestEqual(TEXT("1 hero in extraction zone"), GameState->GetSignalHeldHeroes(), 1);
+		State->HoldAtStart = GameState->GetSignalHoldLeft();
+		Context.Test->TestNearlyEqual(TEXT("Progress begins near 0"), GameState->GetSignalHoldProgress(), 0.0f, 0.1f);
+	}));
+	Steps.Add(Wait(0.4));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		AEIGameState* GameState = GetState(Context);
+		State->HoldAfterSolo = GameState->GetSignalHoldLeft();
+		const float SoloElapsed = State->HoldAtStart - State->HoldAfterSolo;
+		Context.Test->TestTrue(TEXT("Solo hold reduced time"), SoloElapsed > 0.25f && SoloElapsed < 0.65f);
+
+		AEISignalFire* Fire = GetGameMode(Context)->GetRun()->GetActiveFire();
+		const FVector SecondPos = Fire->GetActorLocation() + FVector(-200.0f, 0.0f, HeroHeight);
+		State->SecondHero = Context.World->SpawnActor<AEIHeroCharacter>(AEIHeroCharacter::StaticClass(), SecondPos, FRotator::ZeroRotator);
+	}));
+	Steps.Add(Wait(0.4));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		AEIGameState* GameState = GetState(Context);
+		State->HoldAfterCoop = GameState->GetSignalHoldLeft();
+		Context.Test->TestEqual(TEXT("2 heroes holding zone"), GameState->GetSignalHeldHeroes(), 2);
+		const float CoopElapsed = State->HoldAfterSolo - State->HoldAfterCoop;
+		Context.Test->TestTrue(TEXT("Coop hold is faster than solo"), CoopElapsed > 0.45f);
+		Context.Test->TestTrue(TEXT("Progress increased"), GameState->GetSignalHoldProgress() > 0.0f);
+
+		StandAtFire(Context, 4000.0f);
+		if (State->SecondHero)
+		{
+			State->SecondHero->SetActorLocation(Context.Hero->GetActorLocation(), false, nullptr, ETeleportType::TeleportPhysics);
+		}
+	}));
+	Steps.Add(Wait(0.2));
+	Steps.Add(Do([State](const FEIPlayContext& Context)
+	{
+		AEIGameState* GameState = GetState(Context);
+		Context.Test->TestFalse(TEXT("Nobody holds the fire outside zone"), GameState->IsSignalHeld());
+		Context.Test->TestEqual(TEXT("0 heroes holding"), GameState->GetSignalHeldHeroes(), 0);
+		Context.Test->TestNearlyEqual(TEXT("Timer pauses outside zone"), GameState->GetSignalHoldLeft(), State->HoldAfterCoop, 0.05f);
+
+		if (State->SecondHero)
+		{
+			State->SecondHero->Destroy();
+			State->SecondHero = nullptr;
+		}
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
 }

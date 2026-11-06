@@ -43,6 +43,7 @@ public:
 
 	/** Between the deferred spawn and FinishSpawning. */
 	void Configure(const FEIProjectileSetup& Setup);
+	void InitAsThrownCargo(float InDamage, float InRadiusCm, AActor* InInstigator);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

@@ -183,6 +183,15 @@ TArray<AEIEnemy*> UEIHordeDirector::SpawnGroup(const FEIEnemyGroup& Group, float
 	return Spawned;
 }
 
+TArray<AEIEnemy*> UEIHordeDirector::SpawnEliteAmbushAtLocation(const FVector& Location)
+{
+	FEIEnemyGroup AmbushGroup;
+	AmbushGroup.Name = TEXT("EliteHinterhalt");
+	AmbushGroup.Composition.Add(FEIEnemyQuota{EEIEnemyKind::HollowArmor, 1});
+	AmbushGroup.Composition.Add(FEIEnemyQuota{EEIEnemyKind::BoneRunner, 2});
+	return SpawnGroup(AmbushGroup, 1.0f, Location, 350.0f);
+}
+
 AEIEnemy* UEIHordeDirector::SpawnKind(EEIEnemyKind Kind, const FVector& Center)
 {
 	FVector Location;

@@ -31,6 +31,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Eisenseelen")
 	bool IsFull() const { return Souls >= Count; }
 
+	float GetChargeProgressNormalized() const { return Count > 0 ? FMath::Clamp(static_cast<float>(Souls) / static_cast<float>(Count), 0.0f, 1.0f) : 1.0f; }
+	void DeliverSoulCargo(const struct FEISoulCargoDef& CargoDef, class AEIHeroCharacter* Deliverer);
+	bool TryOverchargeKettle(class AEIHeroCharacter* Striker);
+	bool IsOvercharged() const { return bIsOvercharged; }
+	bool CanBeOvercharged() const { return bCanBeOvercharged; }
+
 	float GetZoneMeters() const { return ZoneMeters; }
 	bool IsInZone(const AActor* Actor) const;
 	bool IsInZone(const FVector& Location) const;
@@ -93,6 +99,14 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_Souls)
 	int32 Souls = 0;
+
+	UPROPERTY(Replicated)
+	bool bIsOvercharged = false;
+
+	UPROPERTY(Replicated)
+	bool bCanBeOvercharged = false;
+
+	float OverchargeWindowRemaining = 0.0f;
 
 	bool bShownOpen = false;
 };

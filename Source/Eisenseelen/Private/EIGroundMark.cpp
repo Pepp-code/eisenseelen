@@ -51,6 +51,30 @@ AEIGroundMark::AEIGroundMark()
 	Fill = MakePart(TEXT("Fill"));
 }
 
+AEIGroundMark* AEIGroundMark::SpawnGroundMark(UWorld* World, const FVector& Location, float RadiusCm, float DurationSeconds)
+{
+	if (!World)
+	{
+		return nullptr;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AEIGroundMark* MarkActor = World->SpawnActor<AEIGroundMark>(AEIGroundMark::StaticClass(), FTransform::Identity, Params))
+	{
+		FEIGroundMarkData Data;
+		Data.bVisible = true;
+		Data.Shape = EEIMarkShape::Circle;
+		Data.Location = Location;
+		Data.LengthCm = RadiusCm * 2.0f;
+		Data.WidthCm = RadiusCm * 2.0f;
+		Data.FillSeconds = DurationSeconds;
+		MarkActor->Show(Data);
+		MarkActor->SetLifeSpan(DurationSeconds + 0.5f);
+		return MarkActor;
+	}
+	return nullptr;
+}
+
 void AEIGroundMark::Show(const FEIGroundMarkData& Data)
 {
 	Mark = Data;

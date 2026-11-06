@@ -90,6 +90,11 @@ public:
 	void ReleaseSecondary();
 	void SetSprintKey(bool bHeld) { bSprintKeyHeld = bHeld; }
 
+	bool PickUpSoulCargo(FName CargoId);
+	void DropSoulCargo(bool bThrowForward);
+	bool IsCarryingSoulCargo() const { return !CarriedCargoId.IsNone(); }
+	FName GetCarriedCargoId() const { return CarriedCargoId; }
+
 	/** Server only: from now on this hero stands on the barge and rides it. */
 	void BoardBarge(AEISkyBarge* Barge);
 	bool IsAboard() const { return bAboard; }
@@ -209,4 +214,9 @@ private:
 
 	UPROPERTY(Replicated)
 	bool bCarriesSoulStone = false;
+
+	UPROPERTY(Replicated)
+	FName CarriedCargoId = NAME_None;
+
+	FEISoulCargoDef CachedCargoDef;
 };

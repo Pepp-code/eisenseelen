@@ -96,6 +96,21 @@ void AEIProjectile::Configure(const FEIProjectileSetup& Setup)
 	Flight->MaxSpeed = Setup.SpeedCm;
 }
 
+void AEIProjectile::InitAsThrownCargo(float InDamage, float InRadiusCm, AActor* InInstigator)
+{
+	FEIProjectileSetup Setup;
+	Setup.Damage = InDamage;
+	Setup.RadiusCm = InRadiusCm;
+	Setup.SpeedCm = 2400.0f;
+	Setup.bBig = true;
+	Setup.bPierces = false;
+	Setup.bCarriesElement = true;
+	Setup.Element = EEIElement::Fire;
+	Configure(Setup);
+	SetInstigator(Cast<APawn>(InInstigator));
+	SetOwner(InInstigator);
+}
+
 void AEIProjectile::BeginPlay()
 {
 	Super::BeginPlay();

@@ -132,9 +132,9 @@ float UEIHeroMovementComponent::GetMaxSpeed() const
 {
 	if (!IsMovingOnGround() && !IsFalling())
 	{
-		return Super::GetMaxSpeed();
+		return Super::GetMaxSpeed() * CarrySpeedModifier;
 	}
-	const float Factor = IsInShallowWater() ? WaterSpeedFactor : 1.0f;
+	const float Factor = (IsInShallowWater() ? WaterSpeedFactor : 1.0f) * CarrySpeedModifier;
 	if (bWantsToBlock)
 	{
 		return BlockSpeedCm * Factor;

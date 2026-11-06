@@ -59,6 +59,8 @@ public:
 	/** Spawns a group in a circle around a place, in plain sight. Places where it did not work out stay empty. */
 	TArray<AEIEnemy*> SpawnGroup(const FEIEnemyGroup& Group, float CountFactor, const FVector& Center, float RadiusCm);
 
+	TArray<AEIEnemy*> SpawnEliteAmbushAtLocation(const FVector& Location);
+
 	/** Server only. One enemy of this kind at this place, if there is ground. */
 	AEIEnemy* SpawnKind(EEIEnemyKind Kind, const FVector& Center);
 

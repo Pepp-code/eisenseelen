@@ -217,6 +217,7 @@ bool FEIRunValues::LoadFromProjectFile(FEIRunValues& OutValues, FString& OutErro
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("signalfeuer_halten_s"), 0.1, 3600.0, Loaded.SignalHoldSeconds, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("signalfeuer_reichweite_m"), 0.5, 100.0, Loaded.SignalReachMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("signalfeuer_zone_m"), 1.0, 200.0, Loaded.SignalZoneMeters, OutError)
+		|| !FEIDataFile::ReadNumber(*Root, TEXT("signalfeuer_koop_tempo_bonus"), 0.0, 10.0, Loaded.SignalCoopSpeedBonus, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abstand_m"), 1.0, 100.0, Loaded.BargeDistanceMeters, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("barke_abflug_tempo_m_pro_s"), 0.1, 100.0, Loaded.BargeDepartMetersPerSecond, OutError)
 		|| !FEIDataFile::ReadNumber(*Root, TEXT("jagdbrett_reichweite_m"), 0.5, 100.0, Loaded.HuntBoardReachMeters, OutError)
@@ -288,6 +289,153 @@ void UEIRunDirector::LoadValues()
 			FEIDataFile::ReportError(TEXT("bosse.json"), FString::Printf(TEXT("Das Gebiet %s von %s steht nicht in laufkarte.json."), *Named.Area, *Named.Name));
 		}
 	}
+	if (AEIGameState* State = GetWorld() ? GetWorld()->GetGameState<AEIGameState>() : nullptr)
+	{
+		State->SetSignalCoopBonus(Values.SignalCoopSpeedBonus);
+	}
+}
+
+void UEIRunDirector::ApplyValues(const FEIRunValues& NewValues)
+{
+	Values = NewValues;
+	if (AEIGameState* State = GetWorld() ? GetWorld()->GetGameState<AEIGameState>() : nullptr)
+	{
+		State->SetSignalCoopBonus(Values.SignalCoopSpeedBonus);
+	}
+}
+
+UEIRunDirector* UEIRunDirector::Get(const UObject* WorldContext)
+{
+	if (!WorldContext)
+	{
+		return nullptr;
+	}
+	UWorld* World = WorldContext->GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+	if (AEIGameMode* GM = Cast<AEIGameMode>(World->GetAuthGameMode()))
+	{
+		return GM->GetRun();
+	}
+	for (TActorIterator<AEIGameMode> It(World); It; ++It)
+	{
+		return It->GetRun();
+	}
+	return nullptr;
+}
+
+void UEIRunDirector::StartHuntFromSkyBarge()
+{
+	BeginRunNow();
+}
+
+void UEIRunDirector::AddBossTrackProgress(int32 Amount)
+{
+	CurrentBossTracks += Amount;
+}
+
+void UEIRunDirector::AddUnsecuredLoot(int32 Souls)
+{
+	UnsecuredSouls += FMath::RoundToInt(Souls * EscalationLootMultiplier);
+}
+
+void UEIRunDirector::IncreaseEscalationTier()
+{
+	EscalationTier++;
+	EscalationLootMultiplier = 1.0f + (EscalationTier - 1) * 0.5f;
+	EscalationNoteSeconds = 5.0f;
+}
+
+void UEIRunDirector::ActivateWorldMutator(FName MutatorId)
+{
+	if (const FEIWorldMutatorDef* Def = FEIDataFile::FindWorldMutator(MutatorId))
+	{
+		ActiveMutator = *Def;
+	}
+	else
+	{
+		ActiveMutator = FEIWorldMutatorDef();
+		ActiveMutator.Id = MutatorId;
+	}
+	MutatorTimer = 0.0f;
+	EIVisuals::SetWorldAtmosphereLightFactor(GetWorld(), ActiveMutator.LightFactor);
+}
+
+void UEIRunDirector::TickWorldMutator(float DeltaTime)
+{
+	if (ActiveMutator.Id.IsNone() || ActiveMutator.Id == TEXT("klar"))
+	{
+		return;
+	}
+
+	if (EscalationNoteSeconds > 0.0f)
+	{
+		EscalationNoteSeconds = FMath::Max(0.0f, EscalationNoteSeconds - DeltaTime);
+	}
+
+	if (ActiveMutator.Id == TEXT("magnet_gewitter") && ActiveMutator.IntervalSeconds > 0.0f)
+	{
+		MutatorTimer += DeltaTime;
+		if (MutatorTimer >= ActiveMutator.IntervalSeconds)
+		{
+			MutatorTimer = 0.0f;
+			UWorld* World = GetWorld();
+			if (!World)
+			{
+				return;
+			}
+
+			TArray<AActor*> Candidates;
+			for (TActorIterator<AEIHeroCharacter> It(World); It; ++It)
+			{
+				if (!It->IsDead())
+				{
+					Candidates.Add(*It);
+				}
+			}
+			for (TActorIterator<AEIHollowArmor> It(World); It; ++It)
+			{
+				Candidates.Add(*It);
+			}
+
+			if (!Candidates.IsEmpty())
+			{
+				AActor* Target = Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
+				const FVector TargetLoc = Target->GetActorLocation();
+				AEIGroundMark::SpawnGroundMark(World, TargetLoc, 200.0f, 2.5f);
+
+				FTimerHandle Handle;
+				World->GetTimerManager().SetTimer(Handle, [this, TargetLoc, Target]()
+				{
+					if (!IsValid(this) || !GetWorld())
+					{
+						return;
+					}
+					EIVisuals::PlaySoundAt(this, TEXT("ExplosionKlein"), TargetLoc);
+					if (IsValid(Target))
+					{
+						if (AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(Target))
+						{
+							if (Hero->GetHeroMovement() && Hero->GetHeroMovement()->IsBlocking())
+							{
+								EIVisuals::PlaySoundAt(this, TEXT("Parade"), TargetLoc);
+							}
+							else
+							{
+								Hero->TakeDamage(35.0f, FDamageEvent(), nullptr, nullptr);
+							}
+						}
+						else
+						{
+							Target->TakeDamage(50.0f, FDamageEvent(), nullptr, nullptr);
+						}
+					}
+				}, 2.5f, false);
+			}
+		}
+	}
 }
 
 void UEIRunDirector::ResetRun()
@@ -299,7 +447,8 @@ void UEIRunDirector::ResetRun()
 	CastOffLeft = Values.CastOffSeconds;
 	CrossingLeft = Values.CrossingSeconds;
 	State->ResetRunClock();
-	State->SetSignalHold(0.0f, false);
+	State->SetSignalCoopBonus(Values.SignalCoopSpeedBonus);
+	State->SetSignalHold(0.0f, false, 0, Values.SignalHoldSeconds);
 	State->SetCastingOff(false);
 	State->SetBloodMoon(bForcedBloodMoon);
 	WaveLeft = 0.0f;
@@ -1292,7 +1441,8 @@ void UEIRunDirector::LightSignal()
 	ActiveFire->SetLit(true);
 	HoldLeft = Values.SignalHoldSeconds;
 	WaveLeft = 0.0f;
-	State->SetSignalHold(HoldLeft, true);
+	State->SetSignalCoopBonus(Values.SignalCoopSpeedBonus);
+	State->SetSignalHold(HoldLeft, true, 1, Values.SignalHoldSeconds);
 	State->SetRunPhase(EEIRunPhase::SignalLit);
 
 	// The barge comes down on the side towards the middle of the map, where it is open.
@@ -1364,13 +1514,25 @@ void UEIRunDirector::UpdateBloodMoon(EEIRunPhase Phase, const TArray<AEIHeroChar
 
 void UEIRunDirector::HoldSignal(const TArray<AEIHeroCharacter*>& LivingHeroes, float DeltaTime)
 {
-	const bool bHeld = LivingHeroes.ContainsByPredicate([this](const AEIHeroCharacter* Hero) { return ActiveFire->IsInZone(Hero); });
+	int32 HeroesInZone = 0;
+	if (ActiveFire != nullptr)
+	{
+		for (const AEIHeroCharacter* Hero : LivingHeroes)
+		{
+			if (Hero != nullptr && ActiveFire->IsInZone(Hero))
+			{
+				++HeroesInZone;
+			}
+		}
+	}
+	const bool bHeld = HeroesInZone > 0;
 	if (bHeld)
 	{
-		HoldLeft = FMath::Max(0.0f, HoldLeft - DeltaTime);
+		const float SpeedMultiplier = 1.0f + FMath::Max(0, HeroesInZone - 1) * Values.SignalCoopSpeedBonus;
+		HoldLeft = FMath::Max(0.0f, HoldLeft - DeltaTime * SpeedMultiplier);
 	}
 	AEIGameState* State = GetWorld()->GetGameState<AEIGameState>();
-	State->SetSignalHold(HoldLeft, bHeld);
+	State->SetSignalHold(HoldLeft, bHeld, HeroesInZone, Values.SignalHoldSeconds);
 	Barge->SetApproachFraction(1.0f - HoldLeft / FMath::Max(Values.SignalHoldSeconds, KINDA_SMALL_NUMBER));
 	if (HoldLeft <= 0.0f)
 	{
@@ -1463,4 +1625,6 @@ void UEIRunDirector::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	default:
 		break;
 	}
+
+	TickWorldMutator(DeltaTime);
 }

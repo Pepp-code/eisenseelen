@@ -60,6 +60,8 @@ class EISENSEELEN_API AEIGroundMark : public AActor
 public:
 	AEIGroundMark();
 
+	static AEIGroundMark* SpawnGroundMark(UWorld* World, const FVector& Location, float RadiusCm, float DurationSeconds);
+
 	void Show(const FEIGroundMarkData& Data);
 
 	virtual void Tick(float DeltaSeconds) override;

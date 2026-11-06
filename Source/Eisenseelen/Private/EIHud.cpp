@@ -552,7 +552,10 @@ void AEIHud::DrawBoss(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 	const EEIBossStage Stage = State->GetBossStage();
 	if (Stage == EEIBossStage::Down)
 	{
-		DrawLine(TEXT("Der Boss ist gefallen. Lauf zum Signalfeuer, und erst in der Barke ist die Beute sicher!"), Margin, LineY, RewardColor);
+		if (State->GetRunPhase() == EEIRunPhase::Exploring)
+		{
+			DrawLine(TEXT("Der Boss ist gefallen. Lauf zum Signalfeuer, und erst in der Barke ist die Beute sicher!"), Margin, LineY, RewardColor);
+		}
 		return;
 	}
 	if (Values == nullptr || Stage == EEIBossStage::None)
@@ -751,6 +754,49 @@ void AEIHud::DrawDock(const AEIHeroCharacter* Hero, const AEIGameState* State, f
 	}
 }
 
+void AEIHud::DrawLootPurse(const UEIProfileComponent* Profile, float LineY)
+{
+	if (Profile == nullptr)
+	{
+		return;
+	}
+	const FEIContractTable& Table = Profile->GetContractTable();
+	const int32 Gold = Profile->GetRunGold();
+	const TArray<FString>& Ingredients = Profile->GetRunIngredients();
+
+	FString LootText = FString::Printf(TEXT("Ungesichert: %d Gold"), Gold);
+	for (const FEIFaction& Faction : Table.Factions)
+	{
+		const int32 Points = Profile->GetRunPoints(Faction.Name);
+		if (Points > 0)
+		{
+			LootText += FString::Printf(TEXT(", %d %s"), Points, *Faction.Name);
+		}
+	}
+
+	const float RightX = Canvas->SizeX - Margin - 380.0f;
+	float CurrentY = LineY;
+
+	if (Gold > 0 || !Ingredients.IsEmpty())
+	{
+		DrawLine(LootText, RightX, CurrentY, RewardColor);
+		CurrentY += 20.0f;
+		const int32 SafeGold = Table.GetKeptOnFailure(Gold);
+		DrawLine(FString::Printf(TEXT("(bei Scheitern bleiben %d Gold, 100 %% in Barke)"), SafeGold), RightX, CurrentY, FLinearColor(0.75f, 0.75f, 0.75f), 0.9f);
+		if (!Ingredients.IsEmpty())
+		{
+			CurrentY += 18.0f;
+			DrawLine(FString::Printf(TEXT("Zutat: %s (nur in Barke sicher!)"), *FString::Join(Ingredients, TEXT(", "))), RightX, CurrentY, RewardColor, 0.9f);
+		}
+	}
+	else
+	{
+		DrawLine(TEXT("Beute: 0 Gold (ungesichert)"), RightX, CurrentY, FLinearColor(0.7f, 0.7f, 0.7f));
+		CurrentY += 20.0f;
+		DrawLine(TEXT("(30 % gesichert bei Scheitern, 100 % in Barke)"), RightX, CurrentY, FLinearColor(0.55f, 0.55f, 0.55f), 0.85f);
+	}
+}
+
 void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 {
 	const int32 Seconds = FMath::Max(0, FMath::FloorToInt(State->GetRunSeconds()));
@@ -795,17 +841,7 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	if (Phase == EEIRunPhase::Exploring || Phase == EEIRunPhase::SignalLit || Phase == EEIRunPhase::BargeWaiting)
 	{
 		DrawBoss(Hero, State, LineY + 24.0f, PromptY);
-	}
-
-	// What this run has earned so far, which is only safe in the barge.
-	FString Purse = FString::Printf(TEXT("Beute: %d Gold"), Profile->GetRunGold());
-	for (const FEIFaction& Faction : Table.Factions)
-	{
-		const int32 Points = Profile->GetRunPoints(Faction.Name);
-		if (Points > 0)
-		{
-			Purse += FString::Printf(TEXT(", %d %s"), Points, *Faction.Name);
-		}
+		DrawLootPurse(Profile, LineY);
 	}
 
 	switch (Phase)
@@ -815,7 +851,7 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 		break;
 
 	case EEIRunPhase::Exploring:
-		DrawLine(FString::Printf(TEXT("%s   Nebenauftr\u00E4ge: %d von %d   %s   M zeigt die Karte"), *Clock, State->CountContractsDone(), State->GetContracts().Num(), *Purse), Margin, LineY, TextColor);
+		DrawLine(FString::Printf(TEXT("%s   Nebenauftr\u00E4ge: %d von %d   M zeigt die Karte"), *Clock, State->CountContractsDone(), State->GetContracts().Num()), Margin, LineY, TextColor);
 		if (State->GetBossStage() == EEIBossStage::None)
 		{
 			DrawLine(TEXT("Entz\u00FCnde das Signalfeuer, dann holt dich die Barke ab."), Margin, LineY + 24.0f, RewardColor);
@@ -835,7 +871,37 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 		break;
 
 	case EEIRunPhase::SignalLit:
-		DrawLine(FString::Printf(TEXT("%s   Halte das Feuer noch %.0f s, bis die Barke da ist   %s"), *Clock, State->GetSignalHoldLeft(), *Purse), Margin, LineY, TextColor);
+		DrawLine(FString::Printf(TEXT("%s   Signalfeuer aktiv   M zeigt die Karte"), *Clock), Margin, LineY, TextColor);
+		{
+			const float ExtractionBarWidth = FMath::Min(520.0f, Canvas->SizeX * 0.4f);
+			const float ExtractionBarHeight = 22.0f;
+			const float BarX = CenterX - ExtractionBarWidth / 2.0f;
+			const float BarY = LineY + 36.0f;
+			const float Progress = State->GetSignalHoldProgress();
+			const int32 Percent = FMath::Clamp(FMath::RoundToInt(Progress * 100.0f), 0, 100);
+			const bool bHeld = State->IsSignalHeld();
+			const int32 HeroesHolding = State->GetSignalHeldHeroes();
+
+			const FLinearColor ExtractionColor(1.0f, 0.65f, 0.2f);
+			const FLinearColor PauseColor(0.85f, 0.25f, 0.2f);
+			DrawBar(BarX, BarY, ExtractionBarWidth, ExtractionBarHeight, Progress, bHeld ? ExtractionColor : PauseColor);
+
+			FString Status;
+			if (!bHeld)
+			{
+				Status = FString::Printf(TEXT("Himmelsbarke pausiert: %d %% \u2014 Zur\u00FCck in den Kreis!"), Percent);
+			}
+			else if (HeroesHolding >= 2)
+			{
+				const int32 BonusPct = FMath::RoundToInt((HeroesHolding - 1) * State->GetSignalCoopBonus() * 100.0f);
+				Status = FString::Printf(TEXT("Himmelsbarke im Anflug: %d %%  (+%d %% Koop-Tempo)  noch %.0f s"), Percent, BonusPct, State->GetSignalHoldLeft());
+			}
+			else
+			{
+				Status = FString::Printf(TEXT("Himmelsbarke im Anflug: %d %%  (noch %.0f s)"), Percent, State->GetSignalHoldLeft());
+			}
+			DrawLine(Status, BarX + 6.0f, BarY - 22.0f, bHeld ? TextColor : WarningTextColor, 1.1f);
+		}
 		for (TActorIterator<AEISignalFire> It(GetWorld()); It; ++It)
 		{
 			if (It->IsLit())
@@ -850,13 +916,21 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 		break;
 
 	case EEIRunPhase::BargeWaiting:
-		DrawLine(FString::Printf(TEXT("%s   Die Barke ist da. Steig ein!   %s"), *Clock, *Purse), Margin, LineY, TextColor);
+		DrawLine(FString::Printf(TEXT("%s   Himmelsbarke bereit   M zeigt die Karte"), *Clock), Margin, LineY, TextColor);
+		{
+			const float ExtractionBarWidth = FMath::Min(520.0f, Canvas->SizeX * 0.4f);
+			const float ExtractionBarHeight = 22.0f;
+			const float BarX = CenterX - ExtractionBarWidth / 2.0f;
+			const float BarY = LineY + 36.0f;
+			DrawBar(BarX, BarY, ExtractionBarWidth, ExtractionBarHeight, 1.0f, BargeMarkColor);
+			DrawLine(TEXT("Himmelsbarke gelandet! Alle an Bord, um die Beute zu sichern!"), BarX + 6.0f, BarY - 22.0f, BargeMarkColor, 1.1f);
+		}
 		for (TActorIterator<AEISkyBarge> It(GetWorld()); It; ++It)
 		{
 			DrawWorldMark(It->GetActorLocation(), DistanceLabel(TEXT("Barke"), It->GetActorLocation()), BargeMarkColor);
 			if (It->IsInBoardingZone(Hero))
 			{
-				DrawLine(TEXT("F: Einsteigen"), CenterX - 70.0f, PromptY, TextColor, 1.5f);
+				DrawLine(TEXT("F: Einsteigen (Beute sichern)"), CenterX - 110.0f, PromptY, TextColor, 1.5f);
 			}
 		}
 		break;

@@ -262,6 +262,14 @@ void UEIHeroBodyComponent::ShowDeath()
 	}
 }
 
+void UEIHeroBodyComponent::SetCarryingVisualState(bool bCarrying)
+{
+	if (WeaponLook != nullptr)
+	{
+		WeaponLook->SetVisibility(!bCarrying, true);
+	}
+}
+
 void UEIHeroBodyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);

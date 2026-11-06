@@ -22,7 +22,10 @@ void AEIGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AEIGameState, RunStartedAt);
 	DOREPLIFETIME(AEIGameState, RunEndedAfter);
 	DOREPLIFETIME(AEIGameState, SignalHoldLeft);
+	DOREPLIFETIME(AEIGameState, SignalHoldTotal);
 	DOREPLIFETIME(AEIGameState, bSignalHeld);
+	DOREPLIFETIME(AEIGameState, SignalHeldHeroes);
+	DOREPLIFETIME(AEIGameState, SignalCoopBonus);
 	DOREPLIFETIME(AEIGameState, bCastingOff);
 	DOREPLIFETIME(AEIGameState, BossStage);
 	DOREPLIFETIME(AEIGameState, BannbruchDone);
@@ -59,10 +62,15 @@ void AEIGameState::StopRunClock()
 	RunEndedAfter = RunStartedAt < 0.0 ? 0.0f : GetRunSeconds();
 }
 
-void AEIGameState::SetSignalHold(float SecondsLeft, bool bHeld)
+void AEIGameState::SetSignalHold(float SecondsLeft, bool bHeld, int32 HeroesHolding, float TotalSeconds)
 {
 	SignalHoldLeft = SecondsLeft;
 	bSignalHeld = bHeld;
+	SignalHeldHeroes = HeroesHolding;
+	if (TotalSeconds > 0.0f)
+	{
+		SignalHoldTotal = TotalSeconds;
+	}
 }
 
 void AEIGameState::SetContracts(const TArray<FEIContract>& NewContracts)

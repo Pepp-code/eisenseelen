@@ -29,6 +29,7 @@ private:
 
 	/** Where the run stands, what to do next and where that is. Nothing on a map without a run. */
 	void DrawRun(const class AEIHeroCharacter* Hero, const class AEIGameState* State);
+	void DrawLootPurse(const class UEIProfileComponent* Profile, float LineY);
 	void DrawWorldMark(const FVector& Location, const FString& Label, const FLinearColor& Color);
 
 	/** The gear page, over everything else. */
