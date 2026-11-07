@@ -3,10 +3,17 @@
 #include "Components/StaticMeshComponent.h"
 #include "EIDataFile.h"
 #include "EIEnemy.h"
+#include "EIGameMode.h"
+#include "EIGroundMark.h"
+#include "EIHeroCharacter.h"
+#include "EIHordeDirector.h"
 #include "EILookComponent.h"
 #include "EIEffects.h"
+#include "EIRunDirector.h"
+#include "EISoulStoneChest.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
@@ -120,6 +127,9 @@ void AEIChest::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(AEIChest, State);
 	DOREPLIFETIME(AEIChest, GuardsLeft);
 	DOREPLIFETIME(AEIChest, bOpened);
+	DOREPLIFETIME(AEIChest, bIsCursed);
+	DOREPLIFETIME(AEIChest, bCurseActive);
+	DOREPLIFETIME(AEIChest, CurseSecondsRemaining);
 }
 
 bool AEIChest::IsInZone(const AActor* Hero) const
@@ -147,7 +157,95 @@ void AEIChest::PrepareForRun(bool bUse)
 	Guards.Reset();
 	GuardsLeft = 0;
 	bOpened = false;
+	const FEIIslandEventsDef& IslandEvents = FEIDataFile::GetIslandEventsDef();
+	bIsCursed = false;
+	if (IsA<AEISoulStoneChest>() && IslandEvents.CursedChestChance > 0.0f)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			if (AEIGameMode* GM = Cast<AEIGameMode>(World->GetAuthGameMode()))
+			{
+				if (UEIRunDirector* RunDir = GM->GetRun())
+				{
+					if (RunDir->GetValues().CampFactor > 0.0f && RunDir->GetContractTable().ContractsPerRun > 0.0f)
+					{
+						bIsCursed = (FMath::FRand() < IslandEvents.CursedChestChance);
+					}
+				}
+			}
+		}
+	}
+	bCurseActive = false;
+	CurseSecondsRemaining = 0.0f;
 	OnRep_Look();
+}
+
+void AEIChest::TriggerCurseAmbush(AEIHeroCharacter* Hero)
+{
+	if (!bIsCursed || bOpened || bCurseActive)
+	{
+		return;
+	}
+	const FEIIslandEventsDef& IslandEvents = FEIDataFile::GetIslandEventsDef();
+	bCurseActive = true;
+	CurseSecondsRemaining = IslandEvents.CursedChestDurationSeconds;
+	SetActorTickEnabled(true);
+
+	AEIGroundMark::SpawnGroundMark(GetWorld(), GetActorLocation(), IslandEvents.CursedChestRadius, IslandEvents.CursedChestDurationSeconds);
+	EIVisuals::PlaySoundAt(this, TEXT("Schlachtruf"), GetActorLocation());
+
+	if (UWorld* World = GetWorld())
+	{
+		if (AEIGameMode* GM = Cast<AEIGameMode>(World->GetAuthGameMode()))
+		{
+			if (GM->GetHorde())
+			{
+				GM->GetHorde()->SpawnEliteAmbushAtLocation(GetActorLocation());
+			}
+		}
+	}
+}
+
+void AEIChest::TickCurseEvent(float DeltaTime)
+{
+	if (!bCurseActive || bOpened)
+	{
+		return;
+	}
+
+	const FEIIslandEventsDef& IslandEvents = FEIDataFile::GetIslandEventsDef();
+	bool bAnyHeroInCircle = false;
+	for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsDead() && FVector::Dist(It->GetActorLocation(), GetActorLocation()) <= IslandEvents.CursedChestRadius)
+		{
+			bAnyHeroInCircle = true;
+			break;
+		}
+	}
+
+	if (!bAnyHeroInCircle)
+	{
+		bCurseActive = false;
+		CurseSecondsRemaining = 0.0f;
+		return;
+	}
+
+	CurseSecondsRemaining -= DeltaTime;
+	if (CurseSecondsRemaining <= 0.0f)
+	{
+		bCurseActive = false;
+		OpenChestAndGrantRewards();
+	}
+}
+
+void AEIChest::OpenChestAndGrantRewards()
+{
+	Open();
+	if (UEIRunDirector* RunDir = UEIRunDirector::Get(this))
+	{
+		RunDir->AddUnsecuredLoot(100);
+	}
 }
 
 void AEIChest::SetGuards(const TArray<AEIEnemy*>& Enemies)
@@ -242,7 +340,11 @@ void AEIChest::ShowLid()
 void AEIChest::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (bCurseActive)
+	{
+		TickCurseEvent(DeltaSeconds);
+	}
 	LidDegrees = FMath::FInterpConstantTo(LidDegrees, LidTargetDegrees, DeltaSeconds, LidDegreesPerSecond);
 	ShowLid();
-	SetActorTickEnabled(LidDegrees != LidTargetDegrees);
+	SetActorTickEnabled(LidDegrees != LidTargetDegrees || bCurseActive);
 }

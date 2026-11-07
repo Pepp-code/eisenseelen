@@ -6,7 +6,7 @@
 class FJsonObject;
 
 USTRUCT(BlueprintType)
-struct FEIWorldMutatorDef
+struct EISENSEELEN_API FEIWorldMutatorDef
 {
 	GENERATED_BODY()
 
@@ -30,7 +30,7 @@ struct FEIWorldMutatorDef
 };
 
 USTRUCT(BlueprintType)
-struct FEISoulCargoDef
+struct EISENSEELEN_API FEISoulCargoDef
 {
 	GENERATED_BODY()
 
@@ -63,7 +63,7 @@ struct FEISoulCargoDef
 };
 
 USTRUCT(BlueprintType)
-struct FEIIslandEventsDef
+struct EISENSEELEN_API FEIIslandEventsDef
 {
 	GENERATED_BODY()
 

@@ -17,6 +17,7 @@
 #include "EIPauseMenu.h"
 #include "EIPlayerController.h"
 #include "EIProfileComponent.h"
+#include "EIRunDirector.h"
 #include "EIRuneComponent.h"
 #include "EISignalFire.h"
 #include "EISkyBarge.h"
@@ -809,8 +810,20 @@ void AEIHud::DrawRun(const AEIHeroCharacter* Hero, const AEIGameState* State)
 	{
 		DrawLine(TEXT("Der Blutmond steigt auf"), Canvas->SizeX / 2.0f - 140.0f, 110.0f, WarningTextColor, 1.5f);
 	}
+	if (const UEIRunDirector* RunDir = UEIRunDirector::Get(Hero))
+	{
+		const int32 Tier = RunDir->GetCurrentEscalationTier();
+		if (Tier > 1)
+		{
+			Clock += FString::Printf(TEXT("   Glut Stufe %d (x%.2f)"), Tier, RunDir->GetEscalationLootMultiplier());
+		}
+	}
 	const float LineY = Margin + 48.0f;
 	const float CenterX = Canvas->SizeX / 2.0f;
+	if (Hero != nullptr && Hero->IsCarryingSoulCargo())
+	{
+		DrawLine(TEXT("Seelenfracht getragen (Angriff = Schleudern)"), CenterX - 200.0f, 135.0f, RewardColor, 1.2f);
+	}
 	const AEIPlayerController* Player = Cast<AEIPlayerController>(PlayerOwner);
 	if (Player == nullptr)
 	{

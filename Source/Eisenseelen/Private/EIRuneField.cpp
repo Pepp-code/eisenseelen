@@ -4,6 +4,7 @@
 #include "EIEffects.h"
 #include "EIHeroCharacter.h"
 #include "EIRuneComponent.h"
+#include "EIRunDirector.h"
 #include "EIVisuals.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
@@ -66,7 +67,12 @@ void AEIRuneField::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 void AEIRuneField::Configure(const FEIRune& Rune, float InDamage, float StatusFactor)
 {
 	bWall = Rune.bWall;
-	SizeCm = Rune.SizeMeters * CentimetersPerMeter * (Rune.bWall ? 1.0f : 2.0f);
+	float ScaleFactor = 1.0f;
+	if (UEIRunDirector* RunDir = UEIRunDirector::Get(this))
+	{
+		ScaleFactor = RunDir->GetActiveMutator().RuneFieldScaleFactor;
+	}
+	SizeCm = Rune.SizeMeters * CentimetersPerMeter * (Rune.bWall ? 1.0f : 2.0f) * ScaleFactor;
 	DurationSeconds = Rune.DurationSeconds;
 	Color = EIElementColor(Rune.Element);
 	Damage = InDamage;
@@ -84,7 +90,12 @@ void AEIRuneField::ConfigureWhirl(EEIElement Partner, const FEIWhirlValues& Whir
 {
 	bWhirl = true;
 	bTall = true;
-	SizeCm = Whirl.RadiusMeters * CentimetersPerMeter * 2.0f;
+	float ScaleFactor = 1.0f;
+	if (UEIRunDirector* RunDir = UEIRunDirector::Get(this))
+	{
+		ScaleFactor = RunDir->GetActiveMutator().RuneFieldScaleFactor;
+	}
+	SizeCm = Whirl.RadiusMeters * CentimetersPerMeter * 2.0f * ScaleFactor;
 	DurationSeconds = Whirl.DurationSeconds;
 	TickSeconds = Whirl.TickSeconds;
 	PullCm = Whirl.PullMetersPerSecond * CentimetersPerMeter;

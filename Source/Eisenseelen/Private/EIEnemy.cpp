@@ -14,6 +14,8 @@
 #include "EILookComponent.h"
 #include "EIProjectile.h"
 #include "EIRunDirector.h"
+#include "EIRuneField.h"
+#include "EISignalFire.h"
 #include "EIVisuals.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -1338,7 +1340,38 @@ float AEIEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, 
 	{
 		return 0.0f;
 	}
-	const float Incoming = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	float Incoming = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+	if (UEIRunDirector* RunDir = UEIRunDirector::Get(this))
+	{
+		if (RunDir->GetActiveMutator().Id == TEXT("schlacke_finsternis"))
+		{
+			bool bInLitArea = false;
+			if (AEISignalFire* Fire = RunDir->GetActiveFire())
+			{
+				if (Fire->IsLit() && Fire->IsInZone(this))
+				{
+					bInLitArea = true;
+				}
+			}
+			if (!bInLitArea)
+			{
+				for (TActorIterator<AEIRuneField> It(GetWorld()); It; ++It)
+				{
+					if (It->IsInZone(GetActorLocation()))
+					{
+						bInLitArea = true;
+						break;
+					}
+				}
+			}
+			if (!bInLitArea)
+			{
+				Incoming *= 0.75f;
+			}
+		}
+	}
+
 	const bool bSpell = DamageEvent.DamageTypeClass != nullptr && DamageEvent.DamageTypeClass->IsChildOf(UEISpellDamage::StaticClass());
 	const float Applied = Health->ApplyDamage(ReduceByShield(Incoming, DamageCauser, bSpell));
 	if (AEIHeroCharacter* Hero = Cast<AEIHeroCharacter>(DamageCauser); Hero != nullptr && Applied > 0.0f)
@@ -1368,6 +1401,47 @@ void AEIEnemy::HandleDied()
 	{
 		GameMode->GetRun()->NoteEnemyDied(*this);
 	}
+
+	if (UEIRunDirector* RunDir = UEIRunDirector::Get(this))
+	{
+		if (RunDir->GetActiveMutator().Id == TEXT("seelensturm") && FMath::FRand() < 0.20f)
+		{
+			AEIHeroCharacter* NearestHero = nullptr;
+			float MinDist = TNumericLimits<float>::Max();
+			for (TActorIterator<AEIHeroCharacter> It(GetWorld()); It; ++It)
+			{
+				if (!It->IsDead())
+				{
+					const float Dist = FVector::Dist(GetActorLocation(), It->GetActorLocation());
+					if (Dist < MinDist)
+					{
+						MinDist = Dist;
+						NearestHero = *It;
+					}
+				}
+			}
+			if (NearestHero != nullptr)
+			{
+				const FVector SpawnLoc = GetActorLocation() + FVector(0.0f, 0.0f, 50.0f);
+				const FVector Dir = (NearestHero->GetActorLocation() - SpawnLoc).GetSafeNormal();
+				FActorSpawnParameters Params;
+				Params.Owner = this;
+				Params.Instigator = this;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				if (AEIProjectile* SoulProj = GetWorld()->SpawnActor<AEIProjectile>(AEIProjectile::StaticClass(), SpawnLoc, Dir.Rotation(), Params))
+				{
+					FEIProjectileSetup Setup;
+					Setup.Damage = 25.0f;
+					Setup.RadiusCm = 100.0f;
+					Setup.SpeedCm = 1800.0f;
+					Setup.bBig = false;
+					SoulProj->Configure(Setup);
+					SoulProj->FinishSpawning(FTransform(Dir.Rotation(), SpawnLoc));
+				}
+			}
+		}
+	}
+
 	MulticastDie();
 	GetCharacterMovement()->DisableMovement();
 	SetLifeSpan(0.2f);

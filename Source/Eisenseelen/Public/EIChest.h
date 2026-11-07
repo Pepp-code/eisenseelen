@@ -54,6 +54,13 @@ public:
 	/** Server only. A stone that its carrier dropped goes back in, so that another hero can take it. */
 	void CloseAgain();
 
+	bool IsCursed() const { return bIsCursed; }
+	bool IsCurseActive() const { return bCurseActive; }
+	float GetCurseSecondsRemaining() const { return CurseSecondsRemaining; }
+	void TriggerCurseAmbush(class AEIHeroCharacter* Hero);
+	void TickCurseEvent(float DeltaTime);
+	void OpenChestAndGrantRewards();
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -100,6 +107,15 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_Look)
 	bool bOpened = false;
+
+	UPROPERTY(Replicated)
+	bool bIsCursed = false;
+
+	UPROPERTY(Replicated)
+	bool bCurseActive = false;
+
+	UPROPERTY(Replicated)
+	float CurseSecondsRemaining = 0.0f;
 
 	TArray<TWeakObjectPtr<AEIEnemy>> Guards;
 	EEIChestState ShownState = EEIChestState::Sealed;

@@ -39,6 +39,17 @@ Nur die Tests:
 pwsh tools/check.ps1 -NoBuild
 ```
 
+Schnelltest für einzelne Themen (deutlich schneller, ca. 15-20 s):
+
+```
+pwsh tools/quick.ps1 -Thema insel      # Fracht, Kessel, Truhen, Mutatoren
+pwsh tools/quick.ps1 -Thema kampf      # Waffen, Schuss, Hieb, Parade, Zauber
+pwsh tools/quick.ps1 -Thema basis      # Held, Bewegung, Leben, Gravuren
+pwsh tools/quick.ps1 -Thema daten      # Balance-Dateien, Ausrüstung
+pwsh tools/quick.ps1 -Thema menue      # Pause, Einstellungen, Ausrüstung
+pwsh tools/quick.ps1 -Filter <Muster>  # Beliebiger Test-Filter
+```
+
 Materialien, Töne und beide Karten neu erzeugen:
 
 ```
@@ -62,7 +73,7 @@ Der Entwickler startet den Editor mit `Editor_starten.bat` (Laufkarte) oder `Tes
 
 ## Aktueller Stand
 
-Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 67 Tests sind grün, darunter sechs mit echtem Gast im Netz.
+Stufe 1 ist fertig, den Lust-Check hat der Entwickler am 3. November 2026 bestanden. Stufe 2 läuft. 70 Tests sind grün, darunter sechs mit echtem Gast im Netz.
 
 - **Bewegung:** Laufen, Sprint auf Shift, Sprung 1 m, Schwerkraft-Faktor 1,6, Luftlenkung, Sprungfelder. Das Ausweichen ist auf Wunsch des Entwicklers ganz gestrichen. Bunnyhop und Tempo-Kette sind auf Wunsch des Entwicklers gestrichen: Ein Sprung nimmt nie mehr Tempo mit als am Boden erlaubt.
 - **Leben:** Wer 6 Sekunden weder getroffen wurde noch selbst getroffen hat, bekommt Leben zurück. Werte in `Data/held.json`.

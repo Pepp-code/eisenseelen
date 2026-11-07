@@ -149,7 +149,7 @@ bool UEIHordeDirector::FindStandingPlace(const FVector& Ground, FVector& OutLoca
 AEIEnemy* UEIHordeDirector::SpawnAt(const FVector& Location, EEIEnemyKind Kind)
 {
 	const FTransform Spawn(Location);
-	AEIEnemy* Enemy = GetWorld()->SpawnActorDeferred<AEIEnemy>(AEIEnemy::StaticClass(), Spawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding);
+	AEIEnemy* Enemy = GetWorld()->SpawnActorDeferred<AEIEnemy>(AEIEnemy::StaticClass(), Spawn, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 	if (Enemy == nullptr)
 	{
 		return nullptr;
@@ -187,8 +187,9 @@ TArray<AEIEnemy*> UEIHordeDirector::SpawnEliteAmbushAtLocation(const FVector& Lo
 {
 	FEIEnemyGroup AmbushGroup;
 	AmbushGroup.Name = TEXT("EliteHinterhalt");
-	AmbushGroup.Composition.Add(FEIEnemyQuota{EEIEnemyKind::HollowArmor, 1});
-	AmbushGroup.Composition.Add(FEIEnemyQuota{EEIEnemyKind::BoneRunner, 2});
+	AmbushGroup.Size = TEXT("mittel");
+	AmbushGroup.Counts[static_cast<int32>(EEIEnemyKind::ShieldBearer)] = 1;
+	AmbushGroup.Counts[static_cast<int32>(EEIEnemyKind::Runner)] = 2;
 	return SpawnGroup(AmbushGroup, 1.0f, Location, 350.0f);
 }
 

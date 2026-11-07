@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "EIBosses.h"
 #include "EIContracts.h"
+#include "EIDataFile.h"
 #include "EIEnemyGroups.h"
 #include "EIRunDirector.generated.h"
 

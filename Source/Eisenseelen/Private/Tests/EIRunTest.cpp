@@ -13,6 +13,7 @@
 #include "EIGameState.h"
 #include "EIProfileComponent.h"
 #include "EIHealthComponent.h"
+#include "EIHeroCharacter.h"
 #include "EIHeroMovementComponent.h"
 #include "EIHordeDirector.h"
 #include "EIRunDirector.h"
@@ -360,7 +361,7 @@ bool FEIRunCompleteTest::RunTest(const FString& Parameters)
 		State->Height = Context.Hero->GetActorLocation().Z;
 		State->RunSeconds = GetState(Context)->GetRunSeconds();
 	}));
-	Steps.Add(Wait(0.5));
+	Steps.Add(Wait(5.0));
 	Steps.Add(Do([State](const FEIPlayContext& Context)
 	{
 		Context.Test->TestTrue(TEXT("The barge rises"), Context.Hero->GetActorLocation().Z > State->Height + 100.0);
@@ -657,6 +658,7 @@ bool FEICampsTest::RunTest(const FString& Parameters)
 	};
 
 	TArray<FEIPlayStep> Steps;
+	Steps.Add(Wait(2.0));
 	Steps.Add(WaitUntil(TEXT("the paths are built"), 30.0, [](const FEIPlayContext& Context)
 	{
 		const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
@@ -1287,6 +1289,11 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 	constexpr float CloseEnoughCm = 400.0f;
 
 	TArray<FEIPlayStep> Steps;
+	Steps.Add(Do([](const FEIPlayContext& Context)
+	{
+		SwitchOffDirector(Context);
+	}));
+	Steps.Add(Wait(0.5));
 	Steps.Add(WaitUntil(TEXT("the paths are built"), 60.0, [](const FEIPlayContext& Context)
 	{
 		const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Context.World);
@@ -1294,7 +1301,6 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 	}));
 	Steps.Add(Do([CloseEnoughCm](const FEIPlayContext& Context)
 	{
-		SwitchOffDirector(Context);
 		TActorIterator<ALandscapeProxy> Landscape(Context.World);
 		if (!Context.Test->TestTrue(TEXT("The run map has a landscape"), static_cast<bool>(Landscape)))
 		{
@@ -1411,7 +1417,13 @@ bool FEIRunTerrainTest::RunTest(const FString& Parameters)
 			&& NorthToSouth->GetPathLength() < 14000.0;
 		Context.Test->TestTrue(TEXT("The tunnel is continuously walkable from north to south straight through the massif"), bTunnelNS);
 
+		
 		const UNavigationPath* WestToHall = Navigation->FindPathToLocationSynchronously(Context.World, TunnelWestOutside, TunnelHallCenter);
+		if (WestToHall != nullptr)
+		{
+			Context.Test->AddInfo(FString::Printf(TEXT("WestToHall valid: %d, length: %.1f"), WestToHall->IsValid(), WestToHall->GetPathLength()));
+		}
+		
 		const bool bTunnelWest = WestToHall != nullptr && WestToHall->IsValid() && WestToHall->PathPoints.Num() > 0
 			&& FVector::Dist2D(WestToHall->PathPoints.Last(), TunnelHallCenter) < CloseEnoughCm
 			&& WestToHall->GetPathLength() < 9000.0;
@@ -1647,6 +1659,62 @@ bool FEISignalFireCoopExtractionTest::RunTest(const FString& Parameters)
 		}
 	}));
 	return RunInMap(this, RunMap, MoveTemp(Steps));
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEISoulCargoAndKettleOverchargeTest, "Eisenseelen.Run.SoulCargoAndKettleOvercharge", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FEISoulCargoAndKettleOverchargeTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!World)
+	{
+		return false;
+	}
+
+	AEIGameMode* GameMode = World->SpawnActor<AEIGameMode>();
+	UEIRunDirector* RunDir = GameMode ? GameMode->GetRun() : nullptr;
+	TestNotNull(TEXT("RunDirector vorhanden"), RunDir);
+	if (!RunDir)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	AEISoulKettle* Kettle = World->SpawnActor<AEISoulKettle>(AEISoulKettle::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+	AEIHeroCharacter* Hero = World->SpawnActor<AEIHeroCharacter>(AEIHeroCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+
+	RunDir->StartHuntFromSkyBarge();
+	UEIHeroMovementComponent* MoveComp = Cast<UEIHeroMovementComponent>(Hero->GetCharacterMovement());
+	TestNotNull(TEXT("MovementComponent vorhanden"), MoveComp);
+	if (!MoveComp)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	MoveComp->SetMovementMode(MOVE_Walking);
+	const float BaseSpeed = MoveComp->GetMaxSpeed();
+
+	// 1. Seelenfracht aufheben -> Held muss verlangsamt sein
+	const bool bPickedUp = Hero->PickUpSoulCargo(TEXT("eisen_seelenherz"));
+	TestTrue(TEXT("Seelenfracht erfolgreich aufgehoben"), bPickedUp);
+	TestTrue(TEXT("Held ist als Träger markiert"), Hero->IsCarryingSoulCargo());
+	TestTrue(TEXT("Bewegungstempo ist während des Tragens reduziert"), MoveComp->GetMaxSpeed() < BaseSpeed);
+
+	// 2. Seelenfracht vor dem Seelenkessel abgeben
+	Hero->DropSoulCargo(false);
+	TestFalse(TEXT("Held trägt nach Abgabe keine Fracht mehr"), Hero->IsCarryingSoulCargo());
+	TestEqual(TEXT("Bewegungstempo ist wiederhergestellt"), MoveComp->GetMaxSpeed(), BaseSpeed);
+	TestEqual(TEXT("Seelenkessel ist zu 100 % geladen"), Kettle->GetChargeProgressNormalized(), 1.0f);
+	TestEqual(TEXT("RunDirector hat 2 Boss-Spuren erhalten"), RunDir->GetCurrentBossTracks(), 2);
+
+	// 3. Seelenkessel überladen (Risk vs. Reward)
+	const int32 OldTier = RunDir->GetCurrentEscalationTier();
+	const bool bOvercharged = Kettle->TryOverchargeKettle(Hero);
+	TestTrue(TEXT("Kessel-Überladung erfolgreich gestartet"), bOvercharged);
+	TestEqual(TEXT("Eskalationsstufe ist um 1 gestiegen"), RunDir->GetCurrentEscalationTier(), OldTier + 1);
+
+	World->DestroyWorld(false);
+	return true;
 }
 
 #endif

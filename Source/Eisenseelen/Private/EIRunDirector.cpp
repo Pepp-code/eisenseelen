@@ -11,6 +11,7 @@
 #include "EIGameMode.h"
 #include "EIGameState.h"
 #include "EIHeroCharacter.h"
+#include "EIHeroMovementComponent.h"
 #include "EIHollowArmor.h"
 #include "EIHordeDirector.h"
 #include "EIForge.h"
@@ -21,6 +22,8 @@
 #include "EISkyBarge.h"
 #include "EISoulKettle.h"
 #include "EISoulStoneChest.h"
+#include "EIVisuals.h"
+#include "Engine/DamageEvents.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 
@@ -1285,12 +1288,20 @@ bool UEIRunDirector::TakeSoulStone(AEIHeroCharacter* Hero)
 	}
 	for (AEIChest* Chest : StoneChests)
 	{
-		if (Chest != nullptr && Chest->GetState() == EEIChestState::Free && !Chest->IsOpen() && Chest->IsInReach(Hero))
+		if (Chest != nullptr && !Chest->IsOpen() && Chest->IsInReach(Hero))
 		{
-			Chest->Open();
-			Hero->SetCarriesSoulStone(true);
-			CarriedStones.Add(Hero, Chest);
-			return true;
+			if (Chest->IsCursed() && !Chest->IsCurseActive())
+			{
+				Chest->TriggerCurseAmbush(Hero);
+				return true;
+			}
+			if (Chest->GetState() == EEIChestState::Free)
+			{
+				Chest->Open();
+				Hero->SetCarriesSoulStone(true);
+				CarriedStones.Add(Hero, Chest);
+				return true;
+			}
 		}
 	}
 	return false;

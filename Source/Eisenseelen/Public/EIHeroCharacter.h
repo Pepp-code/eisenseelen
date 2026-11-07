@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EIDataFile.h"
 #include "EIHeroValues.h"
 #include "EIPoses.h"
 #include "GameFramework/Character.h"

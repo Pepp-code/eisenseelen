@@ -33,6 +33,7 @@ public:
 	bool IsWhirl() const { return bWhirl; }
 	EEIElement GetElement() const { return Element; }
 	float GetRadiusCm() const { return SizeCm / 2.0f; }
+	bool IsInZone(const FVector& Location) const { return FVector::Dist2D(Location, GetActorLocation()) <= (SizeCm / 2.0f); }
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

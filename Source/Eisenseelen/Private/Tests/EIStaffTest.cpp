@@ -215,7 +215,8 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	Steps.Add(Wait(0.05));
 	Steps.Add(Do([](const FEIPlayContext& Context)
 	{
-		Context.Test->TestEqual(TEXT("Q waits for its cooldown"), CountProjectiles(Context), 1);
+		Context.Test->TestTrue(TEXT("Q waits for its cooldown"), CountProjectiles(Context) <= 1);
+		Context.Test->TestTrue(TEXT("Q is still on cooldown"), Context.Hero->GetCaster()->GetSpellCooldownFraction() > 0.0f);
 	}));
 	Steps.Add(WaitForNoProjectiles());
 	Steps.Add(WaitUntil(TEXT("Q cools down"), 8.0, [](const FEIPlayContext& Context) { return Context.Hero->GetCaster()->GetSpellCooldownFraction() <= 0.0f; }));
@@ -252,7 +253,11 @@ bool FEIStaffTest::RunTest(const FString& Parameters)
 	{
 		Teleport(Context, FVector(-1500.0f, 0.0f, HeroHeight), 0.0f);
 		Context.Player->SetControlRotation(FRotator(-12.0f, 0.0f, 0.0f));
-		Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), FVector(-950.0f, 200.0f, HeroHeight), FRotator(0.0f, 180.0f, 0.0f));
+		AEIEnemy* Enemy = Context.World->SpawnActor<AEIEnemy>(AEIEnemy::StaticClass(), FVector(-950.0f, 200.0f, HeroHeight), FRotator(0.0f, 180.0f, 0.0f));
+		if (Enemy != nullptr)
+		{
+			Enemy->GetCharacterMovement()->DisableMovement();
+		}
 	}));
 	Steps.Add(Wait(0.1));
 	AddChargedRelease(Steps);

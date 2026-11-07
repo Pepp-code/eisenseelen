@@ -291,7 +291,7 @@ def scenario():
     player().preview_skip_contracts(3)
     boss = unreal.GameplayStatics.get_all_actors_of_class(world(), unreal.EIBoss)[0]
     spot = boss.get_actor_location()
-    if boss.sleeps_in_grave():
+    if boss.sleeps_hidden():
         yield from soul_caller(boss, spot)
     else:
         yield from chained_one(boss, spot)

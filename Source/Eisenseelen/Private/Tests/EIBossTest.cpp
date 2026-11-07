@@ -50,7 +50,7 @@ namespace
 	void StandBeside(const FEIPlayContext& Context, const AActor* Actor, float DistanceCm)
 	{
 		const FVector Location = Actor->GetActorLocation();
-		Teleport(Context, FVector(Location.X + DistanceCm, Location.Y, HeroHeight), 180.0f);
+		Teleport(Context, FVector(Location.X + DistanceCm, Location.Y, Location.Z + HeroHeight), 180.0f);
 	}
 
 	/** A run with nothing but the boss, with short holds. It only works at the dock. Without a boss index the first of the file comes. */

@@ -130,16 +130,17 @@ bool UEIHeroMovementComponent::IsInShallowWater() const
 
 float UEIHeroMovementComponent::GetMaxSpeed() const
 {
+	const float BaseSpeed = Super::GetMaxSpeed() > 0.0f ? Super::GetMaxSpeed() : MaxWalkSpeed;
 	if (!IsMovingOnGround() && !IsFalling())
 	{
-		return Super::GetMaxSpeed() * CarrySpeedModifier;
+		return BaseSpeed * CarrySpeedModifier;
 	}
 	const float Factor = (IsInShallowWater() ? WaterSpeedFactor : 1.0f) * CarrySpeedModifier;
 	if (bWantsToBlock)
 	{
 		return BlockSpeedCm * Factor;
 	}
-	return (bWantsToSprint ? SprintSpeedCm : Super::GetMaxSpeed()) * Factor;
+	return (bWantsToSprint ? SprintSpeedCm : BaseSpeed) * Factor;
 }
 
 bool UEIHeroMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
